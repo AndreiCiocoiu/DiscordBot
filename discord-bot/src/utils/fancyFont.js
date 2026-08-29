@@ -19,4 +19,21 @@ function toFraktur(text) {
   return out;
 }
 
-module.exports = { toFraktur };
+// Converts plain ASCII letters into ꜱᴍᴀʟʟ ᴄᴀᴘꜱ unicode characters (e.g. ᴠᴏɪᴄᴇ).
+// q and x have no standard small-caps codepoint, so they're left as-is.
+const SMALL_CAPS = {
+  a: 'ᴀ', b: 'ʙ', c: 'ᴄ', d: 'ᴅ', e: 'ᴇ', f: 'ꜰ', g: 'ɢ', h: 'ʜ',
+  i: 'ɪ', j: 'ᴊ', k: 'ᴋ', l: 'ʟ', m: 'ᴍ', n: 'ɴ', o: 'ᴏ', p: 'ᴘ',
+  r: 'ʀ', s: 'ꜱ', t: 'ᴛ', u: 'ᴜ', v: 'ᴠ', w: 'ᴡ', y: 'ʏ', z: 'ᴢ',
+};
+
+function toSmallCaps(text) {
+  let out = '';
+  for (const char of text) {
+    const lower = char.toLowerCase();
+    out += SMALL_CAPS[lower] || char;
+  }
+  return out;
+}
+
+module.exports = { toFraktur, toSmallCaps };

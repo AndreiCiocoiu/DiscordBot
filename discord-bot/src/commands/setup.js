@@ -5,12 +5,12 @@ const {
   EmbedBuilder,
 } = require('discord.js');
 const db = require('../utils/database');
-const { toFraktur } = require('../utils/fancyFont');
+const { toSmallCaps } = require('../utils/fancyFont');
 
 const ROLE_DEFS = [
-  { name: `👑 ${toFraktur('Admin')}`, color: 0xE74C3C, permissions: [PermissionFlagsBits.Administrator], hoist: true },
+  { name: `👑 ${toSmallCaps('Admin')}`, color: 0xE74C3C, permissions: [PermissionFlagsBits.Administrator], hoist: true },
   {
-    name: `🛡️ ${toFraktur('Moderator')}`,
+    name: `🛡️ ${toSmallCaps('Moderator')}`,
     color: 0x3498DB,
     permissions: [
       PermissionFlagsBits.KickMembers,
@@ -21,11 +21,11 @@ const ROLE_DEFS = [
     ],
     hoist: true,
   },
-  { name: `🌱 ${toFraktur('Member')}`, color: 0x95A5A6, permissions: [], hoist: false },
-  { name: `🥉 ${toFraktur('Level 5')}`, color: 0xCD7F32, permissions: [], hoist: true },
-  { name: `🥈 ${toFraktur('Level 10')}`, color: 0xC0C0C0, permissions: [], hoist: true },
-  { name: `🥇 ${toFraktur('Level 20')}`, color: 0xFFD700, permissions: [], hoist: true },
-  { name: `💎 ${toFraktur('Level 30')}`, color: 0x9B59B6, permissions: [], hoist: true },
+  { name: `🌱 ${toSmallCaps('Member')}`, color: 0x95A5A6, permissions: [], hoist: false },
+  { name: `🥉 ${toSmallCaps('Level 5')}`, color: 0xCD7F32, permissions: [], hoist: true },
+  { name: `🥈 ${toSmallCaps('Level 10')}`, color: 0xC0C0C0, permissions: [], hoist: true },
+  { name: `🥇 ${toSmallCaps('Level 20')}`, color: 0xFFD700, permissions: [], hoist: true },
+  { name: `💎 ${toSmallCaps('Level 30')}`, color: 0x9B59B6, permissions: [], hoist: true },
 ];
 
 async function findOrCreateRole(guild, def) {
@@ -33,7 +33,7 @@ async function findOrCreateRole(guild, def) {
   if (!role) {
     role = await guild.roles.create({
       name: def.name,
-      color: def.color,
+      colors: { primaryColor: def.color },
       permissions: def.permissions,
       hoist: def.hoist,
       reason: 'Server setup via /setup',
@@ -93,41 +93,43 @@ module.exports = {
       roles[def.name] = await findOrCreateRole(guild, def);
     }
 
-    const Admin = roles[`👑 ${toFraktur('Admin')}`];
-    const Moderator = roles[`🛡️ ${toFraktur('Moderator')}`];
-    const Member = roles[`🌱 ${toFraktur('Member')}`];
+    const Admin = roles[`👑 ${toSmallCaps('Admin')}`];
+    const Moderator = roles[`🛡️ ${toSmallCaps('Moderator')}`];
+    const Member = roles[`🌱 ${toSmallCaps('Member')}`];
 
     // --- Chill Zone (text) ---
-    const chillCategory = await findOrCreateCategory(guild, `💬 ${toFraktur('Chill Zone')}`);
+    const chillCategory = await findOrCreateCategory(guild, `💬 ${toSmallCaps('Chill Zone')}`);
     const welcomeChannel = await findOrCreateChannel(
       guild,
-      `👋・${toFraktur('welcome')}`,
+      `👋・${toSmallCaps('welcome')}`,
       ChannelType.GuildText,
       chillCategory,
       [{ id: everyone.id, deny: [PermissionFlagsBits.SendMessages], allow: [PermissionFlagsBits.ViewChannel] }]
     );
     const generalChat = await findOrCreateChannel(
       guild,
-      `💬・${toFraktur('general')}`,
+      `💬・${toSmallCaps('general')}`,
       ChannelType.GuildText,
       chillCategory,
       []
     );
-    await findOrCreateChannel(guild, `😂・${toFraktur('memes')}`, ChannelType.GuildText, chillCategory, []);
-    await findOrCreateChannel(guild, `🎮・${toFraktur('gaming')}`, ChannelType.GuildText, chillCategory, []);
+    await findOrCreateChannel(guild, `😂・${toSmallCaps('memes')}`, ChannelType.GuildText, chillCategory, []);
+    await findOrCreateChannel(guild, `🎮・${toSmallCaps('gaming')}`, ChannelType.GuildText, chillCategory, []);
     const botCommandsChannel = await findOrCreateChannel(
       guild,
-      `🤖・${toFraktur('bot-commands')}`,
+      `🤖・${toSmallCaps('bot-commands')}`,
       ChannelType.GuildText,
       chillCategory,
       []
     );
 
     // --- Voice ---
-    const voiceCategory = await findOrCreateCategory(guild, `🔊 ${toFraktur('Voice')}`);
-    await findOrCreateChannel(guild, `🔊・${toFraktur('General Voice')}`, ChannelType.GuildVoice, voiceCategory, []);
-    await findOrCreateChannel(guild, `🎮・${toFraktur('Gaming Voice')}`, ChannelType.GuildVoice, voiceCategory, []);
-    await findOrCreateChannel(guild, `😴・${toFraktur('AFK')}`, ChannelType.GuildVoice, voiceCategory, []);
+    const voiceCategory = await findOrCreateCategory(guild, `🔊 ${toSmallCaps('Voice')}`);
+    await findOrCreateChannel(guild, `🎵・${toSmallCaps('music')}`, ChannelType.GuildText, voiceCategory, []);
+    await findOrCreateChannel(guild, `🔊・${toSmallCaps('General Voice')}`, ChannelType.GuildVoice, voiceCategory, []);
+    await findOrCreateChannel(guild, `🎮・${toSmallCaps('Gaming Voice')}`, ChannelType.GuildVoice, voiceCategory, []);
+    await findOrCreateChannel(guild, `📷・${toSmallCaps('Camera')}`, ChannelType.GuildVoice, voiceCategory, []);
+    await findOrCreateChannel(guild, `😴・${toSmallCaps('AFK')}`, ChannelType.GuildVoice, voiceCategory, []);
 
     // --- Save config for other commands/events to use ---
     db.saveGuildConfig(guild.id, {
@@ -137,20 +139,20 @@ module.exports = {
       welcomeChannelId: welcomeChannel.id,
       botCommandsChannelId: botCommandsChannel.id,
       levelRoles: {
-        5: roles[`🥉 ${toFraktur('Level 5')}`].id,
-        10: roles[`🥈 ${toFraktur('Level 10')}`].id,
-        20: roles[`🥇 ${toFraktur('Level 20')}`].id,
-        30: roles[`💎 ${toFraktur('Level 30')}`].id,
+        5: roles[`🥉 ${toSmallCaps('Level 5')}`].id,
+        10: roles[`🥈 ${toSmallCaps('Level 10')}`].id,
+        20: roles[`🥇 ${toSmallCaps('Level 20')}`].id,
+        30: roles[`💎 ${toSmallCaps('Level 30')}`].id,
       },
     });
 
     const embed = new EmbedBuilder()
-      .setTitle(`✅ ${toFraktur('Server setup complete!')}`)
+      .setTitle(`✅ ${toSmallCaps('Server setup complete!')}`)
       .setColor(0x57F287)
       .setDescription(
         [
-          `**${toFraktur('Roles')}:** ${Admin} ${Moderator} ${Member}, plus 🥉 🥈 🥇 💎 rank roles that unlock as you level up`,
-          `**${toFraktur('Channels')}:** ${welcomeChannel}, ${generalChat}, 😂 memes, 🎮 gaming, ${botCommandsChannel} — and 3 voice channels`,
+          `**${toSmallCaps('Roles')}:** ${Admin} ${Moderator} ${Member}, plus 🥉 🥈 🥇 💎 rank roles that unlock as you level up`,
+          `**${toSmallCaps('Channels')}:** ${welcomeChannel}, ${generalChat}, 😂 memes, 🎮 gaming, ${botCommandsChannel} — plus a 🎵 music-commands channel and 4 voice channels`,
           '',
           `New members auto-get **${Member.name}** and get welcomed in ${welcomeChannel}.`,
           `Chatting earns XP — level up to unlock rank roles automatically. Try /play to get music going! 🎶`,

@@ -9,7 +9,7 @@ const {
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const play = require('play-dl');
 const yts = require('yt-search');
-const { toFraktur } = require('./fancyFont');
+const { toSmallCaps } = require('./fancyFont');
 
 // guildId -> { connection, player, queue: [{title, url, requestedBy}], playing, loop, skipRequested, textChannel, nowPlayingMessage }
 const queues = new Map();
@@ -80,11 +80,11 @@ function ensureQueue(guild, voiceChannel, textChannel) {
 
 function buildNowPlayingEmbed(track, loop) {
   return new EmbedBuilder()
-    .setTitle(`🎶 ${toFraktur('Now Playing')}`)
+    .setTitle(`🎶 ${toSmallCaps('Now Playing')}`)
     .setDescription(`**${track.title}**`)
     .addFields(
-      { name: toFraktur('Requested by'), value: track.requestedBy, inline: true },
-      { name: toFraktur('Loop'), value: loop ? '🔁 On' : 'Off', inline: true }
+      { name: toSmallCaps('Requested by'), value: track.requestedBy, inline: true },
+      { name: toSmallCaps('Loop'), value: loop ? '🔁 On' : 'Off', inline: true }
     )
     .setColor(0x5865f2);
 }
@@ -141,14 +141,18 @@ async function addTrack(guild, voiceChannel, textChannel, searchTermOrUrl, reque
   if (!play.yt_validate(searchTermOrUrl)) {
     const results = await yts(searchTermOrUrl);
     const video = results.videos?.[0];
-    if (!video) throw new Error('No results found for that search');
-    url = video.url;
+    if (!video?.videoId) throw new Error('No results found for that search');
+    // Build a canonical watch URL ourselves — yt-search's own .url field isn't
+    // always in a shape play-dl's validator accepts.
+    url = `https://www.youtube.com/watch?v=${video.videoId}`;
   }
 
   const info = await play.video_info(url);
   const track = {
     title: info.video_details.title,
-    url: info.video_details.url,
+    // Use the URL we already validated above, not info.video_details.url —
+    // that field can come back empty and broke playback.
+    url,
     requestedBy,
   };
 
