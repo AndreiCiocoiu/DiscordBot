@@ -1,0 +1,20 @@
+{
+  "name": "chill-server-bot",
+  "version": "1.0.0",
+  "description": "A Discord bot that sets up a full server (channels, roles/ranks) and provides moderation, fun, leveling and music commands.",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.17.0",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "ffmpeg-static": "^5.2.0",
+    "libsodium-wrappers": "^0.7.15",
+    "opusscript": "^0.1.1",
+    "play-dl": "^1.9.7"
+  }
+}
