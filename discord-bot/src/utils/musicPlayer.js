@@ -11,6 +11,23 @@ const play = require('play-dl');
 const yts = require('yt-search');
 const { toSmallCaps } = require('./fancyFont');
 
+// YouTube rate-limits (429) are often transient — retry a couple of times
+// with a short delay before giving up.
+async function withRetry(fn, { retries = 2, delayMs = 1500 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const isRateLimited = /429/.test(err?.message || '');
+      if (!isRateLimited || attempt === retries) break;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw lastErr;
+}
+
 // guildId -> { connection, player, queue: [{title, url, requestedBy}], playing, loop, skipRequested, textChannel, nowPlayingMessage }
 const queues = new Map();
 
@@ -119,7 +136,7 @@ async function playCurrent(guildId) {
 
   const track = q.queue[0];
   try {
-    const stream = await play.stream(track.url);
+    const stream = await withRetry(() => play.stream(track.url));
     const resource = createAudioResource(stream.stream, { inputType: stream.type });
     q.player.play(resource);
     q.playing = true;
@@ -150,7 +167,7 @@ async function addTrack(guild, voiceChannel, textChannel, searchTermOrUrl, reque
     url = `https://www.youtube.com/watch?v=${video.videoId}`;
   }
 
-  const info = await play.video_info(url);
+  const info = await withRetry(() => play.video_info(url));
   const track = {
     title: info.video_details.title,
     // Use the URL we already validated above, not info.video_details.url —

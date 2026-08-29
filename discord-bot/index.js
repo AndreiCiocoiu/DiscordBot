@@ -3,6 +3,16 @@ const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
 
+// play-dl occasionally throws an error (e.g. YouTube rate-limiting) on an
+// internal promise that nothing awaits directly, which would otherwise
+// crash the entire process. Log it and keep the bot running instead.
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection (bot stayed online):', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception (bot stayed online):', err);
+});
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
