@@ -113,7 +113,7 @@ module.exports = {
       chillCategory,
       []
     );
-    const memesChannel = await findOrCreateChannel(guild, `😂・${toSmallCaps('memes')}`, ChannelType.GuildText, chillCategory, []);
+    await findOrCreateChannel(guild, `😂・${toSmallCaps('memes')}`, ChannelType.GuildText, chillCategory, []);
     await findOrCreateChannel(guild, `🎮・${toSmallCaps('gaming')}`, ChannelType.GuildText, chillCategory, []);
     const botCommandsChannel = await findOrCreateChannel(
       guild,
@@ -137,7 +137,6 @@ module.exports = {
       moderatorRoleId: Moderator.id,
       adminRoleId: Admin.id,
       welcomeChannelId: welcomeChannel.id,
-      memesChannelId: memesChannel.id,
       botCommandsChannelId: botCommandsChannel.id,
       levelRoles: {
         5: roles[`🥉 ${toSmallCaps('Level 5')}`].id,
