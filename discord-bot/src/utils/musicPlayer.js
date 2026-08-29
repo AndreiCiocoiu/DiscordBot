@@ -138,7 +138,10 @@ async function playCurrent(guildId) {
 async function addTrack(guild, voiceChannel, textChannel, searchTermOrUrl, requestedBy) {
   let url = searchTermOrUrl;
 
-  if (!play.yt_validate(searchTermOrUrl)) {
+  // yt_validate returns 'video' for a real watch URL, but 'search' (a truthy
+  // string!) for plain text — so we must check for 'video' specifically,
+  // not just truthiness, or search terms get passed straight to video_info.
+  if (play.yt_validate(searchTermOrUrl) !== 'video') {
     const results = await yts(searchTermOrUrl);
     const video = results.videos?.[0];
     if (!video?.videoId) throw new Error('No results found for that search');
