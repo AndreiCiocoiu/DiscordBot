@@ -7,7 +7,7 @@ A Discord bot that sets up your whole server — channels, categories, and ranks
 **`/setup`** (admin only) builds:
 - **Roles/ranks:** Admin, Moderator, Member, plus auto-unlocking Level 5 / 10 / 20 / 30 roles
 - **Categories & channels:** Information (welcome, rules, announcements), General (chat, memes, bot-commands), Gaming (chat, LFG, clips), Voice Channels (general + 2 gaming rooms + AFK), and a private Staff category
-- New members are automatically given the Member role and welcomed in `#welcome`
+- New members are automatically given the Member role and welcomed in `#welcome` with a generated image card (avatar in a decorative frame, username, member number)
 
 **Leveling:** everyone earns XP for chatting (1 min cooldown) and levels up automatically, unlocking rank roles.
 
