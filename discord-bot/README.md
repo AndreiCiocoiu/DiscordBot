@@ -15,7 +15,7 @@ A Discord bot that sets up your whole server — channels, categories, and ranks
 
 **Fun:** `/meme` `/8ball` `/coinflip` `/guess`
 
-**Music:** `/play <song name>` — just type what you want, no link needed (a YouTube link still works if you have one). Every "Now Playing" message comes with buttons: ⏸️/▶️ pause-resume, ⏭️ skip, 🔁 loop, ⏹️ stop — no typing extra commands needed. `/skip` `/pause` `/resume` `/stop` `/queue` still work too.
+**Music:** `/play <song name>` — just type what you want, no link needed (a YouTube link still works if you have one). Powered by `yt-dlp` under the hood for reliability. Every "Now Playing" message comes with buttons: ⏸️/▶️ pause-resume, ⏭️ skip, 🔁 loop, ⏹️ stop — no typing extra commands needed. `/skip` `/pause` `/resume` `/stop` `/queue` still work too.
 
 **Style:** server roles, channels, and the bot's main titles use a 𝕭𝖔𝖑𝖉 𝕱𝖗𝖆𝖐𝖙𝖚𝖗 unicode font (`src/utils/fancyFont.js` — reusable anywhere else you want it).
 
@@ -65,15 +65,15 @@ Run `/setup` as an admin — it builds everything in a few seconds. After it fin
 ## Notes
 
 - Leveling and warnings are stored locally in `data/*.json`. Back that folder up if you care about keeping XP/history.
-- Music runs on `discord-player` with a `youtubei`-based extractor, which talks to YouTube's internal app API directly instead of scraping/deciphering the web player — much more resilient to YouTube changing things than older scraping-based libraries.
-- **Getting rate-limited or music that won't play?** Optionally authenticate with a real account's cookie, which YouTube trusts more than anonymous traffic:
+- Music runs on `discord-player` with a **custom extractor backed by `yt-dlp`** (`src/utils/ytdlpExtractor.js`), instead of a JS library that scrapes/reverse-engineers YouTube's player. yt-dlp is a huge, near-daily-updated project maintained specifically because YouTube keeps changing things — when something breaks, it's usually patched within hours to days, which is far more reliable long-term than smaller JS scraping libraries (which is what caused earlier versions of this bot's `/play` command to fail outright).
+- **`yt-dlp` requires Python 3.9+ on the machine running the bot.** Most Node.js hosting images (including Railway's) already include Python for native module builds, so this usually just works — but if the bot's logs show a Python-related error on `/play`, that's what to look into. On Railway specifically, if this happens, adding a `nixpacks.toml` with `nixPkgs = ["python3"]` to the repo root forces Python into the build image.
+- If `/play` ever stops working again, the fix is almost always `npm update youtube-dl-exec` (which re-downloads the latest `yt-dlp` binary) rather than anything in this bot's own code.
+- **Optional but helps with reliability:** authenticate with a real account's cookie, which YouTube trusts more than anonymous traffic:
   1. **Use a secondary/throwaway Google account for this**, not your main one — while low-risk, it's still an automated tool touching a logged-in session.
   2. Log into that account at youtube.com in a normal browser.
   3. Install a cookie-export extension like **Cookie-Editor** ([Chrome](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm) / [Firefox](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)).
-  4. While on youtube.com, open Cookie-Editor and click **Export** → **Export as Header String** (or "Copy" if that's the only option — you want one long `name=value; name2=value2; ...` line, not JSON).
-  5. In Railway → your service → **Variables**, add `YOUTUBE_COOKIE` and paste that string in as the value.
-  6. Redeploy. On boot you should see `Music player ready (discord-player + youtubei).` in the logs.
-  7. Treat that cookie like a password — anyone with it can act as that YouTube account. If you ever want to revoke it, just log that Google account out of all sessions.
-- `discord-player-youtubei` is pinned to exactly `1.5.0` in `package.json` on purpose — newer versions pull in an unrelated, flaky optional dependency (`youtube-dl-exec`) that can fail to install. Don't run `npm update` on just that package without checking this first.
+  4. While on youtube.com, open Cookie-Editor, export as a **Netscape cookies.txt file** (not the header-string format this time — yt-dlp wants the file format).
+  5. Save that file into the project as `data/youtube-cookies.txt`, and it'll be picked up automatically (see `COMMON_FLAGS` in `ytdlpExtractor.js` if you want to wire this up — it's not auto-loaded yet, ask if you want this added).
+  6. Treat that cookie file like a password — anyone with it can act as that YouTube account.
 - Everything here uses Discord's native timeout for `/timeout` (no separate mute role needed).
 - Re-running `/setup` is safe — it won't create duplicate roles/channels, it just reuses ones with matching names.

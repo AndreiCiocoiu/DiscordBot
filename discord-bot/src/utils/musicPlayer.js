@@ -1,14 +1,18 @@
-// Music, powered by discord-player + the youtubei extractor.
+// Music, powered by discord-player + a custom yt-dlp-backed extractor.
 //
-// Unlike the old play-dl based setup, this doesn't scrape/decipher YouTube's
-// web player at all — it talks to YouTube's own internal app API the same
-// way the official YouTube apps do, which is far more resilient to YouTube
-// changing things.
+// This doesn't scrape/decipher YouTube's web player in JS at all — yt-dlp
+// (a large, near-daily-updated project) handles resolving and streaming.
+// When YouTube changes something, yt-dlp typically has a fix within hours
+// to days, which is far more reliable long-term than smaller JS libraries.
 
 const { Player, QueueRepeatMode, GuildQueueEvent } = require('discord-player');
-const { YoutubeiExtractor } = require('discord-player-youtubei');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { toSmallCaps } = require('./fancyFont');
+const { YtDlpExtractor } = require('./ytdlpExtractor');
+
+// So prism-media (used internally by discord-player to transcode audio)
+// can find ffmpeg without relying on it being on the system PATH.
+process.env.FFMPEG_PATH = process.env.FFMPEG_PATH || require('ffmpeg-static');
 
 let player = null;
 
@@ -16,11 +20,7 @@ let player = null;
 async function initPlayer(client) {
   player = new Player(client);
 
-  await player.extractors.register(YoutubeiExtractor, {
-    // If a YOUTUBE_COOKIE env var is set, this authenticates requests as
-    // that account, which YouTube trusts a lot more than anonymous traffic.
-    ...(process.env.YOUTUBE_COOKIE ? { cookie: process.env.YOUTUBE_COOKIE } : {}),
-  });
+  await player.extractors.register(YtDlpExtractor, {});
 
   player.events.on(GuildQueueEvent.PlayerStart, async (queue, track) => {
     const embed = buildNowPlayingEmbed(track, queue.repeatMode);
