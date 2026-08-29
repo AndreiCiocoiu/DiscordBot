@@ -16,15 +16,11 @@ async function fetchMeme(subreddit) {
   };
 }
 
-// More Romanian meme sources — RomaniaDank is the biggest/best, the rest
-// add variety so a 20-minute posting interval doesn't repeat itself fast.
-const ROMANIAN_MEME_SUBREDDITS = [
-  'RomaniaDank',
-  'Romania',
-  'CredemInSuveranitate',
-  'RomaniaBun',
-  'Bucuresti',
-];
+// RomaniaDank is the one subreddit that's actually dedicated to memes.
+// r/Romania and r/CredemInSuveranitate were pulled in for variety earlier,
+// but both skew toward political/news content rather than memes, which is
+// why the auto-poster started surfacing political stuff — removed.
+const ROMANIAN_MEME_SUBREDDITS = ['RomaniaDank'];
 
 // If every Romanian source fails (rare — e.g. Reddit hiccup), fall back to
 // general meme subreddits so the channel doesn't just go silent.
