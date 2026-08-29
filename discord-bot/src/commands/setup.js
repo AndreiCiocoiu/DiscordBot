@@ -5,11 +5,12 @@ const {
   EmbedBuilder,
 } = require('discord.js');
 const db = require('../utils/database');
+const { toFraktur } = require('../utils/fancyFont');
 
 const ROLE_DEFS = [
-  { name: 'Admin', color: 0xE74C3C, permissions: [PermissionFlagsBits.Administrator], hoist: true },
+  { name: `👑 ${toFraktur('Admin')}`, color: 0xE74C3C, permissions: [PermissionFlagsBits.Administrator], hoist: true },
   {
-    name: 'Moderator',
+    name: `🛡️ ${toFraktur('Moderator')}`,
     color: 0x3498DB,
     permissions: [
       PermissionFlagsBits.KickMembers,
@@ -20,11 +21,11 @@ const ROLE_DEFS = [
     ],
     hoist: true,
   },
-  { name: 'Member', color: 0x95A5A6, permissions: [], hoist: false },
-  { name: 'Level 5', color: 0x2ECC71, permissions: [], hoist: true },
-  { name: 'Level 10', color: 0x27AE60, permissions: [], hoist: true },
-  { name: 'Level 20', color: 0xF1C40F, permissions: [], hoist: true },
-  { name: 'Level 30', color: 0x9B59B6, permissions: [], hoist: true },
+  { name: `🌱 ${toFraktur('Member')}`, color: 0x95A5A6, permissions: [], hoist: false },
+  { name: `🥉 ${toFraktur('Level 5')}`, color: 0xCD7F32, permissions: [], hoist: true },
+  { name: `🥈 ${toFraktur('Level 10')}`, color: 0xC0C0C0, permissions: [], hoist: true },
+  { name: `🥇 ${toFraktur('Level 20')}`, color: 0xFFD700, permissions: [], hoist: true },
+  { name: `💎 ${toFraktur('Level 30')}`, color: 0x9B59B6, permissions: [], hoist: true },
 ];
 
 async function findOrCreateRole(guild, def) {
@@ -92,62 +93,41 @@ module.exports = {
       roles[def.name] = await findOrCreateRole(guild, def);
     }
 
-    const { Admin, Moderator, Member } = roles;
+    const Admin = roles[`👑 ${toFraktur('Admin')}`];
+    const Moderator = roles[`🛡️ ${toFraktur('Moderator')}`];
+    const Member = roles[`🌱 ${toFraktur('Member')}`];
 
-    // --- Info category ---
-    const infoCategory = await findOrCreateCategory(guild, 'ℹ️ Information');
-    const welcomeChannel = await findOrCreateChannel(guild, 'welcome', ChannelType.GuildText, infoCategory, [
-      { id: everyone.id, deny: [PermissionFlagsBits.SendMessages], allow: [PermissionFlagsBits.ViewChannel] },
-    ]);
-    const rulesChannel = await findOrCreateChannel(guild, 'rules', ChannelType.GuildText, infoCategory, [
-      { id: everyone.id, deny: [PermissionFlagsBits.SendMessages], allow: [PermissionFlagsBits.ViewChannel] },
-    ]);
-    const announcementsChannel = await findOrCreateChannel(
+    // --- Chill Zone (text) ---
+    const chillCategory = await findOrCreateCategory(guild, `💬 ${toFraktur('Chill Zone')}`);
+    const welcomeChannel = await findOrCreateChannel(
       guild,
-      'announcements',
+      `👋・${toFraktur('welcome')}`,
       ChannelType.GuildText,
-      infoCategory,
-      [
-        { id: everyone.id, deny: [PermissionFlagsBits.SendMessages], allow: [PermissionFlagsBits.ViewChannel] },
-        { id: Moderator.id, allow: [PermissionFlagsBits.SendMessages] },
-        { id: Admin.id, allow: [PermissionFlagsBits.SendMessages] },
-      ]
+      chillCategory,
+      [{ id: everyone.id, deny: [PermissionFlagsBits.SendMessages], allow: [PermissionFlagsBits.ViewChannel] }]
     );
-
-    // --- General category ---
-    const generalCategory = await findOrCreateCategory(guild, '💬 General');
-    const generalChat = await findOrCreateChannel(guild, 'general-chat', ChannelType.GuildText, generalCategory, []);
-    const memesChannel = await findOrCreateChannel(guild, 'memes', ChannelType.GuildText, generalCategory, []);
+    const generalChat = await findOrCreateChannel(
+      guild,
+      `💬・${toFraktur('general')}`,
+      ChannelType.GuildText,
+      chillCategory,
+      []
+    );
+    await findOrCreateChannel(guild, `😂・${toFraktur('memes')}`, ChannelType.GuildText, chillCategory, []);
+    await findOrCreateChannel(guild, `🎮・${toFraktur('gaming')}`, ChannelType.GuildText, chillCategory, []);
     const botCommandsChannel = await findOrCreateChannel(
       guild,
-      'bot-commands',
+      `🤖・${toFraktur('bot-commands')}`,
       ChannelType.GuildText,
-      generalCategory,
+      chillCategory,
       []
     );
 
-    // --- Gaming category ---
-    const gamingCategory = await findOrCreateCategory(guild, '🎮 Gaming');
-    await findOrCreateChannel(guild, 'gaming-chat', ChannelType.GuildText, gamingCategory, []);
-    await findOrCreateChannel(guild, 'looking-for-group', ChannelType.GuildText, gamingCategory, []);
-    await findOrCreateChannel(guild, 'clips-and-clutches', ChannelType.GuildText, gamingCategory, []);
-
-    // --- Voice category ---
-    const voiceCategory = await findOrCreateCategory(guild, '🔊 Voice Channels');
-    await findOrCreateChannel(guild, 'General Voice', ChannelType.GuildVoice, voiceCategory, []);
-    await findOrCreateChannel(guild, 'Gaming Voice 1', ChannelType.GuildVoice, voiceCategory, []);
-    await findOrCreateChannel(guild, 'Gaming Voice 2', ChannelType.GuildVoice, voiceCategory, []);
-    await findOrCreateChannel(guild, 'AFK', ChannelType.GuildVoice, voiceCategory, []);
-
-    // --- Staff-only category ---
-    const staffCategory = await findOrCreateCategory(guild, '🔒 Staff');
-    const staffOverwrites = [
-      { id: everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-      { id: Moderator.id, allow: [PermissionFlagsBits.ViewChannel] },
-      { id: Admin.id, allow: [PermissionFlagsBits.ViewChannel] },
-    ];
-    await findOrCreateChannel(guild, 'mod-chat', ChannelType.GuildText, staffCategory, staffOverwrites);
-    await findOrCreateChannel(guild, 'reports', ChannelType.GuildText, staffCategory, staffOverwrites);
+    // --- Voice ---
+    const voiceCategory = await findOrCreateCategory(guild, `🔊 ${toFraktur('Voice')}`);
+    await findOrCreateChannel(guild, `🔊・${toFraktur('General Voice')}`, ChannelType.GuildVoice, voiceCategory, []);
+    await findOrCreateChannel(guild, `🎮・${toFraktur('Gaming Voice')}`, ChannelType.GuildVoice, voiceCategory, []);
+    await findOrCreateChannel(guild, `😴・${toFraktur('AFK')}`, ChannelType.GuildVoice, voiceCategory, []);
 
     // --- Save config for other commands/events to use ---
     db.saveGuildConfig(guild.id, {
@@ -155,26 +135,27 @@ module.exports = {
       moderatorRoleId: Moderator.id,
       adminRoleId: Admin.id,
       welcomeChannelId: welcomeChannel.id,
-      announcementsChannelId: announcementsChannel.id,
       botCommandsChannelId: botCommandsChannel.id,
       levelRoles: {
-        5: roles['Level 5'].id,
-        10: roles['Level 10'].id,
-        20: roles['Level 20'].id,
-        30: roles['Level 30'].id,
+        5: roles[`🥉 ${toFraktur('Level 5')}`].id,
+        10: roles[`🥈 ${toFraktur('Level 10')}`].id,
+        20: roles[`🥇 ${toFraktur('Level 20')}`].id,
+        30: roles[`💎 ${toFraktur('Level 30')}`].id,
       },
     });
 
     const embed = new EmbedBuilder()
-      .setTitle('✅ Server setup complete')
+      .setTitle(`✅ ${toFraktur('Server setup complete!')}`)
       .setColor(0x57F287)
       .setDescription(
         [
-          `**Roles:** ${Admin} ${Moderator} ${Member}, plus Level 5/10/20/30 rank roles`,
-          `**Channels:** Information, General, Gaming, Voice, and a private Staff category`,
+          `**${toFraktur('Roles')}:** ${Admin} ${Moderator} ${Member}, plus 🥉 🥈 🥇 💎 rank roles that unlock as you level up`,
+          `**${toFraktur('Channels')}:** ${welcomeChannel}, ${generalChat}, 😂 memes, 🎮 gaming, ${botCommandsChannel} — and 3 voice channels`,
           '',
-          `New members auto-get **${Member.name}**. Chatting earns XP and unlocks level roles automatically.`,
-          `Heads up: for role auto-assignment to work, make sure my bot role is positioned **above** the roles I created in Server Settings → Roles.`,
+          `New members auto-get **${Member.name}** and get welcomed in ${welcomeChannel}.`,
+          `Chatting earns XP — level up to unlock rank roles automatically. Try /play to get music going! 🎶`,
+          '',
+          `⚠️ For roles to auto-assign, drag my bot's role **above** these roles in Server Settings → Roles.`,
         ].join('\n')
       );
 

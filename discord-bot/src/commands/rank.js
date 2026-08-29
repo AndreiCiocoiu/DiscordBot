@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../utils/database');
 const { xpForLevel } = require('../utils/leveling');
+const { toFraktur } = require('../utils/fancyFont');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -17,13 +18,13 @@ module.exports = {
     for (let l = 0; l < entry.level; l++) xpIntoLevel -= xpForLevel(l);
 
     const embed = new EmbedBuilder()
-      .setTitle(`${target.username}'s Rank`)
+      .setTitle(`${target.username}'s ${toFraktur('Rank')}`)
       .setThumbnail(target.displayAvatarURL())
       .setColor(0x5865F2)
       .addFields(
-        { name: 'Level', value: `${entry.level}`, inline: true },
-        { name: 'XP', value: `${xpIntoLevel} / ${needed}`, inline: true },
-        { name: 'Total XP', value: `${entry.xp}`, inline: true }
+        { name: toFraktur('Level'), value: `${entry.level}`, inline: true },
+        { name: toFraktur('XP'), value: `${xpIntoLevel} / ${needed}`, inline: true },
+        { name: toFraktur('Total XP'), value: `${entry.xp}`, inline: true }
       );
 
     await interaction.reply({ embeds: [embed] });

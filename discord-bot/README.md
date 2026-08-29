@@ -15,7 +15,9 @@ A Discord bot that sets up your whole server — channels, categories, and ranks
 
 **Fun:** `/meme` `/8ball` `/coinflip` `/guess`
 
-**Music:** `/play` `/skip` `/pause` `/resume` `/stop` `/queue` (plays YouTube links or search terms in your voice channel)
+**Music:** `/play <song name>` — just type what you want, no link needed (a YouTube link still works if you have one). Every "Now Playing" message comes with buttons: ⏸️/▶️ pause-resume, ⏭️ skip, 🔁 loop, ⏹️ stop — no typing extra commands needed. `/skip` `/pause` `/resume` `/stop` `/queue` still work too.
+
+**Style:** server roles, channels, and the bot's main titles use a 𝕭𝖔𝖑𝖉 𝕱𝖗𝖆𝖐𝖙𝖚𝖗 unicode font (`src/utils/fancyFont.js` — reusable anywhere else you want it).
 
 **Utility:** `/rank` `/leaderboard` `/ping` `/serverinfo` `/userinfo`
 

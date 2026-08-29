@@ -1,13 +1,12 @@
 const { SlashCommandBuilder } = require('discord.js');
-const play = require('play-dl');
 const music = require('../utils/musicPlayer');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Play a YouTube song/URL or search term in your voice channel.')
+    .setDescription('Search and play a song in your voice channel — just type the name, no link needed.')
     .addStringOption((opt) =>
-      opt.setName('query').setDescription('YouTube URL or search term').setRequired(true)
+      opt.setName('song').setDescription('Song name (or a YouTube link if you have one)').setRequired(true)
     ),
 
   async execute(interaction) {
@@ -17,20 +16,20 @@ module.exports = {
     }
 
     await interaction.deferReply();
-    let query = interaction.options.getString('query');
+    const query = interaction.options.getString('song');
 
     try {
-      if (!play.yt_validate(query)) {
-        const results = await play.search(query, { limit: 1 });
-        if (!results.length) return interaction.editReply("Couldn't find anything for that.");
-        query = results[0].url;
-      }
-
-      const track = await music.addTrack(interaction.guild, voiceChannel, interaction.channel, query, interaction.user.tag);
+      const track = await music.addTrack(
+        interaction.guild,
+        voiceChannel,
+        interaction.channel,
+        query,
+        interaction.user.tag
+      );
       await interaction.editReply(`➕ Queued: **${track.title}**`);
     } catch (err) {
-      console.error(err);
-      await interaction.editReply("Couldn't play that — check the link/search term and try again.");
+      console.error('play-dl/yt-search error:', err);
+      await interaction.editReply("Couldn't find or play that — try a different search.");
     }
   },
 };

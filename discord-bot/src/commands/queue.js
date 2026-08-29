@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const music = require('../utils/musicPlayer');
+const { toFraktur } = require('../utils/fancyFont');
 
 module.exports = {
   data: new SlashCommandBuilder().setName('queue').setDescription('Show the current music queue.'),
@@ -12,7 +13,10 @@ module.exports = {
 
     const lines = q.queue.map((t, i) => `${i === 0 ? '▶️' : `${i}.`} **${t.title}** — requested by ${t.requestedBy}`);
 
-    const embed = new EmbedBuilder().setTitle('🎶 Queue').setColor(0x5865F2).setDescription(lines.join('\n'));
+    const embed = new EmbedBuilder()
+      .setTitle(`🎶 ${toFraktur('Queue')}`)
+      .setColor(0x5865F2)
+      .setDescription(lines.join('\n'));
     await interaction.reply({ embeds: [embed] });
   },
 };
