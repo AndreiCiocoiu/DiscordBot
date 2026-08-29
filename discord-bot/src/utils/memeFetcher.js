@@ -16,20 +16,48 @@ async function fetchMeme(subreddit) {
   };
 }
 
-// Well-known Romanian meme subreddits — RomaniaDank is the big one, the
-// others are fallbacks in case a fetch comes back empty.
-const ROMANIAN_MEME_SUBREDDITS = ['RomaniaDank', 'Romania'];
+// More Romanian meme sources — RomaniaDank is the biggest/best, the rest
+// add variety so a 20-minute posting interval doesn't repeat itself fast.
+const ROMANIAN_MEME_SUBREDDITS = [
+  'RomaniaDank',
+  'Romania',
+  'CredemInSuveranitate',
+  'RomaniaBun',
+  'Bucuresti',
+];
+
+// If every Romanian source fails (rare — e.g. Reddit hiccup), fall back to
+// general meme subreddits so the channel doesn't just go silent.
+const GENERAL_FALLBACK_SUBREDDITS = ['memes', 'dankmemes', 'wholesomememes'];
+
+function shuffled(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
 
 async function fetchRomanianMeme() {
   let lastErr;
-  for (const sub of ROMANIAN_MEME_SUBREDDITS) {
+  // Random order each call so posts pull from different sources over time,
+  // instead of always hitting the same subreddit first.
+  for (const sub of shuffled(ROMANIAN_MEME_SUBREDDITS)) {
     try {
       return await fetchMeme(sub);
     } catch (err) {
       lastErr = err;
     }
   }
-  throw lastErr ?? new Error('No Romanian meme subreddits worked');
+  for (const sub of GENERAL_FALLBACK_SUBREDDITS) {
+    try {
+      return await fetchMeme(sub);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new Error('No meme subreddits worked');
 }
 
 // Reacts with 👍/👎 so people can vote on a posted meme.
