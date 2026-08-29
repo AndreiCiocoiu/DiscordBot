@@ -13,7 +13,7 @@ A Discord bot that sets up your whole server — channels, categories, and ranks
 
 **Moderation:** `/kick` `/ban` `/unban` `/timeout` `/warn` `/warnings` `/clear`
 
-**Fun:** `/meme` `/8ball` `/coinflip` `/guess`
+**Fun:** `/meme` `/meme-ro` (Romanian memes from r/RomaniaDank) `/8ball` `/coinflip` `/guess` — plus an automatic Romanian meme every 20 minutes in the memes channel (adjustable via `MEME_INTERVAL_MINUTES`), auto-reacted with 👍/👎 so people can vote. Manually posted memes get the same vote reactions.
 
 **Music:** `/play <song name>` — just type what you want, no link needed (a YouTube link still works if you have one). Powered by `yt-dlp` under the hood for reliability. Every "Now Playing" message comes with buttons: ⏸️/▶️ pause-resume, ⏭️ skip, 🔁 loop, ⏹️ stop — no typing extra commands needed. `/skip` `/pause` `/resume` `/stop` `/queue` still work too.
 
