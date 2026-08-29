@@ -37,7 +37,7 @@ class YtDlpExtractor extends BaseExtractor {
     try {
       info = await youtubedl(target, { ...COMMON_FLAGS, dumpSingleJson: true, noPlaylist: true });
     } catch (err) {
-      this.debug(`yt-dlp lookup failed: ${err.message}`);
+      console.error(`[ytdlp-extractor] yt-dlp lookup failed for "${query}":`, err.stderr || err.message || err);
       return this.createResponse(null, []);
     }
 

@@ -16,11 +16,28 @@ process.env.FFMPEG_PATH = process.env.FFMPEG_PATH || require('ffmpeg-static');
 
 let player = null;
 
+// Confirms yt-dlp (and the Python it needs) actually works on this machine,
+// so a broken setup shows up clearly in the boot logs instead of only
+// surfacing later as a vague "no results" on /play.
+async function checkYtDlp() {
+  const youtubedl = require('youtube-dl-exec');
+  try {
+    const version = await youtubedl('--version', {});
+    console.log(`yt-dlp OK — version ${String(version).trim()}`);
+  } catch (err) {
+    console.error(
+      '⚠️  yt-dlp self-test FAILED — /play will not work until this is fixed. Error:',
+      err.stderr || err.message || err
+    );
+  }
+}
+
 // Called once from index.js after the Discord client is created.
 async function initPlayer(client) {
   player = new Player(client);
 
   await player.extractors.register(YtDlpExtractor, {});
+  await checkYtDlp();
 
   player.events.on(GuildQueueEvent.PlayerStart, async (queue, track) => {
     const embed = buildNowPlayingEmbed(track, queue.repeatMode);
