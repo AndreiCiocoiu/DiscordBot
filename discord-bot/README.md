@@ -65,6 +65,15 @@ Run `/setup` as an admin — it builds everything in a few seconds. After it fin
 ## Notes
 
 - Leveling and warnings are stored locally in `data/*.json`. Back that folder up if you care about keeping XP/history.
-- Music uses `play-dl`, which pulls audio from YouTube. YouTube occasionally changes things in ways that break scraping-based players; if `/play` stops working, run `npm update play-dl` first.
+- Music runs on `discord-player` with a `youtubei`-based extractor, which talks to YouTube's internal app API directly instead of scraping/deciphering the web player — much more resilient to YouTube changing things than older scraping-based libraries.
+- **Getting rate-limited or music that won't play?** Optionally authenticate with a real account's cookie, which YouTube trusts more than anonymous traffic:
+  1. **Use a secondary/throwaway Google account for this**, not your main one — while low-risk, it's still an automated tool touching a logged-in session.
+  2. Log into that account at youtube.com in a normal browser.
+  3. Install a cookie-export extension like **Cookie-Editor** ([Chrome](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm) / [Firefox](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)).
+  4. While on youtube.com, open Cookie-Editor and click **Export** → **Export as Header String** (or "Copy" if that's the only option — you want one long `name=value; name2=value2; ...` line, not JSON).
+  5. In Railway → your service → **Variables**, add `YOUTUBE_COOKIE` and paste that string in as the value.
+  6. Redeploy. On boot you should see `Music player ready (discord-player + youtubei).` in the logs.
+  7. Treat that cookie like a password — anyone with it can act as that YouTube account. If you ever want to revoke it, just log that Google account out of all sessions.
+- `discord-player-youtubei` is pinned to exactly `1.5.0` in `package.json` on purpose — newer versions pull in an unrelated, flaky optional dependency (`youtube-dl-exec`) that can fail to install. Don't run `npm update` on just that package without checking this first.
 - Everything here uses Discord's native timeout for `/timeout` (no separate mute role needed).
 - Re-running `/setup` is safe — it won't create duplicate roles/channels, it just reuses ones with matching names.

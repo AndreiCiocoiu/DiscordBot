@@ -2,10 +2,9 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
+const { initPlayer } = require('./src/utils/musicPlayer');
 
-// play-dl occasionally throws an error (e.g. YouTube rate-limiting) on an
-// internal promise that nothing awaits directly, which would otherwise
-// crash the entire process. Log it and keep the bot running instead.
+// Log unexpected errors instead of letting them crash the whole bot.
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled rejection (bot stayed online):', err);
 });
@@ -43,5 +42,9 @@ for (const file of fs.readdirSync(eventsPath).filter((f) => f.endsWith('.js'))) 
     client.on(event.name, (...args) => event.execute(...args, client));
   }
 }
+
+initPlayer(client)
+  .then(() => console.log('Music player ready (discord-player + youtubei).'))
+  .catch((err) => console.error('Failed to initialize music player:', err));
 
 client.login(process.env.DISCORD_TOKEN);

@@ -10,8 +10,7 @@ async function handleMusicButton(interaction) {
   }
 
   if (action === 'pause') {
-    const isPaused = q.player.state.status === 'paused';
-    if (isPaused) music.resume(guildId);
+    if (q.node.isPaused()) music.resume(guildId);
     else music.pause(guildId);
   } else if (action === 'skip') {
     music.skip(guildId);
@@ -23,9 +22,9 @@ async function handleMusicButton(interaction) {
   }
 
   // Refresh the buttons/embed to reflect the new state (pause icon, loop highlight, etc.)
-  const currentTrack = q.queue[0];
+  const currentTrack = q.currentTrack;
   if (currentTrack) {
-    const embed = music.buildNowPlayingEmbed(currentTrack, q.loop);
+    const embed = music.buildNowPlayingEmbed(currentTrack, q.repeatMode);
     const row = music.buildControlsRow(guildId);
     await interaction.update({ embeds: [embed], components: [row] });
   } else {
