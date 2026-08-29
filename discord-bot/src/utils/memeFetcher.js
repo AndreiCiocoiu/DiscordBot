@@ -16,11 +16,10 @@ async function fetchMeme(subreddit) {
   };
 }
 
-// RomaniaDank is the one subreddit that's actually dedicated to memes.
-// r/Romania and r/CredemInSuveranitate were pulled in for variety earlier,
-// but both skew toward political/news content rather than memes, which is
-// why the auto-poster started surfacing political stuff — removed.
-const ROMANIAN_MEME_SUBREDDITS = ['RomaniaDank'];
+// RomaniaDank is the dedicated meme-format subreddit; RoCirclejerk is a
+// separate, ironic/self-aware humor sub about Romanian culture — different
+// flavor of authentic Romanian humor, not political.
+const ROMANIAN_MEME_SUBREDDITS = ['RomaniaDank', 'RoCirclejerk'];
 
 // If every Romanian source fails (rare — e.g. Reddit hiccup), fall back to
 // general meme subreddits so the channel doesn't just go silent.
