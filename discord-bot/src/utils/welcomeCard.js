@@ -1,7 +1,17 @@
 // Builds a styled "Welcome" image card: a gradient background, a decorative
 // frame ring around the new member's avatar, and their name + member count.
 
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const path = require('path');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
+
+// Register a bundled font explicitly instead of relying on "sans-serif"
+// resolving to *something* on the host — minimal server images (like
+// Railway's) often have zero fonts installed, which silently renders no
+// text at all (shapes still draw fine, which is why only the avatar showed
+// up and all the text was missing).
+const FONT_DIR = path.join(require.resolve('dejavu-fonts-ttf/package.json'), '..', 'ttf');
+GlobalFonts.registerFromPath(path.join(FONT_DIR, 'DejaVuSans.ttf'), 'Welcome Card Sans');
+GlobalFonts.registerFromPath(path.join(FONT_DIR, 'DejaVuSans-Bold.ttf'), 'Welcome Card Sans Bold');
 
 const WIDTH = 1000;
 const HEIGHT = 400;
@@ -77,16 +87,16 @@ async function buildWelcomeImage(member) {
   // --- "WELCOME" heading ---
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 42px sans-serif';
+  ctx.font = 'bold 42px "Welcome Card Sans Bold"';
   ctx.fillText('WELCOME', avatarX, 300);
 
   // --- Username ---
-  ctx.font = '28px sans-serif';
+  ctx.font = '28px "Welcome Card Sans"';
   ctx.fillStyle = '#c9c9f5';
   ctx.fillText(member.user.username, avatarX, 340);
 
   // --- Member count ---
-  ctx.font = '20px sans-serif';
+  ctx.font = '20px "Welcome Card Sans"';
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.fillText(`MEMBER #${member.guild.memberCount}`, avatarX, 372);
 

@@ -25,7 +25,8 @@ module.exports = {
         const embed = new EmbedBuilder()
           .setColor(0x5865f2)
           .setDescription(`${member} just joined — say hi! 👋`)
-          .setImage('attachment://welcome.png');
+          .setImage('attachment://welcome.png')
+          .setFooter({ text: `${member.user.tag} · Member #${member.guild.memberCount}` });
 
         await channel.send({ content: `${member}`, embeds: [embed], files: [attachment] });
       } catch (err) {
