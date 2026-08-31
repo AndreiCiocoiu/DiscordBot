@@ -8,19 +8,36 @@
 
 const { BaseExtractor, Track } = require('discord-player');
 const youtubedl = require('youtube-dl-exec');
+const fs = require('fs');
+const path = require('path');
 
-const COMMON_FLAGS = {
-  noWarnings: true,
-  noCheckCertificates: true,
-  preferFreeFormats: true,
-  addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
-};
+// If a Netscape-format cookies.txt file is present in the persistent data
+// volume, use it — YouTube trusts authenticated requests far more than
+// anonymous ones from a datacenter IP, which is what "Sign in to confirm
+// you're not a bot" errors mean. See README.md for how to get this file.
+const COOKIES_PATH = path.join(__dirname, '..', '..', 'data', 'youtube-cookies.txt');
+
+function getCommonFlags() {
+  const hasCookies = fs.existsSync(COOKIES_PATH);
+  return {
+    noWarnings: true,
+    noCheckCertificates: true,
+    preferFreeFormats: true,
+    addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
+    ...(hasCookies ? { cookies: COOKIES_PATH } : {}),
+  };
+}
 
 class YtDlpExtractor extends BaseExtractor {
   static identifier = 'ytdlp-extractor';
 
   async activate() {
     this.protocols = ['ytsearch', 'youtube'];
+    if (fs.existsSync(COOKIES_PATH)) {
+      console.log('[ytdlp-extractor] Using YouTube cookies from data/youtube-cookies.txt');
+    } else {
+      console.log('[ytdlp-extractor] No YouTube cookies file found — running anonymously (more likely to hit "Sign in to confirm" errors).');
+    }
   }
 
   async validate(query) {
@@ -35,7 +52,7 @@ class YtDlpExtractor extends BaseExtractor {
 
     let info;
     try {
-      info = await youtubedl(target, { ...COMMON_FLAGS, dumpSingleJson: true, noPlaylist: true });
+      info = await youtubedl(target, { ...getCommonFlags(), dumpSingleJson: true, noPlaylist: true });
     } catch (err) {
       console.error(`[ytdlp-extractor] yt-dlp lookup failed for "${query}":`, err.stderr || err.message || err);
       return this.createResponse(null, []);
@@ -65,7 +82,7 @@ class YtDlpExtractor extends BaseExtractor {
   async stream(info) {
     const subprocess = youtubedl.exec(
       info.url,
-      { ...COMMON_FLAGS, output: '-', format: 'bestaudio', noPlaylist: true },
+      { ...getCommonFlags(), output: '-', format: 'bestaudio', noPlaylist: true },
       { stdio: ['ignore', 'pipe', 'pipe'] }
     );
 
