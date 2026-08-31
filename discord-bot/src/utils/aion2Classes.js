@@ -12,20 +12,31 @@ const ROLE_COLORS = {
   Healer: 0x1abc9c,
 };
 
-function buildClassEmbed(cls) {
+// A Discord embed always renders its image below the title/description, so
+// to get "big character art on top, description underneath" (like the
+// game's own class-select screen) we send two stacked messages per class
+// instead of forcing it all into one embed.
+
+function buildClassImageEmbed(cls) {
   return new EmbedBuilder()
     .setTitle(`${cls.name} — ${cls.role}`)
+    .setImage(cls.image)
+    .setColor(ROLE_COLORS[cls.role] ?? 0x8a2be2);
+}
+
+function buildClassInfoEmbed(cls) {
+  return new EmbedBuilder()
     .setDescription(cls.description)
     .addFields({ name: 'Weapon', value: cls.weapon, inline: true })
-    .setThumbnail(cls.image)
     .setColor(ROLE_COLORS[cls.role] ?? 0x8a2be2)
-    .setFooter({ text: 'AION 2 Wiki · aion2.wiki.fextralife.com' });
+    .setFooter({ text: 'AION 2 Wiki · aion2guide.wiki' });
 }
 
 async function postClassShowcase(channel) {
   for (const cls of AION2_CLASSES) {
-    await channel.send({ embeds: [buildClassEmbed(cls)] }).catch(() => {});
+    await channel.send({ embeds: [buildClassImageEmbed(cls)] }).catch(() => {});
+    await channel.send({ embeds: [buildClassInfoEmbed(cls)] }).catch(() => {});
   }
 }
 
-module.exports = { buildClassEmbed, postClassShowcase };
+module.exports = { buildClassImageEmbed, buildClassInfoEmbed, postClassShowcase };

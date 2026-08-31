@@ -17,7 +17,7 @@ A Discord bot that sets up your whole server — channels, categories, and ranks
 
 **AION 2:** a whole `🕊️ AION 2` category, built by `/setup`:
 - `📰・news` — auto-posts new AION 2 announcements (checked every 30 min, adjustable via `AION2_CHECK_INTERVAL_MINUTES`), pulled from the game's official Steam news feed, no third-party source or API key needed. `/aion2` also shows the latest 3 posts on demand, anywhere.
-- `⚔️・classes` — a showcase of all 8 launch classes (role, weapon, playstyle, and each class's own icon art from the AION 2 Wiki), auto-posted once when `/setup` first runs. Re-post anytime with `/aion2classes` (mod-only).
+- `⚔️・classes` — a showcase of all 8 launch classes, each posted as a full character render (official art, one per class) followed by its role, weapon, and playstyle description underneath — auto-posted once when `/setup` first runs. Re-post anytime with `/aion2classes` (mod-only).
 - `💬・aion-2-chat` — open discussion channel, no bot involvement.
 
 **Music:** `/play <song name>` — just type what you want, no link needed (a YouTube link still works if you have one). Powered by `yt-dlp` under the hood for reliability. Every "Now Playing" message comes with a full control panel:
