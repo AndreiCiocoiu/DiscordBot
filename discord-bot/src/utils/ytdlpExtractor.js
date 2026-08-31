@@ -66,8 +66,26 @@ class YtDlpExtractor extends BaseExtractor {
     const subprocess = youtubedl.exec(
       info.url,
       { ...COMMON_FLAGS, output: '-', format: 'bestaudio', noPlaylist: true },
-      { stdio: ['ignore', 'pipe', 'ignore'] }
+      { stdio: ['ignore', 'pipe', 'pipe'] }
     );
+
+    // youtube-dl-exec's return value is both the child process AND a
+    // promise that rejects on a non-zero exit code. We use the streams
+    // directly, but we must still handle that rejection — otherwise a
+    // failed/killed process crashes the bot with an unhandled rejection,
+    // and previously we were also discarding stderr entirely, which meant
+    // failures gave zero information about what actually went wrong.
+    let stderrOutput = '';
+    subprocess.stderr?.on('data', (chunk) => {
+      stderrOutput += chunk.toString();
+    });
+
+    subprocess.catch((err) => {
+      console.error(
+        `[ytdlp-extractor] yt-dlp stream failed for "${info.url}":`,
+        stderrOutput.trim() || err.shortMessage || err.message
+      );
+    });
 
     subprocess.stdout.once('close', () => {
       if (!subprocess.killed) subprocess.kill();
