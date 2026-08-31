@@ -18,9 +18,19 @@ let player = null;
 
 // Confirms yt-dlp (and the Python it needs) actually works on this machine,
 // so a broken setup shows up clearly in the boot logs instead of only
-// surfacing later as a vague "no results" on /play.
+// surfacing later as a vague "no results" on /play. Also self-updates
+// yt-dlp to the latest release first — YouTube changes frequently enough
+// that a stale binary is a common cause of playback failures, and yt-dlp's
+// maintainers typically ship fixes within hours to days.
 async function checkYtDlp() {
   const youtubedl = require('youtube-dl-exec');
+  try {
+    const updateResult = await youtubedl.update();
+    console.log(`yt-dlp self-update: ${String(updateResult).trim() || 'already up to date'}`);
+  } catch (err) {
+    console.error('yt-dlp self-update failed (continuing anyway):', err.stderr || err.message || err);
+  }
+
   try {
     const version = await youtubedl('--version', {});
     console.log(`yt-dlp OK — version ${String(version).trim()}`);
