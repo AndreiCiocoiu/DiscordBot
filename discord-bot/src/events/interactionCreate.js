@@ -7,6 +7,7 @@ const {
   ActionRowBuilder,
 } = require('discord.js');
 const music = require('../utils/musicPlayer');
+const db = require('../utils/database');
 const { toSmallCaps } = require('../utils/fancyFont');
 
 async function refreshNowPlaying(interaction, guildId, q) {
@@ -94,6 +95,37 @@ async function handleSongRequestModal(interaction) {
   }
 }
 
+async function toggleRole(interaction, roleId, roleLabel) {
+  if (!roleId) {
+    return interaction.reply({ content: "That role isn't set up yet — an admin needs to run /setup.", ephemeral: true });
+  }
+  const role = interaction.guild.roles.cache.get(roleId);
+  if (!role) {
+    return interaction.reply({ content: "That role no longer exists — an admin needs to run /setup again.", ephemeral: true });
+  }
+
+  const member = interaction.member;
+  if (member.roles.cache.has(roleId)) {
+    await member.roles.remove(roleId).catch(() => {});
+    return interaction.reply({ content: `Removed **${roleLabel}**.`, ephemeral: true });
+  }
+
+  await member.roles.add(roleId).catch(() => {});
+  return interaction.reply({ content: `Added **${roleLabel}**! 🎉`, ephemeral: true });
+}
+
+async function handleAion2ClassRoleButton(interaction) {
+  const className = interaction.customId.replace('aion2role_', '');
+  const config = db.getGuildConfig(interaction.guild.id);
+  const roleId = config?.aion2ClassRoleIds?.[className];
+  await toggleRole(interaction, roleId, className);
+}
+
+async function handleAion2GeneralRoleButton(interaction) {
+  const config = db.getGuildConfig(interaction.guild.id);
+  await toggleRole(interaction, config?.aion2GeneralRoleId, 'AION 2');
+}
+
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction, client) {
@@ -113,6 +145,26 @@ module.exports = {
       } catch (err) {
         console.error('Song request modal error:', err);
         await interaction.reply({ content: 'Something went wrong with that request.', ephemeral: true }).catch(() => {});
+      }
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('aion2role_')) {
+      try {
+        await handleAion2ClassRoleButton(interaction);
+      } catch (err) {
+        console.error('AION 2 class role button error:', err);
+        await interaction.reply({ content: 'Something went wrong with that role.', ephemeral: true }).catch(() => {});
+      }
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId === 'aion2general') {
+      try {
+        await handleAion2GeneralRoleButton(interaction);
+      } catch (err) {
+        console.error('AION 2 general role button error:', err);
+        await interaction.reply({ content: 'Something went wrong with that role.', ephemeral: true }).catch(() => {});
       }
       return;
     }

@@ -15,9 +15,10 @@ A Discord bot that sets up your whole server — channels, categories, and ranks
 
 **Fun:** `/meme` `/8ball` `/coinflip` `/guess`
 
-**AION 2:** a whole `🕊️ AION 2` category, built by `/setup`:
-- `📰・news` — auto-posts new AION 2 announcements (checked every 30 min, adjustable via `AION2_CHECK_INTERVAL_MINUTES`), pulled from the game's official Steam news feed, no third-party source or API key needed. `/aion2` also shows the latest 3 posts on demand, anywhere.
-- `⚔️・classes` — a showcase of all 8 launch classes, each posted as a full character render (official art, one per class) followed by its role, weapon, and playstyle description underneath — auto-posted once when `/setup` first runs. Re-post anytime with `/aion2classes` (mod-only).
+**AION 2:** a whole `🕊️ AION 2` category, built by `/setup`, roles channel first:
+- `🕊️・roles` — one message with every self-assignable AION 2 role: a general **"I play AION 2"** button plus one button per class (9 total). Click to add, click again to remove.
+- `📰・news` — auto-posts new AION 2 announcements (checked every 30 min, adjustable via `AION2_CHECK_INTERVAL_MINUTES`), pulled from the game's official Steam news feed, no third-party source or API key needed. Each post gets a branded header, a banner image, up to ~1200 characters of content, and a link to the full post. `/aion2` shows the latest 3 posts on demand, anywhere, in the same format.
+- `⚔️・classes` — a pure showcase of all 8 launch classes, each posted as a full character render (official art, one per class) followed by its role, weapon, and playstyle description underneath — no buttons here, those live in `🕊️・roles`. Auto-posted once when `/setup` first runs; re-post anytime with `/aion2classes` (mod-only).
 - `💬・aion-2-chat` — open discussion channel, no bot involvement.
 
 **Music:** `/play <song name>` — just type what you want, no link needed (a YouTube link still works if you have one). Powered by `yt-dlp` under the hood for reliability. Every "Now Playing" message comes with a full control panel:

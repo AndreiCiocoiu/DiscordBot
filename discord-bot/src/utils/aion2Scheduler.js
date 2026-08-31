@@ -2,20 +2,9 @@
 // to each guild's configured AION 2 news channel. Interval is configurable
 // via AION2_CHECK_INTERVAL_MINUTES, default 30.
 
-const { EmbedBuilder } = require('discord.js');
 const db = require('./database');
 const { fetchAion2News } = require('./aion2News');
-const { toSmallCaps } = require('./fancyFont');
-
-function buildNewsEmbed(item) {
-  return new EmbedBuilder()
-    .setTitle(item.title)
-    .setURL(item.url)
-    .setDescription(item.content.slice(0, 500) || '*(click the title to read the full post)*')
-    .setColor(0x8a2be2)
-    .setFooter({ text: `${toSmallCaps('aion 2')} · ${item.feedName}` })
-    .setTimestamp(item.date * 1000);
-}
+const { buildAion2NewsEmbed } = require('./aion2NewsEmbed');
 
 async function checkGuild(client, guildId) {
   const config = db.getGuildConfig(guildId);
@@ -41,7 +30,7 @@ async function checkGuild(client, guildId) {
     if (freshItems.length === 0) return;
 
     for (const item of freshItems) {
-      await channel.send({ embeds: [buildNewsEmbed(item)] }).catch(() => {});
+      await channel.send({ embeds: [buildAion2NewsEmbed(item)] }).catch(() => {});
     }
 
     db.saveGuildConfig(guildId, { aion2LastPostedDate: freshItems[freshItems.length - 1].date });

@@ -16,7 +16,7 @@ function cleanContent(raw = '') {
 }
 
 async function fetchAion2News(count = 5) {
-  const url = `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${AION2_APP_ID}&count=${count}&maxlength=600&format=json`;
+  const url = `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${AION2_APP_ID}&count=${count}&maxlength=1400&format=json`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Steam news API returned ${res.status}`);
   const data = await res.json();

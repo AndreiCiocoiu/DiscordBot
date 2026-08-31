@@ -15,7 +15,8 @@ const ROLE_COLORS = {
 // A Discord embed always renders its image below the title/description, so
 // to get "big character art on top, description underneath" (like the
 // game's own class-select screen) we send two stacked messages per class
-// instead of forcing it all into one embed.
+// instead of forcing it all into one embed. Role-assign buttons live in
+// their own channel (see aion2Roles.js), not on these showcase posts.
 
 function buildClassImageEmbed(cls) {
   return new EmbedBuilder()

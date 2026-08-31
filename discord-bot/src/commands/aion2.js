@@ -1,6 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { fetchAion2News } = require('../utils/aion2News');
-const { toSmallCaps } = require('../utils/fancyFont');
+const { buildAion2NewsEmbed } = require('../utils/aion2NewsEmbed');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -16,17 +16,13 @@ module.exports = {
         return interaction.editReply('No AION 2 news right now — check back later.');
       }
 
-      const embeds = news.map((item) =>
-        new EmbedBuilder()
-          .setTitle(item.title)
-          .setURL(item.url)
-          .setDescription(item.content.slice(0, 500) || '*(no preview available — click the title to read the full post)*')
-          .setColor(0x8a2be2)
-          .setFooter({ text: `${toSmallCaps('aion 2')} · ${item.feedName}` })
-          .setTimestamp(item.date * 1000)
-      );
-
-      await interaction.editReply({ embeds });
+      // Separate messages (not one message with 3 embeds) so each post's
+      // banner image gets room to breathe instead of stacking on top of
+      // each other.
+      await interaction.editReply({ embeds: [buildAion2NewsEmbed(news[0])] });
+      for (const item of news.slice(1)) {
+        await interaction.followUp({ embeds: [buildAion2NewsEmbed(item)] });
+      }
     } catch (err) {
       console.error('AION 2 news fetch failed:', err);
       await interaction.editReply("Couldn't fetch AION 2 news right now, try again in a bit.");
