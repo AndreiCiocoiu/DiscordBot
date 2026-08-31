@@ -9,22 +9,68 @@
 const { BaseExtractor, Track } = require('discord-player');
 const youtubedl = require('youtube-dl-exec');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
-// If a Netscape-format cookies.txt file is present in the persistent data
-// volume, use it — YouTube trusts authenticated requests far more than
-// anonymous ones from a datacenter IP, which is what "Sign in to confirm
-// you're not a bot" errors mean. See README.md for how to get this file.
-const COOKIES_PATH = path.join(__dirname, '..', '..', 'data', 'youtube-cookies.txt');
+// If present, a manually-uploaded Netscape-format cookies.txt file on the
+// persistent data volume takes priority.
+const UPLOADED_COOKIES_PATH = path.join(__dirname, '..', '..', 'data', 'youtube-cookies.txt');
+// Otherwise, cookies are generated at boot from the YOUTUBE_COOKIE env var
+// (much easier to set in Railway than uploading a file) into a temp file,
+// since yt-dlp's --cookies flag needs an actual file path either way.
+const GENERATED_COOKIES_PATH = path.join(os.tmpdir(), 'youtube-cookies-generated.txt');
+
+// Converts a browser "header string" cookie export (name1=value1; name2=value2; ...)
+// into the Netscape cookies.txt format yt-dlp actually requires.
+function headerStringToNetscape(headerString) {
+  const lines = ['# Netscape HTTP Cookie File'];
+  const pairs = headerString.split(';').map((s) => s.trim()).filter(Boolean);
+  for (const pair of pairs) {
+    const idx = pair.indexOf('=');
+    if (idx === -1) continue;
+    const name = pair.slice(0, idx).trim();
+    const value = pair.slice(idx + 1).trim();
+    if (!name) continue;
+    lines.push(['.youtube.com', 'TRUE', '/', 'TRUE', '0', name, value].join('\t'));
+  }
+  return lines.join('\n') + '\n';
+}
+
+// Resolves the cookies file to use, generating one from YOUTUBE_COOKIE the
+// first time it's needed. Returns null if no cookies are configured at all.
+let resolvedCookiesPath;
+function getCookiesPath() {
+  if (resolvedCookiesPath !== undefined) return resolvedCookiesPath;
+
+  if (fs.existsSync(UPLOADED_COOKIES_PATH)) {
+    resolvedCookiesPath = UPLOADED_COOKIES_PATH;
+    return resolvedCookiesPath;
+  }
+
+  const raw = process.env.YOUTUBE_COOKIE;
+  if (raw && raw.trim()) {
+    // Already in Netscape format (starts with the standard header, or has
+    // tab-separated fields) — use as-is. Otherwise assume it's a browser
+    // "header string" export and convert it.
+    const looksNetscape = raw.includes('# Netscape') || raw.includes('\t');
+    const content = looksNetscape ? raw : headerStringToNetscape(raw);
+    fs.writeFileSync(GENERATED_COOKIES_PATH, content);
+    resolvedCookiesPath = GENERATED_COOKIES_PATH;
+    return resolvedCookiesPath;
+  }
+
+  resolvedCookiesPath = null;
+  return resolvedCookiesPath;
+}
 
 function getCommonFlags() {
-  const hasCookies = fs.existsSync(COOKIES_PATH);
+  const cookiesPath = getCookiesPath();
   return {
     noWarnings: true,
     noCheckCertificates: true,
     preferFreeFormats: true,
     addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
-    ...(hasCookies ? { cookies: COOKIES_PATH } : {}),
+    ...(cookiesPath ? { cookies: cookiesPath } : {}),
   };
 }
 
@@ -33,10 +79,11 @@ class YtDlpExtractor extends BaseExtractor {
 
   async activate() {
     this.protocols = ['ytsearch', 'youtube'];
-    if (fs.existsSync(COOKIES_PATH)) {
-      console.log('[ytdlp-extractor] Using YouTube cookies from data/youtube-cookies.txt');
+    const cookiesPath = getCookiesPath();
+    if (cookiesPath) {
+      console.log(`[ytdlp-extractor] Using YouTube cookies (${cookiesPath}).`);
     } else {
-      console.log('[ytdlp-extractor] No YouTube cookies file found — running anonymously (more likely to hit "Sign in to confirm" errors).');
+      console.log('[ytdlp-extractor] No YouTube cookies configured — running anonymously (more likely to hit "Sign in to confirm" errors). Set the YOUTUBE_COOKIE env var to fix this.');
     }
   }
 

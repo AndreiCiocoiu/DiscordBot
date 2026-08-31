@@ -78,12 +78,16 @@ Run `/setup` as an admin — it builds everything in a few seconds. After it fin
 - Music runs on `discord-player` with a **custom extractor backed by `yt-dlp`** (`src/utils/ytdlpExtractor.js`), instead of a JS library that scrapes/reverse-engineers YouTube's player. yt-dlp is a huge, near-daily-updated project maintained specifically because YouTube keeps changing things — when something breaks, it's usually patched within hours to days, which is far more reliable long-term than smaller JS scraping libraries (which is what caused earlier versions of this bot's `/play` command to fail outright).
 - **`yt-dlp` requires Python 3.9+ on the machine running the bot.** Railway's Node build image does NOT include Python by default — you'll see `env: 'python3': No such file or directory` in the logs if it's missing (the bot logs a clear `yt-dlp self-test FAILED` line on boot if this is the problem). Fix: in Railway → your service → **Variables**, add `RAILPACK_DEPLOY_APT_PACKAGES` with the value `python3`, then let it redeploy. Confirm it worked by checking for `yt-dlp OK — version ...` in the boot logs.
 - If `/play` ever stops working again, the fix is almost always `npm update youtube-dl-exec` (which re-downloads the latest `yt-dlp` binary) rather than anything in this bot's own code.
-- **Optional but helps with reliability:** authenticate with a real account's cookie, which YouTube trusts more than anonymous traffic:
+- **Strongly recommended — authenticate with a real account's cookie.** Without this, YouTube frequently blocks requests with "Sign in to confirm you're not a bot" (anonymous datacenter traffic gets flagged hard):
   1. **Use a secondary/throwaway Google account for this**, not your main one — while low-risk, it's still an automated tool touching a logged-in session.
   2. Log into that account at youtube.com in a normal browser.
   3. Install a cookie-export extension like **Cookie-Editor** ([Chrome](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm) / [Firefox](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/)).
-  4. While on youtube.com, open Cookie-Editor, export as a **Netscape cookies.txt file** (not the header-string format this time — yt-dlp wants the file format).
-  5. Save that file into the project as `data/youtube-cookies.txt`, and it'll be picked up automatically (see `COMMON_FLAGS` in `ytdlpExtractor.js` if you want to wire this up — it's not auto-loaded yet, ask if you want this added).
-  6. Treat that cookie file like a password — anyone with it can act as that YouTube account.
+  4. While on youtube.com, open Cookie-Editor and export — either format works, the bot auto-detects and converts if needed:
+     - **Header String** (`name=value; name2=value2; ...`) — simplest, just copy-paste
+     - **Netscape** — also fine, used as-is
+  5. In Railway → your service → **Variables**, add `YOUTUBE_COOKIE` and paste in what you copied.
+  6. Redeploy (or just restart) and check the boot logs for `[ytdlp-extractor] Using YouTube cookies (...)` instead of the "No YouTube cookies configured" warning.
+  7. Treat that value like a password — anyone with it can act as that YouTube account.
+  8. (Advanced/alternative: you can instead upload a Netscape-format file directly to `data/youtube-cookies.txt` on the persistent volume — that takes priority over the env var if both are present. The env var is easier for most people since Railway's Variables tab is simple to use, no volume file browser needed.)
 - Everything here uses Discord's native timeout for `/timeout` (no separate mute role needed).
 - Re-running `/setup` is safe — it won't create duplicate roles/channels, it just reuses ones with matching names.
