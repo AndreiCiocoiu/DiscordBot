@@ -73,6 +73,11 @@ function getCommonFlags() {
     noCheckCertificates: true,
     preferFreeFormats: true,
     addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
+    // The default "web" client is the one most often hit by YouTube's
+    // "page needs to be reloaded" extraction bug. android/tv clients use a
+    // different API path that's generally more stable — try those first,
+    // falling back to web if they don't work for a given video.
+    extractorArgs: 'youtube:player_client=android,tv,web',
     ...(cookiesPath ? { cookies: cookiesPath } : {}),
   };
 }
