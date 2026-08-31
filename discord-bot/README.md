@@ -15,6 +15,8 @@ A Discord bot that sets up your whole server — channels, categories, and ranks
 
 **Fun:** `/meme` `/8ball` `/coinflip` `/guess`
 
+**AION 2 news:** `/aion2` shows the latest 3 posts on demand. New posts also auto-post to the `🕊️・aion 2` channel (checked every 30 min, adjustable via `AION2_CHECK_INTERVAL_MINUTES`) — pulled straight from AION 2's official Steam news feed, no third-party source or API key needed.
+
 **Music:** `/play <song name>` — just type what you want, no link needed (a YouTube link still works if you have one). Powered by `yt-dlp` under the hood for reliability. Every "Now Playing" message comes with a full control panel:
 - Row 1: ⏸️/▶️ pause-resume, ⏭️ skip, 🔁 loop, 🔀 shuffle, ⏹️ stop
 - Row 2: ➕ **Request a song** (opens a popup to type a song name/link without using `/play`), 📃 Queue (shows what's up next, only visible to you), 🔊/🔉 volume up/down

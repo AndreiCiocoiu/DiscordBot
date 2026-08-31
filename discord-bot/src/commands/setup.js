@@ -115,6 +115,13 @@ module.exports = {
     );
     await findOrCreateChannel(guild, `😂・${toSmallCaps('memes')}`, ChannelType.GuildText, chillCategory, []);
     await findOrCreateChannel(guild, `🎮・${toSmallCaps('gaming')}`, ChannelType.GuildText, chillCategory, []);
+    const aion2Channel = await findOrCreateChannel(
+      guild,
+      `🕊️・${toSmallCaps('aion 2')}`,
+      ChannelType.GuildText,
+      chillCategory,
+      []
+    );
     const botCommandsChannel = await findOrCreateChannel(
       guild,
       `🤖・${toSmallCaps('bot-commands')}`,
@@ -138,6 +145,7 @@ module.exports = {
       adminRoleId: Admin.id,
       welcomeChannelId: welcomeChannel.id,
       botCommandsChannelId: botCommandsChannel.id,
+      aion2ChannelId: aion2Channel.id,
       levelRoles: {
         5: roles[`🥉 ${toSmallCaps('Level 5')}`].id,
         10: roles[`🥈 ${toSmallCaps('Level 10')}`].id,
@@ -152,7 +160,7 @@ module.exports = {
       .setDescription(
         [
           `**${toSmallCaps('Roles')}:** ${Admin} ${Moderator} ${Member}, plus 🥉 🥈 🥇 💎 rank roles that unlock as you level up`,
-          `**${toSmallCaps('Channels')}:** ${welcomeChannel}, ${generalChat}, 😂 memes, 🎮 gaming, ${botCommandsChannel} — plus a 🎵 music-commands channel and 4 voice channels`,
+          `**${toSmallCaps('Channels')}:** ${welcomeChannel}, ${generalChat}, 😂 memes, 🎮 gaming, ${aion2Channel}, ${botCommandsChannel} — plus a 🎵 music-commands channel and 4 voice channels`,
           '',
           `New members auto-get **${Member.name}** and get welcomed in ${welcomeChannel}.`,
           `Chatting earns XP — level up to unlock rank roles automatically. Try /play to get music going! 🎶`,
