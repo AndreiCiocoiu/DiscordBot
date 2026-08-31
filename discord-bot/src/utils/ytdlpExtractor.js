@@ -24,6 +24,9 @@ const GENERATED_COOKIES_PATH = path.join(os.tmpdir(), 'youtube-cookies-generated
 // into the Netscape cookies.txt format yt-dlp actually requires.
 function headerStringToNetscape(headerString) {
   const lines = ['# Netscape HTTP Cookie File'];
+  // A far-future expiration — 0 means "expired in 1970" in this format,
+  // which caused every cookie to be silently dropped as already-expired.
+  const farFutureExpiry = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 * 2; // +2 years
   const pairs = headerString.split(';').map((s) => s.trim()).filter(Boolean);
   for (const pair of pairs) {
     const idx = pair.indexOf('=');
@@ -31,7 +34,7 @@ function headerStringToNetscape(headerString) {
     const name = pair.slice(0, idx).trim();
     const value = pair.slice(idx + 1).trim();
     if (!name) continue;
-    lines.push(['.youtube.com', 'TRUE', '/', 'TRUE', '0', name, value].join('\t'));
+    lines.push(['.youtube.com', 'TRUE', '/', 'TRUE', String(farFutureExpiry), name, value].join('\t'));
   }
   return lines.join('\n') + '\n';
 }
