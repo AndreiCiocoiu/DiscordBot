@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 const db = require('../utils/database');
 const { toSmallCaps } = require('../utils/fancyFont');
+const { postClassShowcase } = require('../utils/aion2Classes');
 
 const ROLE_DEFS = [
   { name: `👑 ${toSmallCaps('Admin')}`, color: 0xE74C3C, permissions: [PermissionFlagsBits.Administrator], hoist: true },
@@ -115,13 +116,6 @@ module.exports = {
     );
     await findOrCreateChannel(guild, `😂・${toSmallCaps('memes')}`, ChannelType.GuildText, chillCategory, []);
     await findOrCreateChannel(guild, `🎮・${toSmallCaps('gaming')}`, ChannelType.GuildText, chillCategory, []);
-    const aion2Channel = await findOrCreateChannel(
-      guild,
-      `🕊️・${toSmallCaps('aion 2')}`,
-      ChannelType.GuildText,
-      chillCategory,
-      []
-    );
     const botCommandsChannel = await findOrCreateChannel(
       guild,
       `🤖・${toSmallCaps('bot-commands')}`,
@@ -138,6 +132,30 @@ module.exports = {
     await findOrCreateChannel(guild, `📷・${toSmallCaps('Camera')}`, ChannelType.GuildVoice, voiceCategory, []);
     await findOrCreateChannel(guild, `😴・${toSmallCaps('AFK')}`, ChannelType.GuildVoice, voiceCategory, []);
 
+    // --- AION 2 ---
+    const aion2Category = await findOrCreateCategory(guild, `🕊️ ${toSmallCaps('AION 2')}`);
+    const aion2NewsChannel = await findOrCreateChannel(
+      guild,
+      `📰・${toSmallCaps('news')}`,
+      ChannelType.GuildText,
+      aion2Category,
+      []
+    );
+    const aion2ClassesChannel = await findOrCreateChannel(
+      guild,
+      `⚔️・${toSmallCaps('classes')}`,
+      ChannelType.GuildText,
+      aion2Category,
+      [{ id: everyone.id, deny: [PermissionFlagsBits.SendMessages], allow: [PermissionFlagsBits.ViewChannel] }]
+    );
+    await findOrCreateChannel(guild, `💬・${toSmallCaps('aion-2-chat')}`, ChannelType.GuildText, aion2Category, []);
+
+    // Post the class showcase into #classes once — not on every /setup re-run.
+    const existingConfig = db.getGuildConfig(guild.id);
+    if (!existingConfig?.aion2ClassesPosted) {
+      await postClassShowcase(aion2ClassesChannel);
+    }
+
     // --- Save config for other commands/events to use ---
     db.saveGuildConfig(guild.id, {
       memberRoleId: Member.id,
@@ -145,7 +163,9 @@ module.exports = {
       adminRoleId: Admin.id,
       welcomeChannelId: welcomeChannel.id,
       botCommandsChannelId: botCommandsChannel.id,
-      aion2ChannelId: aion2Channel.id,
+      aion2NewsChannelId: aion2NewsChannel.id,
+      aion2ClassesChannelId: aion2ClassesChannel.id,
+      aion2ClassesPosted: true,
       levelRoles: {
         5: roles[`🥉 ${toSmallCaps('Level 5')}`].id,
         10: roles[`🥈 ${toSmallCaps('Level 10')}`].id,
@@ -160,7 +180,7 @@ module.exports = {
       .setDescription(
         [
           `**${toSmallCaps('Roles')}:** ${Admin} ${Moderator} ${Member}, plus 🥉 🥈 🥇 💎 rank roles that unlock as you level up`,
-          `**${toSmallCaps('Channels')}:** ${welcomeChannel}, ${generalChat}, 😂 memes, 🎮 gaming, ${aion2Channel}, ${botCommandsChannel} — plus a 🎵 music-commands channel and 4 voice channels`,
+          `**${toSmallCaps('Channels')}:** ${welcomeChannel}, ${generalChat}, 😂 memes, 🎮 gaming, ${botCommandsChannel} — plus a 🎵 music-commands channel, 4 voice channels, and a whole 🕊️ AION 2 category (${aion2NewsChannel}, ${aion2ClassesChannel}, and a chat channel)`,
           '',
           `New members auto-get **${Member.name}** and get welcomed in ${welcomeChannel}.`,
           `Chatting earns XP — level up to unlock rank roles automatically. Try /play to get music going! 🎶`,

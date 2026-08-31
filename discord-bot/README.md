@@ -6,7 +6,7 @@ A Discord bot that sets up your whole server — channels, categories, and ranks
 
 **`/setup`** (admin only) builds:
 - **Roles/ranks:** Admin, Moderator, Member, plus auto-unlocking Level 5 / 10 / 20 / 30 roles
-- **Categories & channels:** Information (welcome, rules, announcements), General (chat, memes, bot-commands), Gaming (chat, LFG, clips), Voice Channels (general + 2 gaming rooms + AFK), and a private Staff category
+- **Categories & channels:** Information (welcome, rules, announcements), General (chat, memes, bot-commands), Gaming (chat, LFG, clips), Voice Channels (general + 2 gaming rooms + AFK), a private Staff category, and a dedicated **AION 2** category (news, classes, chat)
 - New members are automatically given the Member role and welcomed in `#welcome` with a generated image card (avatar in a decorative frame, username, member number)
 
 **Leveling:** everyone earns XP for chatting (1 min cooldown) and levels up automatically, unlocking rank roles.
@@ -15,7 +15,10 @@ A Discord bot that sets up your whole server — channels, categories, and ranks
 
 **Fun:** `/meme` `/8ball` `/coinflip` `/guess`
 
-**AION 2 news:** `/aion2` shows the latest 3 posts on demand. New posts also auto-post to the `🕊️・aion 2` channel (checked every 30 min, adjustable via `AION2_CHECK_INTERVAL_MINUTES`) — pulled straight from AION 2's official Steam news feed, no third-party source or API key needed.
+**AION 2:** a whole `🕊️ AION 2` category, built by `/setup`:
+- `📰・news` — auto-posts new AION 2 announcements (checked every 30 min, adjustable via `AION2_CHECK_INTERVAL_MINUTES`), pulled from the game's official Steam news feed, no third-party source or API key needed. `/aion2` also shows the latest 3 posts on demand, anywhere.
+- `⚔️・classes` — a showcase of all 8 launch classes (role, weapon, playstyle), auto-posted once when `/setup` first runs. Re-post anytime with `/aion2classes` (mod-only). Class art uses the game's official Steam banner for now — send me direct image URLs for individual classes if you want those swapped in.
+- `💬・aion-2-chat` — open discussion channel, no bot involvement.
 
 **Music:** `/play <song name>` — just type what you want, no link needed (a YouTube link still works if you have one). Powered by `yt-dlp` under the hood for reliability. Every "Now Playing" message comes with a full control panel:
 - Row 1: ⏸️/▶️ pause-resume, ⏭️ skip, 🔁 loop, 🔀 shuffle, ⏹️ stop

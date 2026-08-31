@@ -19,9 +19,9 @@ function buildNewsEmbed(item) {
 
 async function checkGuild(client, guildId) {
   const config = db.getGuildConfig(guildId);
-  if (!config?.aion2ChannelId) return;
+  if (!config?.aion2NewsChannelId) return;
 
-  const channel = await client.channels.fetch(config.aion2ChannelId).catch(() => null);
+  const channel = await client.channels.fetch(config.aion2NewsChannelId).catch(() => null);
   if (!channel) return;
 
   try {
