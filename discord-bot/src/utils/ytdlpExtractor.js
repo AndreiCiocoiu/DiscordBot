@@ -73,13 +73,12 @@ function getCommonFlags() {
     noCheckCertificates: true,
     preferFreeFormats: true,
     addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
-    // The default "web" client is the one most often hit by YouTube's
-    // "page needs to be reloaded" extraction bug. "tv" currently gets much
-    // lighter bot-detection scrutiny and doesn't need extra credentials —
-    // "android" was tried here too, but it now requires a separate PO
-    // token setup we don't have, which is what caused "sign in to confirm"
-    // errors even with valid cookies. tv first, web as fallback.
-    extractorArgs: 'youtube:player_client=tv,web',
+    // Deliberately NOT forcing a specific player_client (android/tv/web) —
+    // that was tried here and caused more regressions than it fixed
+    // (android needs a separate PO token setup we don't have; tv was
+    // untested in practice). Plain default client + valid cookies + the
+    // boot-time self-update is the simpler combination that's actually
+    // been confirmed working.
     ...(cookiesPath ? { cookies: cookiesPath } : {}),
   };
 }
