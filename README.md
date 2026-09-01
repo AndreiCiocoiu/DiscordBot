@@ -89,5 +89,11 @@ Run `/setup` as an admin — it builds everything in a few seconds. After it fin
   6. Redeploy (or just restart) and check the boot logs for `[ytdlp-extractor] Using YouTube cookies (...)` instead of the "No YouTube cookies configured" warning.
   7. Treat that value like a password — anyone with it can act as that YouTube account.
   8. (Advanced/alternative: you can instead upload a Netscape-format file directly to `data/youtube-cookies.txt` on the persistent volume — that takes priority over the env var if both are present. The env var is easier for most people since Railway's Variables tab is simple to use, no volume file browser needed.)
+- **For the most reliable setup — route through a residential proxy.** Cookies and client-switching help, but the real reason YouTube flags requests in the first place is that Railway's IP is a datacenter IP. A residential proxy fixes the actual cause instead of working around it:
+  1. Sign up with a residential proxy provider — e.g. [Webshare](https://www.webshare.io) (has a free tier, good for testing) or [DataImpulse](https://dataimpulse.com) (~$1/GB, pay-as-you-go, cheap for ongoing use).
+  2. Get your proxy connection string from their dashboard — it looks like `http://username:password@host:port`.
+  3. In Railway → your service → **Variables**, add `YT_PROXY` with that full string as the value.
+  4. Redeploy. No log confirmation line for this one — just try `/play` and see if it holds up better.
+  5. Treat that value like a password too — regenerate it in your provider's dashboard if it's ever exposed (e.g. pasted in a chat).
 - Everything here uses Discord's native timeout for `/timeout` (no separate mute role needed).
 - Re-running `/setup` is safe — it won't create duplicate roles/channels, it just reuses ones with matching names.

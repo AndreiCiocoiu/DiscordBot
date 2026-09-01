@@ -81,6 +81,10 @@ function getCommonFlags() {
     // being fundamentally inconsistent request-to-request — see README.
     extractorArgs: 'youtube:player_client=tv,web',
     ...(cookiesPath ? { cookies: cookiesPath } : {}),
+    // Optional residential proxy — addresses the actual root cause (Railway's
+    // shared datacenter IPs getting flagged) rather than working around the
+    // symptom. Format: http://username:password@host:port
+    ...(process.env.YT_PROXY ? { proxy: process.env.YT_PROXY } : {}),
   };
 }
 
