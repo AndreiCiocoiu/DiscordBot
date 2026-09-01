@@ -99,6 +99,14 @@ class YtDlpExtractor extends BaseExtractor {
     } else {
       console.log('[ytdlp-extractor] No YouTube cookies configured — running anonymously (more likely to hit "Sign in to confirm" errors). Set the YOUTUBE_COOKIE env var to fix this.');
     }
+
+    if (process.env.YT_PROXY) {
+      // Don't log the full value — it contains a password.
+      const masked = process.env.YT_PROXY.replace(/:([^:@]+)@/, ':****@');
+      console.log(`[ytdlp-extractor] Using proxy (${masked}).`);
+    } else {
+      console.log('[ytdlp-extractor] No YT_PROXY configured — requests go through this server\'s own IP.');
+    }
   }
 
   async validate(query) {
