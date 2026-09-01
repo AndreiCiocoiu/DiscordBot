@@ -19,16 +19,10 @@ module.exports = {
     const query = interaction.options.getString('song');
 
     try {
-      const track = await music.addTrack(
-        interaction.guild,
-        voiceChannel,
-        interaction.channel,
-        query,
-        interaction.user.tag
-      );
+      const track = await music.playSong(voiceChannel, interaction.channel, query, interaction.user);
       await interaction.editReply(`➕ Queued: **${track.title}**`);
     } catch (err) {
-      console.error(err);
+      console.error('play command error:', err);
       await interaction.editReply("Couldn't find or play that — try a different search.");
     }
   },

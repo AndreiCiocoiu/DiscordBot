@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { fetchMeme, addVoteReactions } = require('../utils/memeFetcher');
 
 module.exports = {
   data: new SlashCommandBuilder().setName('meme').setDescription('Get a random meme.'),
@@ -6,16 +7,17 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply();
     try {
-      const res = await fetch('https://meme-api.com/gimme');
-      const data = await res.json();
+      const meme = await fetchMeme();
 
       const embed = new EmbedBuilder()
-        .setTitle(data.title)
-        .setImage(data.url)
-        .setColor(0x5865F2)
-        .setFooter({ text: `👍 ${data.ups} · r/${data.subreddit}` });
+        .setTitle(meme.title)
+        .setImage(meme.imageUrl)
+        .setColor(0x5865f2)
+        .setFooter({ text: `👍 ${meme.ups} · r/${meme.subreddit}` });
 
       await interaction.editReply({ embeds: [embed] });
+      const message = await interaction.fetchReply();
+      await addVoteReactions(message);
     } catch {
       await interaction.editReply("Couldn't fetch a meme right now, try again in a bit.");
     }
