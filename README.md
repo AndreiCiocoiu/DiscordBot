@@ -21,6 +21,10 @@ A Discord bot that sets up your whole server — channels, categories, and ranks
 - `⚔️・classes` — a pure showcase of all 8 launch classes, each posted as a full character render (official art, one per class) followed by its role, weapon, and playstyle description underneath — no buttons here, those live in `🕊️・roles`. Auto-posted once when `/setup` first runs; re-post anytime with `/aion2classes` (mod-only).
 - `💬・aion-2-chat` — open discussion channel, no bot involvement.
 
+**RDR2 Online:** a `🤠 RDR2 Online` category, built by `/setup` — a `💬・rdr2-chat` channel, no bot automation, just a dedicated space for it.
+
+**Game Roles:** a `🎮 Game Roles` category with one channel, `🎮・game-roles` — a single message with a button per game: League, CS2, GTA 5, RDR2, ARK, AION 2 (same role as the AION 2 roles channel — click either, same effect), REPO, Phasmophobia, Minecraft, Terraria. Click to add/remove, same self-toggle pattern as everywhere else.
+
 **Music:** `/play <song name>` — just type what you want, no link needed (a YouTube link still works if you have one). Powered by `yt-dlp` under the hood for reliability. Every "Now Playing" message comes with a full control panel:
 - Row 1: ⏸️/▶️ pause-resume, ⏭️ skip, 🔁 loop, 🔀 shuffle, ⏹️ stop
 - Row 2: ➕ **Request a song** (opens a popup to type a song name/link without using `/play`), 📃 Queue (shows what's up next, only visible to you), 🔊/🔉 volume up/down
@@ -96,4 +100,5 @@ Run `/setup` as an admin — it builds everything in a few seconds. After it fin
   4. Redeploy. No log confirmation line for this one — just try `/play` and see if it holds up better.
   5. Treat that value like a password too — regenerate it in your provider's dashboard if it's ever exposed (e.g. pasted in a chat).
 - Everything here uses Discord's native timeout for `/timeout` (no separate mute role needed).
-- Re-running `/setup` is safe — it won't create duplicate roles/channels, it just reuses ones with matching names.
+- Re-running `/setup` is safe — it fetches a fresh list of channels/roles from Discord first (not just the local cache) before checking what already exists, so it reuses matching ones instead of creating duplicates, even right after a restart when the cache might not be fully warmed up yet.
+- The `🕊️ AION 2` category (news, classes, chat) is only visible to people with the **🕊️ AION 2** role. The `🕊️・roles` channel itself stays visible to everyone, so people can actually see it to opt in — Admins and Moderators can also see the whole category regardless of the role.

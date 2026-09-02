@@ -126,6 +126,13 @@ async function handleAion2GeneralRoleButton(interaction) {
   await toggleRole(interaction, config?.aion2GeneralRoleId, 'AION 2');
 }
 
+async function handleGameRoleButton(interaction) {
+  const gameKey = interaction.customId.replace('gamerole_', '');
+  const config = db.getGuildConfig(interaction.guild.id);
+  const roleId = config?.gameRoleIds?.[gameKey];
+  await toggleRole(interaction, roleId, gameKey);
+}
+
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction, client) {
@@ -164,6 +171,16 @@ module.exports = {
         await handleAion2GeneralRoleButton(interaction);
       } catch (err) {
         console.error('AION 2 general role button error:', err);
+        await interaction.reply({ content: 'Something went wrong with that role.', ephemeral: true }).catch(() => {});
+      }
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('gamerole_')) {
+      try {
+        await handleGameRoleButton(interaction);
+      } catch (err) {
+        console.error('Game role button error:', err);
         await interaction.reply({ content: 'Something went wrong with that role.', ephemeral: true }).catch(() => {});
       }
       return;
