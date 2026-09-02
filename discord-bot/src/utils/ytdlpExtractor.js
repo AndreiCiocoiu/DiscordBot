@@ -73,13 +73,18 @@ function getCommonFlags() {
     noCheckCertificates: true,
     preferFreeFormats: true,
     addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
-    // Deliberately NOT forcing a specific player_client (android/tv/web) —
-    // that was tried here and caused more regressions than it fixed
-    // (android needs a separate PO token setup we don't have; tv was
-    // untested in practice). Plain default client + valid cookies + the
-    // boot-time self-update is the simpler combination that's actually
-    // been confirmed working.
+    // "tv" client currently gets lighter bot-detection scrutiny than the
+    // default "web" client and needs no extra token (unlike "android",
+    // which was tried here before and made things worse — it requires a
+    // separate PO token setup). Falls back to web if tv doesn't work for a
+    // given video. This helps, but won't eliminate YouTube's bot-detection
+    // being fundamentally inconsistent request-to-request — see README.
+    extractorArgs: 'youtube:player_client=tv,web',
     ...(cookiesPath ? { cookies: cookiesPath } : {}),
+    // Optional residential proxy — addresses the actual root cause (Railway's
+    // shared datacenter IPs getting flagged) rather than working around the
+    // symptom. Format: http://username:password@host:port
+    ...(process.env.YT_PROXY ? { proxy: process.env.YT_PROXY } : {}),
   };
 }
 
@@ -93,6 +98,14 @@ class YtDlpExtractor extends BaseExtractor {
       console.log(`[ytdlp-extractor] Using YouTube cookies (${cookiesPath}).`);
     } else {
       console.log('[ytdlp-extractor] No YouTube cookies configured — running anonymously (more likely to hit "Sign in to confirm" errors). Set the YOUTUBE_COOKIE env var to fix this.');
+    }
+
+    if (process.env.YT_PROXY) {
+      // Don't log the full value — it contains a password.
+      const masked = process.env.YT_PROXY.replace(/:([^:@]+)@/, ':****@');
+      console.log(`[ytdlp-extractor] Using proxy (${masked}).`);
+    } else {
+      console.log('[ytdlp-extractor] No YT_PROXY configured — requests go through this server\'s own IP.');
     }
   }
 
