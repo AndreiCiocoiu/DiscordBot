@@ -7,6 +7,7 @@ process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', 
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
 
 const razii = require('./src/utils/razii');
+const raziiUi = require('./src/utils/raziiUi');
 
 const client = new Client({
   intents: [
@@ -48,11 +49,11 @@ client.once(Events.ClientReady, async (c) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (interaction.isButton()) {
+  if (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) {
     try {
-      await razii.handleButton(interaction, client); // ignores buttons that aren't ours
+      await raziiUi.handleInteraction(interaction, client); // ignores components that aren't ours
     } catch (err) {
-      console.error('Button error:', err);
+      console.error('Component error:', err);
       const payload = { content: 'Something went wrong.', ephemeral: true };
       if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
       else await interaction.reply(payload).catch(() => {});
@@ -83,7 +84,8 @@ client.on(Events.MessageCreate, async (message) => {
     channelId: message.channel.id,
     userId: message.author.id,
   });
-  await message.reply({ content: razii.startMessage(result), allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
+  if (!result.ok) return;
+  await message.reply({ ...raziiUi.startPayload(result), allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
 });
 
 client.login(process.env.DISCORD_TOKEN);
