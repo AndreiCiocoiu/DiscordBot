@@ -1,9 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
-  data: new SlashCommandBuilder().setName('ping').setDescription("Check the bot's latency."),
-
+  data: new SlashCommandBuilder().setName('ping').setDescription('Check that the bot is alive.'),
   async execute(interaction) {
-    await interaction.reply(`🏓 Pong! Latency: ${Math.round(interaction.client.ws.ping)}ms`);
+    await interaction.reply('pong');
   },
 };

@@ -11,23 +11,10 @@ for (const file of fs.readdirSync(commandsPath).filter((f) => f.endsWith('.js'))
 }
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+const route = process.env.GUILD_ID
+  ? Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
+  : Routes.applicationCommands(process.env.CLIENT_ID);
 
-(async () => {
-  try {
-    console.log(`Deploying ${commands.length} slash commands...`);
-
-    const route = process.env.GUILD_ID
-      ? Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
-      : Routes.applicationCommands(process.env.CLIENT_ID);
-
-    await rest.put(route, { body: commands });
-
-    console.log(
-      process.env.GUILD_ID
-        ? 'Deployed instantly to the test guild.'
-        : 'Deployed globally — can take up to an hour to show up everywhere.'
-    );
-  } catch (err) {
-    console.error(err);
-  }
-})();
+rest.put(route, { body: commands })
+  .then(() => console.log(`Deployed ${commands.length} command(s). Old ones not in src/commands are removed.`))
+  .catch(console.error);
