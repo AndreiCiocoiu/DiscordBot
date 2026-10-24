@@ -64,7 +64,8 @@ module.exports = {
     // The channel the command runs in can't be deleted mid-reply.
     const delChannels = [...channels.values()].filter((c) => c && !keep.has(c.id) && c.id !== interaction.channelId);
     const skippedHere = !keep.has(interaction.channelId) ? channels.get(interaction.channelId) : null;
-    const delRoles = [...roles.values()].filter((r) => r.id !== guild.id && !r.managed && r.editable);
+    const isRazie = (r) => r.name.toLowerCase() === 'razie'; // keep the alert role
+    const delRoles = [...roles.values()].filter((r) => r.id !== guild.id && !r.managed && r.editable && !isRazie(r));
     const blocked = [...roles.values()].filter((r) => r.id !== guild.id && !r.managed && !r.editable);
 
     const list = (arr) => arr.map((x) => x.name).join(', ') || '-';

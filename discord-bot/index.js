@@ -6,7 +6,16 @@ const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const razii = require('./src/utils/razii');
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent, // needed for the "razie <zona>" text trigger
+  ],
+});
 client.commands = new Collection();
 
 const commandsPath = path.join(__dirname, 'src', 'commands');
@@ -17,6 +26,7 @@ for (const file of fs.readdirSync(commandsPath).filter((f) => f.endsWith('.js'))
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`Logged in as ${c.user.tag}`);
+  razii.restore(client);
 
   // Register the slash commands on every start, so a Railway redeploy is
   // enough and `npm run deploy` isn't needed. Anything not in src/commands
@@ -38,6 +48,17 @@ client.once(Events.ClientReady, async (c) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
+  if (interaction.isButton()) {
+    try {
+      await razii.handleButton(interaction, client); // ignores buttons that aren't ours
+    } catch (err) {
+      console.error('Button error:', err);
+      const payload = { content: 'Something went wrong.', ephemeral: true };
+      if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
+      else await interaction.reply(payload).catch(() => {});
+    }
+    return;
+  }
   if (!interaction.isChatInputCommand()) return;
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
@@ -49,6 +70,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
     else await interaction.reply(payload).catch(() => {});
   }
+});
+
+// Text trigger: write "razie Valentine" in any channel the bot can read.
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot || !message.guild) return;
+  const m = message.content.trim().match(/^razie\s+(.+)$/i);
+  if (!m) return;
+  const result = razii.start(client, {
+    guildId: message.guild.id,
+    zone: m[1],
+    channelId: message.channel.id,
+    userId: message.author.id,
+  });
+  await message.reply({ content: razii.startMessage(result), allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
 });
 
 client.login(process.env.DISCORD_TOKEN);
