@@ -57,7 +57,11 @@ function startPayload(result) {
     .setFooter({ text: result.replaced ? 'Timerul vechi a fost înlocuit.' : 'Greșeală? Apasă Anulează.' });
   return {
     embeds: [embed],
-    components: [row(btn(`rz:x:${t.zone}`, 'Anulează timerul', ButtonStyle.Danger), btn(`rz:r:${t.zone}`, `Repornește ${core.cooldownLabel()}`))],
+    components: [row(
+      btn(`rz:x:${t.zone}`, 'Anulează timerul', ButtonStyle.Danger),
+      btn(`rz:r:${t.zone}`, `Repornește ${core.cooldownLabel()}`),
+      btn(`rz:e:${t.zone}`, 'A venit mai repede', ButtonStyle.Primary),
+    )],
     allowedMentions: NO_PING,
   };
 }
@@ -74,7 +78,7 @@ function historyEmbed(guildId) {
   const embed = new EmbedBuilder().setColor(BLURPLE).setTitle('Istoric razii');
   embed.setDescription(
     rows.length
-      ? rows.map((h) => `**${h.zone}** · <t:${unix(h.at)}:f> · ${core.STATUS_LABEL[h.status]}`).join('\n').slice(0, 3800)
+      ? rows.map((h) => `**${h.zone}** · <t:${unix(h.at)}:f> · ${core.STATUS_LABEL[h.status]}${h.early ? ' (mai devreme)' : ''}`).join('\n').slice(0, 3800)
       : 'Nicio razie în istoric încă.'
   );
   return embed;
@@ -100,6 +104,20 @@ function statsEmbed(guildId) {
   return embed;
 }
 
+function earlyPayload(res, userId) {
+  const e = res.entry;
+  const embed = new EmbedBuilder()
+    .setColor(GREEN)
+    .setTitle('Razie venită mai devreme')
+    .setDescription(`${timerLine(e)}\nConfirmată de <@${userId}>. Cooldown-ul a pornit de acum.`);
+  return {
+    content: '',
+    embeds: [embed],
+    components: [row(btn(`rz:ue:${res.prevEndsAt}:${e.zone}`, 'Anulează (am apăsat greșit)'))],
+    allowedMentions: NO_PING,
+  };
+}
+
 // ---- panel --------------------------------------------------------------
 
 function panelRows() {
@@ -111,7 +129,8 @@ function panelRows() {
       btn('rz:stats', 'Statistici'),
     ),
     row(
-      btn('rz:role', 'Alerte on/off', ButtonStyle.Primary),
+      btn('rz:early', 'A venit mai repede', ButtonStyle.Primary),
+      btn('rz:role', 'Alerte on/off'),
       btn('rz:set', 'Setări'),
     ),
   ];
@@ -193,6 +212,7 @@ async function announceWarn(client, entry) {
   await channel.send({
     content: role ? `<@&${role.id}>` : undefined,
     embeds: [embed],
+    components: [row(btn(`rz:e:${entry.zone}`, 'A venit mai repede', ButtonStyle.Primary))],
     allowedMentions: { roles: role ? [role.id] : [] },
   });
 }
@@ -319,6 +339,35 @@ async function handleInteraction(interaction, client) {
       return true;
     }
 
+    if (kind === 'early') {
+      const timers = core.list(guildId).slice(0, 25);
+      if (!timers.length) { await interaction.reply({ content: 'Niciun timer activ.', ephemeral: true }); return true; }
+      await interaction.reply({
+        content: 'La ce zonă a venit mai repede?',
+        components: [row(new StringSelectMenuBuilder().setCustomId('rz:s:early').setPlaceholder('Alege zona')
+          .addOptions(timers.map((x) => ({ label: x.zone.slice(0, 100), value: x.zone.slice(0, 100) }))))],
+        ephemeral: true,
+      });
+      return true;
+    }
+
+    if (kind === 'e') { // came earlier, from the start / warning message
+      const res = core.earlyRaid(client, { guildId, zone: arg, channelId: interaction.channelId, userId: interaction.user.id });
+      if (!res.ok) { await interaction.reply({ content: 'Nu mai există timer pentru zona asta.', ephemeral: true }); return true; }
+      await interaction.update(earlyPayload(res, interaction.user.id));
+      return true;
+    }
+
+    if (kind === 'ue') { // undo "came earlier"
+      const [prev, ...zoneParts] = arg.split(':');
+      const zone = zoneParts.join(':');
+      const entry = core.undoEarly(client, { guildId, zone, prevEndsAt: Number(prev), channelId: interaction.channelId, userId: interaction.user.id });
+      await interaction.update(entry
+        ? startPayload({ ok: true, entry, replaced: true })
+        : { embeds: [new EmbedBuilder().setColor(GREY).setTitle('Anulat').setDescription(`**${zone}**: raziea a fost scoasă din istoric.`)], components: [], allowedMentions: NO_PING });
+      return true;
+    }
+
     if (kind === 'hist') { await interaction.reply({ embeds: [historyEmbed(guildId)], ephemeral: true }); return true; }
     if (kind === 'stats') { await interaction.reply({ embeds: [statsEmbed(guildId)], ephemeral: true }); return true; }
 
@@ -401,6 +450,14 @@ async function handleInteraction(interaction, client) {
       const result = core.start(client, { guildId, zone: value, channelId: interaction.channelId, userId: interaction.user.id });
       await interaction.update({ content: `Pornit: **${value}**.`, components: [] });
       await interaction.channel.send(startPayload(result)).catch(log('send'));
+      return true;
+    }
+
+    if (kind === 's' && arg === 'early') {
+      const res = core.earlyRaid(client, { guildId, zone: value, channelId: interaction.channelId, userId: interaction.user.id });
+      if (!res.ok) { await interaction.update({ content: 'Nu mai există timer pentru zona asta.', components: [] }); return true; }
+      await interaction.update({ content: `Marcat: **${value}**.`, components: [] });
+      await interaction.channel.send(earlyPayload(res, interaction.user.id)).catch(log('send'));
       return true;
     }
 

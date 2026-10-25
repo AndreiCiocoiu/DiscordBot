@@ -5,6 +5,7 @@ Everything works with buttons. Post the panel once with `/razie panou`:
 
 - **Porneste timer**: pick a saved zone from a menu, or "Alta zona / minute ramase" (modal) to type a new zone and, if you started late, the minutes that are left.
 - **Anuleaza**: menu with the active timers (or all of them).
+- **A venit mai repede**: the raid came before the timer ended. Logs it as confirmed now and restarts the full cooldown from this moment (also a button on the start and warning messages; has an undo button).
 - **Istoric / Statistici**: last raids and per-zone stats.
 - **Alerte on/off**: get / drop the @Razie role.
 - **Setari** (admin): voice siren on/off, 10 minute warning on/off, notification channel, remove saved zones.

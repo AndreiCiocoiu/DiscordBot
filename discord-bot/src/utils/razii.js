@@ -148,6 +148,34 @@ function cancelAll(client, guildId) {
   return mine.length;
 }
 
+// The raid came before the timer ended: log it as confirmed right now and
+// restart the full cooldown from this moment.
+function earlyRaid(client, { guildId, zone, channelId, userId }) {
+  const old = db.timers[keyOf(guildId, zone)];
+  if (!old) return { ok: false, reason: 'none' };
+  clearHandles(old.key);
+  delete db.timers[old.key];
+  db.history.push({ guildId, zone: old.zone, at: Date.now(), status: 'confirmed', early: true });
+  if (db.history.length > HISTORY_CAP) db.history.splice(0, db.history.length - HISTORY_CAP);
+  save();
+  const res = start(client, { guildId, zone: old.zone, channelId, userId });
+  return { ok: true, entry: res.entry, prevEndsAt: old.endsAt };
+}
+
+// Undo earlyRaid: drop the logged raid and put the old timer back.
+function undoEarly(client, { guildId, zone, prevEndsAt, channelId, userId }) {
+  const z = zone.toLowerCase();
+  for (let i = db.history.length - 1; i >= 0; i--) {
+    const h = db.history[i];
+    if (h.guildId === guildId && h.zone.toLowerCase() === z && h.early) { db.history.splice(i, 1); break; }
+  }
+  cancel(client, guildId, zone);
+  const minutes = (prevEndsAt - Date.now()) / 60_000;
+  if (minutes > 0.1) return start(client, { guildId, zone, minutes, channelId, userId }).entry;
+  save();
+  return null;
+}
+
 const list = (guildId) =>
   Object.values(db.timers).filter((t) => t.guildId === guildId).sort((a, b) => a.endsAt - b.endsAt);
 
@@ -294,7 +322,7 @@ async function sirenInVoice(client, guild, preferUserId) {
 
 module.exports = {
   // timers
-  start, cancel, cancelAll, list, restore,
+  start, cancel, cancelAll, earlyRaid, undoEarly, list, restore,
   // config / zones / role
   cfg, setConfig, removeZone, panelGuilds, ensureRole, toggleRole,
   // history
