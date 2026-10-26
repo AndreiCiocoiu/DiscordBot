@@ -2,19 +2,18 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
+const razii = require('./src/utils/razii');
+const raziiUi = require('./src/utils/raziiUi');
 
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
-
-const razii = require('./src/utils/razii');
-const raziiUi = require('./src/utils/raziiUi');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent, // needed for the "razie <zona>" text trigger
+    GatewayIntentBits.MessageContent, // for the "razie <zona>" text trigger
   ],
 });
 client.commands = new Collection();
@@ -29,9 +28,7 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`Logged in as ${c.user.tag}`);
   razii.restore(client);
 
-  // Register the slash commands on every start, so a Railway redeploy is
-  // enough and `npm run deploy` isn't needed. Anything not in src/commands
-  // is removed from Discord.
+  // Register the slash commands on every start (anything not in src/commands is removed).
   const body = [...client.commands.values()].map((cmd) => cmd.data.toJSON());
   try {
     if (process.env.GUILD_ID) {
@@ -41,51 +38,61 @@ client.once(Events.ClientReady, async (c) => {
       console.log(`Registered ${body.length} command(s) in guild ${guild.name}.`);
     } else {
       await c.application.commands.set(body);
-      console.log(`Registered ${body.length} global command(s) (can take a while to show up; set GUILD_ID for instant).`);
+      console.log(`Registered ${body.length} global command(s). Set GUILD_ID for instant updates.`);
     }
   } catch (err) {
     console.error('Failed to register commands:', err);
   }
 });
 
+async function fail(interaction, err) {
+  if (err?.code === 10062 || err?.code === 40060) return; // expired / already answered
+  console.error('Interaction error:', err);
+  const payload = { content: 'Ceva nu a mers, mai încearcă o dată.', ephemeral: true };
+  if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
+  else await interaction.reply(payload).catch(() => {});
+}
+
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) {
-    try {
-      await raziiUi.handleInteraction(interaction, client); // ignores components that aren't ours
-    } catch (err) {
-      console.error('Component error:', err);
-      const payload = { content: 'Something went wrong.', ephemeral: true };
-      if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
-      else await interaction.reply(payload).catch(() => {});
-    }
-    return;
-  }
-  if (!interaction.isChatInputCommand()) return;
-  const command = client.commands.get(interaction.commandName);
-  if (!command) return;
   try {
-    await command.execute(interaction, client);
+    if (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) {
+      await raziiUi.handleInteraction(interaction, client); // ignores components that aren't ours
+    } else if (interaction.isChatInputCommand()) {
+      const command = client.commands.get(interaction.commandName);
+      if (command) await command.execute(interaction, client);
+    }
   } catch (err) {
-    console.error(`Error in /${interaction.commandName}:`, err);
-    const payload = { content: 'Something went wrong.', ephemeral: true };
-    if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
-    else await interaction.reply(payload).catch(() => {});
+    await fail(interaction, err);
   }
 });
 
-// Text trigger: write "razie Valentine" in any channel the bot can read.
+// Text trigger: "razie Valentine". Only works in the panel / alert channel
+// (or anywhere if no panel exists yet), at most once every 2 seconds per user.
+const lastUse = new Map();
 client.on(Events.MessageCreate, async (message) => {
-  if (message.author.bot || !message.guild) return;
-  const m = message.content.trim().match(/^razie\s+(.+)$/i);
-  if (!m) return;
-  const result = razii.start(client, {
-    guildId: message.guild.id,
-    zone: m[1],
-    channelId: message.channel.id,
-    userId: message.author.id,
-  });
-  if (!result.ok) return;
-  await message.reply({ ...raziiUi.startPayload(result), allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
+  try {
+    if (message.author.bot || !message.guild) return;
+    const m = message.content.trim().match(/^razie\s+(.+)$/i);
+    if (!m) return;
+
+    const c = razii.cfg(message.guild.id);
+    const allowed = [c.panel?.channelId, c.channelId].filter(Boolean);
+    if (allowed.length && !allowed.includes(message.channel.id)) return;
+
+    const now = Date.now();
+    if (now - (lastUse.get(message.author.id) || 0) < 2000) return;
+    lastUse.set(message.author.id, now);
+
+    const res = razii.start(client, { guildId: message.guild.id, zone: m[1], userId: message.author.id });
+    if (!res.ok) return;
+    if (c.panel) {
+      await message.react('✅').catch(() => message.reply({ content: `Pornit: **${res.entry.zone}**`, allowedMentions: { parse: [] } }).catch(() => {}));
+    } else {
+      await message.reply({ content: `Pornit: **${res.entry.zone}** · <t:${Math.floor(res.entry.endsAt / 1000)}:R>`, allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
+    }
+  } catch (err) {
+    console.error('Text trigger error:', err);
+  }
 });
 
 client.login(process.env.DISCORD_TOKEN);

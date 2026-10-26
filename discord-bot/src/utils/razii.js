@@ -1,7 +1,7 @@
-// Razie (police raid) core: timers, history, config, role and voice.
-// Everything is saved to disk so it survives restarts (on Railway, mount a
-// Volume at the data folder, otherwise a redeploy wipes it).
-// All Discord messages/buttons live in raziiUi.js.
+// Razie core: timers, history, config, role, voice.
+// Data is saved to disk (atomically), so it survives restarts. On Railway,
+// mount a Volume at the data folder, otherwise a redeploy wipes it.
+// Everything the user sees (messages, buttons, panel) is in raziiUi.js.
 const fs = require('fs');
 const path = require('path');
 const { PermissionFlagsBits } = require('discord.js');
@@ -14,20 +14,34 @@ const ASSETS = path.join(__dirname, '..', '..', 'assets');
 const DEFAULT_MINUTES = Number(process.env.RAZIE_MINUTES) || 180; // 3 hours
 const WARN_MINUTES = Number(process.env.RAZIE_WARN_MINUTES) || 10;
 const ROLE_NAME = 'Razie';
-const HISTORY_CAP = 1000;
-const MAX_ZONES = 25;
+const HISTORY_CAP = 200;
+const MAX_ZONES = 20;
 const AUDIO_EXT = ['mp3', 'wav', 'ogg', 'm4a'];
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
-let db = { timers: {}, config: {}, history: [] };
-try {
-  db = { timers: {}, config: {}, history: [], ...JSON.parse(fs.readFileSync(FILE, 'utf8')) };
-} catch { /* first run */ }
+// ---- storage ------------------------------------------------------------
 
-const handles = new Map(); // key -> { fire, warn }
+function load() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+    return { timers: raw.timers || {}, config: raw.config || {}, history: raw.history || [] };
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      try { fs.renameSync(FILE, `${FILE}.bak`); console.warn('razii: data file was corrupt, moved to razii.json.bak'); } catch { /* ignore */ }
+    }
+    return { timers: {}, config: {}, history: [] };
+  }
+}
 
-const save = () => fs.writeFileSync(FILE, JSON.stringify(db, null, 2));
+let db = load();
+
+function save() {
+  const tmp = `${FILE}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(db)); // write + rename = never half-written
+  fs.renameSync(tmp, FILE);
+}
+
 const keyOf = (guildId, zone) => `${guildId}:${zone.trim().toLowerCase()}`;
 const cleanZone = (zone) => zone.replace(/\s+/g, ' ').trim().slice(0, 60);
 const log = (what) => (err) => console.error(`razii ${what}:`, err);
@@ -42,7 +56,13 @@ function setConfig(guildId, patch) {
   save();
 }
 
-function addZone(guildId, zone) {
+function removeZone(guildId, zone) {
+  const c = cfg(guildId);
+  c.zones = (c.zones || []).filter((z) => z.toLowerCase() !== zone.toLowerCase());
+  save();
+}
+
+function rememberZone(guildId, zone) {
   const c = cfg(guildId);
   c.zones ||= [];
   if (!c.zones.some((z) => z.toLowerCase() === zone.toLowerCase())) {
@@ -50,14 +70,6 @@ function addZone(guildId, zone) {
     if (c.zones.length > MAX_ZONES) c.zones.shift();
   }
 }
-
-function removeZone(guildId, zone) {
-  const c = cfg(guildId);
-  c.zones = (c.zones || []).filter((z) => z.toLowerCase() !== zone.toLowerCase());
-  save();
-}
-
-const panelGuilds = () => Object.keys(db.config).filter((g) => db.config[g].panel);
 
 // ---- role ---------------------------------------------------------------
 
@@ -73,7 +85,7 @@ async function ensureRole(guild) {
       .create({ name: ROLE_NAME, color: 0xe74c3c, mentionable: true, reason: 'Alerte de razie' })
       .catch((err) => { console.warn('razii: could not create role:', err.message); return null; });
   }
-  if (role) { c.roleId = role.id; save(); }
+  if (role && c.roleId !== role.id) { c.roleId = role.id; save(); }
   return role;
 }
 
@@ -82,10 +94,12 @@ async function toggleRole(member) {
   if (!role) return { ok: false };
   const has = member.roles.cache.has(role.id);
   await (has ? member.roles.remove(role) : member.roles.add(role));
-  return { ok: true, has: !has, role };
+  return { ok: true, has: !has };
 }
 
 // ---- timers -------------------------------------------------------------
+
+const handles = new Map(); // key -> { fire, warn }
 
 function clearHandles(key) {
   const h = handles.get(key);
@@ -96,45 +110,39 @@ function clearHandles(key) {
 function schedule(client, entry) {
   clearHandles(entry.key);
   const now = Date.now();
-  const h = {};
-  h.fire = setTimeout(() => fire(client, entry).catch(log('fire')), Math.max(0, entry.endsAt - now));
+  const h = { fire: setTimeout(() => fire(client, entry).catch(log('fire')), Math.max(0, entry.endsAt - now)) };
   const warnAt = entry.endsAt - WARN_MINUTES * 60_000;
-  if (!entry.warned && warnAt > now) {
-    h.warn = setTimeout(() => warn(client, entry).catch(log('warn')), warnAt - now);
-  }
+  if (!entry.warned && warnAt > now) h.warn = setTimeout(() => warn(client, entry).catch(log('warn')), warnAt - now);
   handles.set(entry.key, h);
 }
 
-// Starting a zone that already has a timer simply replaces it (fix a mistake
-// by writing it again).
-function start(client, { guildId, zone, minutes, channelId, userId }) {
-  zone = cleanZone(zone);
-  if (!zone) return { ok: false, reason: 'empty' };
-  const key = keyOf(guildId, zone);
-  const replaced = Boolean(db.timers[key]);
-  if (replaced) clearHandles(key);
+function drop(client, entry) {
+  clearHandles(entry.key);
+  delete db.timers[entry.key];
+  ui().clearWarn(client, entry).catch(log('clearWarn'));
+}
 
-  const now = Date.now();
-  const entry = {
-    key, guildId, zone, channelId, userId, warned: false,
-    startedAt: now,
-    totalMs: DEFAULT_MINUTES * 60_000,
-    endsAt: now + (minutes || DEFAULT_MINUTES) * 60_000,
-  };
+// Starting a zone that already has a timer replaces it (fixes a mistake).
+function start(client, { guildId, zone, minutes, userId }) {
+  zone = cleanZone(zone || '');
+  if (!zone) return { ok: false };
+  const key = keyOf(guildId, zone);
+  const old = db.timers[key];
+  if (old) drop(client, old);
+
+  const entry = { key, guildId, zone, userId, warned: false, endsAt: Date.now() + (minutes || DEFAULT_MINUTES) * 60_000 };
   db.timers[key] = entry;
-  addZone(guildId, zone);
+  rememberZone(guildId, zone);
   save();
   schedule(client, entry);
   ui().updatePanel(client, guildId).catch(log('panel'));
-  return { ok: true, entry, replaced };
+  return { ok: true, entry, replaced: Boolean(old) };
 }
 
 function cancel(client, guildId, zone) {
-  const key = keyOf(guildId, zone);
-  const entry = db.timers[key];
+  const entry = db.timers[keyOf(guildId, zone)];
   if (!entry) return null;
-  clearHandles(key);
-  delete db.timers[key];
+  drop(client, entry);
   save();
   ui().updatePanel(client, guildId).catch(log('panel'));
   return entry;
@@ -142,38 +150,10 @@ function cancel(client, guildId, zone) {
 
 function cancelAll(client, guildId) {
   const mine = list(guildId);
-  for (const e of mine) { clearHandles(e.key); delete db.timers[e.key]; }
+  mine.forEach((e) => drop(client, e));
   save();
   ui().updatePanel(client, guildId).catch(log('panel'));
   return mine.length;
-}
-
-// The raid came before the timer ended: log it as confirmed right now and
-// restart the full cooldown from this moment.
-function earlyRaid(client, { guildId, zone, channelId, userId }) {
-  const old = db.timers[keyOf(guildId, zone)];
-  if (!old) return { ok: false, reason: 'none' };
-  clearHandles(old.key);
-  delete db.timers[old.key];
-  db.history.push({ guildId, zone: old.zone, at: Date.now(), status: 'confirmed', early: true });
-  if (db.history.length > HISTORY_CAP) db.history.splice(0, db.history.length - HISTORY_CAP);
-  save();
-  const res = start(client, { guildId, zone: old.zone, channelId, userId });
-  return { ok: true, entry: res.entry, prevEndsAt: old.endsAt };
-}
-
-// Undo earlyRaid: drop the logged raid and put the old timer back.
-function undoEarly(client, { guildId, zone, prevEndsAt, channelId, userId }) {
-  const z = zone.toLowerCase();
-  for (let i = db.history.length - 1; i >= 0; i--) {
-    const h = db.history[i];
-    if (h.guildId === guildId && h.zone.toLowerCase() === z && h.early) { db.history.splice(i, 1); break; }
-  }
-  cancel(client, guildId, zone);
-  const minutes = (prevEndsAt - Date.now()) / 60_000;
-  if (minutes > 0.1) return start(client, { guildId, zone, minutes, channelId, userId }).entry;
-  save();
-  return null;
 }
 
 const list = (guildId) =>
@@ -182,11 +162,7 @@ const list = (guildId) =>
 function restore(client) {
   for (const entry of Object.values(db.timers)) schedule(client, entry);
   console.log(`Razii: restored ${Object.keys(db.timers).length} timer(s).`);
-  // keep the live panels fresh (progress bar + colour)
-  setInterval(() => ui().refreshPanels(client).catch(log('refresh')), 60_000);
 }
-
-// ---- warn + fire --------------------------------------------------------
 
 async function warn(client, entry) {
   entry.warned = true;
@@ -196,63 +172,69 @@ async function warn(client, entry) {
 }
 
 async function fire(client, entry) {
-  clearHandles(entry.key);
-  delete db.timers[entry.key];
+  drop(client, entry);
   db.history.push({ guildId: entry.guildId, zone: entry.zone, at: entry.endsAt, status: 'pending' });
   if (db.history.length > HISTORY_CAP) db.history.splice(0, db.history.length - HISTORY_CAP);
   save();
 
   const late = Date.now() - entry.endsAt > 60_000;
   await ui().announceFire(client, entry, late).catch(log('announce'));
-
   if (!late && cfg(entry.guildId).voice !== false) {
     const guild = await client.guilds.fetch(entry.guildId).catch(() => null);
     if (guild) await sirenInVoice(client, guild, entry.userId).catch(log('voice'));
   }
 }
 
-// ---- history + stats ----------------------------------------------------
+// The raid came before the timer ended: log it now and restart the cooldown.
+function earlyRaid(client, { guildId, zone, userId }) {
+  const old = db.timers[keyOf(guildId, zone)];
+  if (!old) return { ok: false };
+  drop(client, old);
+  db.history.push({ guildId, zone: old.zone, at: Date.now(), status: 'confirmed', early: true });
+  if (db.history.length > HISTORY_CAP) db.history.splice(0, db.history.length - HISTORY_CAP);
+  const res = start(client, { guildId, zone: old.zone, userId });
+  return { ok: true, entry: res.entry, prevEndsAt: old.endsAt };
+}
+
+// Undo earlyRaid: remove the logged raid and put the old timer back.
+function undoEarly(client, { guildId, zone, prevEndsAt, userId }) {
+  const z = zone.toLowerCase();
+  for (let i = db.history.length - 1; i >= 0; i--) {
+    const h = db.history[i];
+    if (h.guildId === guildId && h.zone.toLowerCase() === z && h.early) { db.history.splice(i, 1); break; }
+  }
+  cancel(client, guildId, zone);
+  const minutes = (prevEndsAt - Date.now()) / 60_000;
+  const entry = minutes > 0.1 ? start(client, { guildId, zone, minutes, userId }).entry : null;
+  save();
+  return entry;
+}
+
+// ---- history ------------------------------------------------------------
 
 function markHistory(guildId, zone, from, to) {
   const z = zone.toLowerCase();
   for (let i = db.history.length - 1; i >= 0; i--) {
     const h = db.history[i];
-    if (h.guildId === guildId && h.zone.toLowerCase() === z && (from === null || h.status === from)) {
-      h.status = to;
-      save();
-      return h;
-    }
+    if (h.guildId === guildId && h.zone.toLowerCase() === z && h.status === from) { h.status = to; save(); return h; }
   }
   return null;
 }
 
 const STATUS_LABEL = { pending: 'neconfirmată', confirmed: 'confirmată', none: 'n-a fost' };
-
 const recent = (guildId, n = 10) => db.history.filter((h) => h.guildId === guildId).slice(-n).reverse();
 
-function stats(guildId) {
-  const byZone = new Map();
-  for (const h of db.history.filter((x) => x.guildId === guildId)) {
-    const key = h.zone.toLowerCase();
-    if (!byZone.has(key)) byZone.set(key, { zone: h.zone, total: 0, confirmed: 0, none: 0, times: [] });
-    const z = byZone.get(key);
-    z.total++;
-    if (h.status === 'confirmed') { z.confirmed++; z.times.push(h.at); }
-    if (h.status === 'none') z.none++;
-  }
-  const weekAgo = Date.now() - 7 * 24 * 3600_000;
-  return [...byZone.values()].map((z) => {
-    const gaps = z.times.slice(1).map((t, i) => t - z.times[i]);
-    return {
-      zone: z.zone, total: z.total, confirmed: z.confirmed, none: z.none,
-      last: z.times.length ? z.times[z.times.length - 1] : null,
-      avgGapMin: gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length / 60_000) : null,
-      last7: z.times.filter((t) => t > weekAgo).length,
-    };
-  }).sort((a, b) => b.confirmed - a.confirmed);
-}
+// ---- voice (one at a time per server) -----------------------------------
 
-// ---- voice --------------------------------------------------------------
+const voiceQueues = new Map();
+
+function queueVoice(guildId, job) {
+  const prev = voiceQueues.get(guildId) || Promise.resolve();
+  const next = prev.catch(() => {}).then(job);
+  voiceQueues.set(guildId, next);
+  next.catch(() => {}).finally(() => { if (voiceQueues.get(guildId) === next) voiceQueues.delete(guildId); });
+  return next;
+}
 
 function pickVoiceChannel(client, guild, preferUserId) {
   const counts = new Map();
@@ -277,42 +259,36 @@ function findVoiceRecording() {
   return null;
 }
 
-function audioFiles() {
-  const files = [path.join(ASSETS, 'siren.wav')];
-  const rec = findVoiceRecording();
-  if (rec) files.push(rec);
-  return files;
-}
-
 function saveRecording(buffer, ext) {
   for (const e of AUDIO_EXT) fs.rmSync(path.join(DATA_DIR, `atentie.${e}`), { force: true });
   fs.writeFileSync(path.join(DATA_DIR, `atentie.${ext}`), buffer);
 }
 
-async function playInChannel(guild, channel) {
-  const voice = require('@discordjs/voice');
-  const perms = channel.permissionsFor(guild.members.me);
-  if (!perms?.has(PermissionFlagsBits.Connect) || !perms.has(PermissionFlagsBits.Speak)) {
-    throw new Error(`Botul nu are Connect/Speak în ${channel.name}.`);
-  }
-  const connection = voice.joinVoiceChannel({
-    channelId: channel.id,
-    guildId: guild.id,
-    adapterCreator: guild.voiceAdapterCreator,
-    selfDeaf: true,
-  });
-  try {
-    await voice.entersState(connection, voice.VoiceConnectionStatus.Ready, 20_000);
-    const player = voice.createAudioPlayer();
-    connection.subscribe(player);
-    for (const file of audioFiles()) {
-      player.play(voice.createAudioResource(file));
-      await voice.entersState(player, voice.AudioPlayerStatus.Playing, 10_000);
-      await voice.entersState(player, voice.AudioPlayerStatus.Idle, 60_000);
+function playInChannel(guild, channel) {
+  return queueVoice(guild.id, async () => {
+    const voice = require('@discordjs/voice');
+    const perms = channel.permissionsFor(guild.members.me);
+    if (!perms?.has(PermissionFlagsBits.Connect) || !perms.has(PermissionFlagsBits.Speak)) {
+      throw new Error(`Botul nu are Connect/Speak în ${channel.name}.`);
     }
-  } finally {
-    connection.destroy();
-  }
+    voice.getVoiceConnection(guild.id)?.destroy(); // never keep a stale connection
+    const connection = voice.joinVoiceChannel({
+      channelId: channel.id, guildId: guild.id, adapterCreator: guild.voiceAdapterCreator, selfDeaf: true,
+    });
+    try {
+      await voice.entersState(connection, voice.VoiceConnectionStatus.Ready, 20_000);
+      const player = voice.createAudioPlayer();
+      connection.subscribe(player);
+      const files = [path.join(ASSETS, 'siren.wav'), findVoiceRecording()].filter(Boolean);
+      for (const file of files) {
+        player.play(voice.createAudioResource(file));
+        await voice.entersState(player, voice.AudioPlayerStatus.Playing, 10_000);
+        await voice.entersState(player, voice.AudioPlayerStatus.Idle, 60_000);
+      }
+    } finally {
+      connection.destroy();
+    }
+  });
 }
 
 async function sirenInVoice(client, guild, preferUserId) {
@@ -321,14 +297,9 @@ async function sirenInVoice(client, guild, preferUserId) {
 }
 
 module.exports = {
-  // timers
   start, cancel, cancelAll, earlyRaid, undoEarly, list, restore,
-  // config / zones / role
-  cfg, setConfig, removeZone, panelGuilds, ensureRole, toggleRole,
-  // history
-  markHistory, recent, stats, STATUS_LABEL,
-  // voice
-  playInChannel, sirenInVoice, saveRecording, findVoiceRecording,
-  // misc
-  AUDIO_EXT, DEFAULT_MINUTES, WARN_MINUTES, cooldownLabel, save,
+  cfg, setConfig, removeZone, ensureRole, toggleRole,
+  markHistory, recent, STATUS_LABEL,
+  playInChannel, saveRecording, findVoiceRecording,
+  save, AUDIO_EXT, DEFAULT_MINUTES, WARN_MINUTES, cooldownLabel,
 };

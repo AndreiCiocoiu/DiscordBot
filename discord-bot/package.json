@@ -1,6 +1,6 @@
 {
   "name": "muie-bot",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Discord bot: RDR2 raid (razie) timers.",
   "main": "index.js",
   "scripts": {

@@ -1,180 +1,78 @@
-// Everything the user sees for razie: embeds, buttons, menus, modals, panel.
+// What the user sees for razie: the panel, the alerts, buttons, menus, modal.
+// Public messages are kept to a minimum: the panel, one warning (deleted when
+// the timer ends) and one alert per raid. Everything else is private (ephemeral).
 const {
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  StringSelectMenuBuilder,
-  ChannelSelectMenuBuilder,
-  ChannelType,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  PermissionFlagsBits,
+  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
+  StringSelectMenuBuilder, ChannelSelectMenuBuilder, ChannelType,
+  ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits,
 } = require('discord.js');
 const core = require('./razii');
 
-const RED = 0xe74c3c, ORANGE = 0xf39c12, GREEN = 0x2ecc71, GREY = 0x95a5a6, BLURPLE = 0x5865f2;
+const RED = 0xe74c3c, GREEN = 0x2ecc71, GREY = 0x95a5a6, BLURPLE = 0x5865f2;
 const NO_PING = { parse: [] };
 const log = (what) => (err) => console.error(`raziiUi ${what}:`, err);
 const unix = (ms) => Math.floor(ms / 1000);
 
-// ---- small helpers ------------------------------------------------------
-
-function bar(fraction, size = 10) {
-  const f = Math.max(0, Math.min(1, fraction));
-  const filled = Math.round(f * size);
-  return '▰'.repeat(filled) + '▱'.repeat(size - filled);
-}
-
-const progress = (t) => 1 - (t.endsAt - Date.now()) / (t.totalMs || core.DEFAULT_MINUTES * 60_000);
-
-function dot(leftMs) {
-  if (leftMs < 10 * 60_000) return '🔴';
-  if (leftMs < 30 * 60_000) return '🟡';
-  return '🟢';
-}
-
-function timerLine(t) {
-  const left = t.endsAt - Date.now();
-  const pct = Math.round(Math.max(0, Math.min(1, progress(t))) * 100);
-  return `${dot(left)} **${t.zone}** · <t:${unix(t.endsAt)}:R> (<t:${unix(t.endsAt)}:t>)\n\`${bar(progress(t))}\` ${pct}%`;
-}
-
-const btn = (id, label, style = ButtonStyle.Secondary) =>
-  new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
+const btn = (id, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
 const row = (...components) => new ActionRowBuilder().addComponents(...components);
 const isAdmin = (i) => i.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+const when = (ms) => `<t:${unix(ms)}:R> (<t:${unix(ms)}:t>)`;
 
-// ---- embeds -------------------------------------------------------------
-
-function startPayload(result) {
-  const t = result.entry;
-  const embed = new EmbedBuilder()
-    .setColor(GREEN)
-    .setTitle(result.replaced ? 'Timer repornit' : 'Timer pornit')
-    .setDescription(`${timerLine(t)}\nPornit de <@${t.userId}>`)
-    .setFooter({ text: result.replaced ? 'Timerul vechi a fost înlocuit.' : 'Greșeală? Apasă Anulează.' });
-  return {
-    embeds: [embed],
-    components: [row(
-      btn(`rz:x:${t.zone}`, 'Anulează timerul', ButtonStyle.Danger),
-      btn(`rz:r:${t.zone}`, `Repornește ${core.cooldownLabel()}`),
-      btn(`rz:e:${t.zone}`, 'A venit mai repede', ButtonStyle.Primary),
-    )],
-    allowedMentions: NO_PING,
-  };
-}
-
-function fireEmbed(zone, late) {
-  return new EmbedBuilder()
-    .setColor(RED)
-    .setTitle('Posibilă razie')
-    .setDescription(`**${zone}**\nTimerul de ${core.cooldownLabel()} s-a terminat.${late ? '\nBotul a fost oprit între timp.' : ''}`);
-}
-
-function historyEmbed(guildId) {
-  const rows = core.recent(guildId, 10);
-  const embed = new EmbedBuilder().setColor(BLURPLE).setTitle('Istoric razii');
-  embed.setDescription(
-    rows.length
-      ? rows.map((h) => `**${h.zone}** · <t:${unix(h.at)}:f> · ${core.STATUS_LABEL[h.status]}${h.early ? ' (mai devreme)' : ''}`).join('\n').slice(0, 3800)
-      : 'Nicio razie în istoric încă.'
-  );
-  return embed;
-}
-
-function statsEmbed(guildId) {
-  const rows = core.stats(guildId);
-  const embed = new EmbedBuilder().setColor(BLURPLE).setTitle('Statistici razii');
-  if (!rows.length) return embed.setDescription('Nu sunt date încă.');
-  const fmtGap = (m) => (m == null ? '-' : m >= 60 ? `${(m / 60).toFixed(1)}h` : `${m} min`);
-  for (const r of rows.slice(0, 12)) {
-    embed.addFields({
-      name: r.zone,
-      value:
-        `Confirmate: **${r.confirmed}** din ${r.total}\n` +
-        `N-au fost: ${r.none}\n` +
-        `Ultima: ${r.last ? `<t:${unix(r.last)}:R>` : '-'}\n` +
-        `Interval mediu: ${fmtGap(r.avgGapMin)}\n` +
-        `Ultimele 7 zile: ${r.last7}`,
-      inline: true,
-    });
-  }
-  return embed;
-}
-
-function earlyPayload(res, userId) {
-  const e = res.entry;
-  const embed = new EmbedBuilder()
-    .setColor(GREEN)
-    .setTitle('Razie venită mai devreme')
-    .setDescription(`${timerLine(e)}\nConfirmată de <@${userId}>. Cooldown-ul a pornit de acum.`);
-  return {
-    content: '',
-    embeds: [embed],
-    components: [row(btn(`rz:ue:${res.prevEndsAt}:${e.zone}`, 'Anulează (am apăsat greșit)'))],
-    allowedMentions: NO_PING,
-  };
-}
-
-// ---- panel --------------------------------------------------------------
-
-function panelRows() {
-  return [
-    row(
-      btn('rz:new', 'Pornește timer', ButtonStyle.Success),
-      btn('rz:cancel', 'Anulează', ButtonStyle.Danger),
-      btn('rz:hist', 'Istoric'),
-      btn('rz:stats', 'Statistici'),
-    ),
-    row(
-      btn('rz:early', 'A venit mai repede', ButtonStyle.Primary),
-      btn('rz:role', 'Alerte on/off'),
-      btn('rz:set', 'Setări'),
-    ),
-  ];
-}
+// ---- panel (the one pinned message) -------------------------------------
 
 function panelPayload(guildId) {
   const timers = core.list(guildId);
-  const soonest = timers[0] ? timers[0].endsAt - Date.now() : null;
-  const color = soonest == null ? BLURPLE : soonest < 10 * 60_000 ? RED : soonest < 30 * 60_000 ? ORANGE : GREEN;
-
   const embed = new EmbedBuilder()
-    .setColor(color)
-    .setAuthor({ name: 'Razii · RDR2 Online' })
+    .setColor(timers.length ? GREEN : BLURPLE)
+    .setTitle('Razii')
     .setDescription(
       timers.length
-        ? timers.map(timerLine).join('\n\n').slice(0, 3800)
-        : 'Niciun timer activ.\nApasă **Pornește timer** sau scrie `razie <zona>`.'
+        ? timers.map((t) => `**${t.zone}** · ${when(t.endsAt)} · <@${t.userId}>`).join('\n').slice(0, 3800)
+        : 'Niciun timer activ.\nApasă **Pornește** sau scrie `razie <zona>`.'
     )
-    .setFooter({ text: `${timers.length} ${timers.length === 1 ? 'timer activ' : 'timere active'} · cooldown ${core.cooldownLabel()}` })
-    .setTimestamp();
+    .setFooter({ text: `Cooldown ${core.cooldownLabel()}` });
 
   const last = core.recent(guildId, 3);
   if (last.length) {
     embed.addFields({
-      name: 'Ultimele razii',
+      name: 'Ultimele',
       value: last.map((h) => `**${h.zone}** · <t:${unix(h.at)}:R> · ${core.STATUS_LABEL[h.status]}`).join('\n').slice(0, 1000),
     });
   }
-  return { content: '', embeds: [embed], components: panelRows(), allowedMentions: NO_PING };
+  return {
+    content: '',
+    embeds: [embed],
+    components: [
+      row(
+        btn('rz:new', 'Pornește', ButtonStyle.Success),
+        btn('rz:cancel', 'Anulează', ButtonStyle.Danger),
+        btn('rz:early', 'A venit mai repede', ButtonStyle.Primary),
+      ),
+      row(btn('rz:hist', 'Istoric'), btn('rz:role', 'Alerte on/off'), btn('rz:set', 'Setări')),
+    ],
+    allowedMentions: NO_PING,
+  };
 }
 
-async function updatePanel(client, guildId) {
-  const p = core.cfg(guildId).panel;
-  if (!p) return;
-  const channel = await client.channels.fetch(p.channelId).catch(() => null);
-  const msg = channel ? await channel.messages.fetch(p.messageId).catch(() => null) : null;
-  if (!msg) { core.setConfig(guildId, { panel: null }); return; }
-  await msg.edit(panelPayload(guildId));
-}
-
-async function refreshPanels(client) {
-  for (const guildId of core.panelGuilds()) {
-    if (core.list(guildId).length) await updatePanel(client, guildId).catch(log('refresh'));
-  }
+// Several changes in a row become a single edit.
+const pending = new Set();
+function updatePanel(client, guildId) {
+  if (pending.has(guildId)) return Promise.resolve();
+  pending.add(guildId);
+  return new Promise((resolve) => {
+    setTimeout(async () => {
+      pending.delete(guildId);
+      try {
+        const p = core.cfg(guildId).panel;
+        if (!p) return;
+        const channel = await client.channels.fetch(p.channelId).catch(() => null);
+        const msg = channel ? await channel.messages.fetch(p.messageId).catch(() => null) : null;
+        if (!msg) core.setConfig(guildId, { panel: null });
+        else await msg.edit(panelPayload(guildId));
+      } catch (err) { log('panel')(err); }
+      resolve();
+    }, 400);
+  });
 }
 
 async function createPanel(client, channel) {
@@ -192,107 +90,112 @@ async function createPanel(client, channel) {
   return msg;
 }
 
-// ---- announcements ------------------------------------------------------
+// ---- alerts -------------------------------------------------------------
 
-async function notifyChannel(client, entry) {
-  const id = core.cfg(entry.guildId).channelId || entry.channelId;
-  const ch = await client.channels.fetch(id).catch(() => null);
+async function alertChannel(client, entry) {
+  const c = core.cfg(entry.guildId);
+  const id = c.channelId || c.panel?.channelId || entry.channelId;
+  const ch = id ? await client.channels.fetch(id).catch(() => null) : null;
   return ch?.isTextBased() ? ch : null;
 }
 
+const fireButtons = (zone) =>
+  row(btn(`rz:y:${zone}`, `A fost razie, repornește ${core.cooldownLabel()}`, ButtonStyle.Success), btn(`rz:n:${zone}`, "N-a fost"));
+
+const fireEmbed = (zone, late) =>
+  new EmbedBuilder().setColor(RED).setTitle('Posibilă razie')
+    .setDescription(`**${zone}**\nTimerul de ${core.cooldownLabel()} s-a terminat.${late ? '\n(Botul a fost oprit între timp.)' : ''}`);
+
 async function announceWarn(client, entry) {
   const guild = await client.guilds.fetch(entry.guildId).catch(() => null);
-  const channel = await notifyChannel(client, entry);
+  const channel = await alertChannel(client, entry);
   if (!guild || !channel) return;
   const role = await core.ensureRole(guild);
-  const embed = new EmbedBuilder()
-    .setColor(ORANGE)
-    .setTitle(`Razie posibilă în ~${core.WARN_MINUTES} minute`)
-    .setDescription(`**${entry.zone}** · <t:${unix(entry.endsAt)}:R>`);
-  await channel.send({
-    content: role ? `<@&${role.id}>` : undefined,
-    embeds: [embed],
-    components: [row(btn(`rz:e:${entry.zone}`, 'A venit mai repede', ButtonStyle.Primary))],
+  const msg = await channel.send({
+    content: `Razie posibilă în ~${core.WARN_MINUTES} min: **${entry.zone}** ${role ? `<@&${role.id}>` : ''}`.trim(),
     allowedMentions: { roles: role ? [role.id] : [] },
   });
+  entry.warnMsg = { channelId: channel.id, messageId: msg.id };
+  core.save();
+}
+
+// The warning disappears when the timer ends, is cancelled or replaced.
+async function clearWarn(client, entry) {
+  const w = entry.warnMsg;
+  if (!w) return;
+  entry.warnMsg = null;
+  const ch = await client.channels.fetch(w.channelId).catch(() => null);
+  const msg = ch ? await ch.messages.fetch(w.messageId).catch(() => null) : null;
+  await msg?.delete().catch(() => {});
 }
 
 async function announceFire(client, entry, late) {
   const guild = await client.guilds.fetch(entry.guildId).catch(() => null);
   if (!guild) return;
-  const channel = await notifyChannel(client, entry);
+  const channel = await alertChannel(client, entry);
   const role = await core.ensureRole(guild);
   if (channel) {
     await channel.send({
-      content: `${role ? `<@&${role.id}> ` : ''}<@${entry.userId}>`,
+      content: role ? `<@&${role.id}>` : `<@${entry.userId}>`,
       embeds: [fireEmbed(entry.zone, late)],
-      components: [row(
-        btn(`rz:y:${entry.zone}`, `A fost razie, repornește ${core.cooldownLabel()}`, ButtonStyle.Success),
-        btn(`rz:n:${entry.zone}`, "N-a fost"),
-      )],
-      allowedMentions: { users: [entry.userId], roles: role ? [role.id] : [] },
+      components: [fireButtons(entry.zone)],
+      allowedMentions: { roles: role ? [role.id] : [], users: role ? [] : [entry.userId] },
     }).catch(log('send'));
   }
   updatePanel(client, entry.guildId).catch(log('panel'));
 }
 
-// ---- menus / modals / settings -----------------------------------------
+// ---- menus, modal, settings --------------------------------------------
 
-function zoneModal() {
-  return new ModalBuilder()
-    .setCustomId('rz:m:start')
-    .setTitle('Pornește timer de razie')
+const zoneModal = () =>
+  new ModalBuilder().setCustomId('rz:m:start').setTitle('Pornește timer')
     .addComponents(
       row(new TextInputBuilder().setCustomId('zone').setLabel('Zona').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(60).setPlaceholder('ex: Annesburg')),
       row(new TextInputBuilder().setCustomId('mins').setLabel('Minute rămase (gol = timer întreg)').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(4).setPlaceholder('ex: 45')),
     );
-}
 
-function activeTimersMenu(guildId) {
-  const timers = core.list(guildId).slice(0, 24);
-  const options = [
-    ...timers.map((t) => ({ label: t.zone.slice(0, 100), value: t.zone.slice(0, 100), description: `se termină la ${new Date(t.endsAt).toISOString().slice(11, 16)} UTC` })),
-    { label: 'Toate timerele', value: '__all__', description: 'Șterge tot' },
-  ];
-  return new StringSelectMenuBuilder().setCustomId('rz:s:cancel').setPlaceholder('Ce timer anulezi?').addOptions(options);
-}
+const zoneOptions = (zones) => zones.slice(0, 25).map((z) => ({ label: z.slice(0, 100), value: z.slice(0, 100) }));
 
 function settingsPayload(guildId) {
   const c = core.cfg(guildId);
-  const on = (v) => (v === false ? 'oprit' : 'pornit');
-  const embed = new EmbedBuilder()
-    .setColor(BLURPLE)
-    .setTitle('Setări razie')
-    .addFields(
-      { name: 'Canal notificări', value: c.channelId ? `<#${c.channelId}>` : 'canalul unde pornești timerul', inline: true },
-      { name: 'Sirenă pe voice', value: on(c.voice), inline: true },
-      { name: 'Avertizare', value: `${on(c.warn)} (${core.WARN_MINUTES} min înainte)`, inline: true },
-      { name: 'Vocea ta (Atenție razie)', value: core.findVoiceRecording() ? 'încărcată' : 'neîncărcată, folosește `/razie sunet`', inline: true },
-      { name: 'Zone salvate', value: (c.zones || []).join(', ').slice(0, 900) || '-' },
-    );
+  const state = (v) => (v === false ? 'oprit' : 'pornit');
+  const embed = new EmbedBuilder().setColor(BLURPLE).setTitle('Setări').addFields(
+    { name: 'Canal alerte', value: c.channelId ? `<#${c.channelId}>` : c.panel ? `<#${c.panel.channelId}> (canalul panoului)` : '-', inline: true },
+    { name: 'Sirenă pe voice', value: state(c.voice), inline: true },
+    { name: `Avertizare (${core.WARN_MINUTES} min)`, value: state(c.warn), inline: true },
+    { name: 'Vocea ta', value: core.findVoiceRecording() ? 'încărcată' : 'neîncărcată (`/razie sunet`)', inline: true },
+    { name: 'Zone salvate', value: (c.zones || []).join(', ').slice(0, 900) || '-' },
+  );
   const rows = [
     row(
       btn('rz:t:voice', `Sirenă: ${c.voice === false ? 'OFF' : 'ON'}`, c.voice === false ? ButtonStyle.Secondary : ButtonStyle.Success),
       btn('rz:t:warn', `Avertizare: ${c.warn === false ? 'OFF' : 'ON'}`, c.warn === false ? ButtonStyle.Secondary : ButtonStyle.Success),
     ),
-    row(new ChannelSelectMenuBuilder().setCustomId('rz:s:chan').setPlaceholder('Alege canalul de notificări').setChannelTypes(ChannelType.GuildText)),
+    row(new ChannelSelectMenuBuilder().setCustomId('rz:s:chan').setPlaceholder('Canal pentru alerte').setChannelTypes(ChannelType.GuildText)),
   ];
   if ((c.zones || []).length) {
-    rows.push(row(
-      new StringSelectMenuBuilder().setCustomId('rz:s:delzone').setPlaceholder('Șterge o zonă salvată')
-        .addOptions(c.zones.slice(0, 25).map((z) => ({ label: z.slice(0, 100), value: z.slice(0, 100) }))),
-    ));
+    rows.push(row(new StringSelectMenuBuilder().setCustomId('rz:s:delzone').setPlaceholder('Șterge o zonă salvată').addOptions(zoneOptions(c.zones))));
   }
   return { embeds: [embed], components: rows, ephemeral: true };
 }
 
-// ---- interaction router -------------------------------------------------
+function activeMenu(guildId, customId, placeholder, withAll) {
+  const options = zoneOptions(core.list(guildId).map((t) => t.zone));
+  if (withAll) options.push({ label: 'Toate timerele', value: '__all__' });
+  return new StringSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder).addOptions(options.slice(0, 25));
+}
 
 function parseMinutes(text) {
-  if (!text) return undefined;
-  const n = Number(String(text).replace(',', '.'));
+  const n = Number(String(text || '').replace(',', '.'));
   return Number.isFinite(n) && n > 0 && n <= 1440 ? n : undefined;
 }
+
+const startedText = (res) => `${res.replaced ? 'Repornit' : 'Pornit'}: **${res.entry.zone}** · ${when(res.entry.endsAt)}`;
+
+const earlyText = (res) =>
+  `**${res.entry.zone}**: marcat ca venit mai repede. Cooldown-ul a pornit de acum, ${when(res.entry.endsAt)}.`;
+
+// ---- router -------------------------------------------------------------
 
 async function handleInteraction(interaction, client) {
   const id = interaction.customId;
@@ -300,210 +203,141 @@ async function handleInteraction(interaction, client) {
   const [, kind, ...rest] = id.split(':');
   const arg = rest.join(':');
   const guildId = interaction.guildId;
+  const userId = interaction.user.id;
+  const say = (content) => interaction.reply({ content, ephemeral: true, allowedMentions: NO_PING });
+  const adminOnly = () => say('Doar adminii.');
 
   // ---- buttons
   if (interaction.isButton()) {
-    if (kind === 'role') {
-      const res = await core.toggleRole(interaction.member);
-      await interaction.reply({
-        content: !res.ok
-          ? 'Nu pot da rolul (botul are nevoie de Manage Roles și rolul lui trebuie să fie deasupra lui @Razie).'
-          : res.has ? 'Ai primit rolul **Razie**, vei primi alertele.' : 'Ți-am scos rolul **Razie**.',
-        ephemeral: true,
-      });
-      return true;
-    }
-
-    if (kind === 'new') {
-      const zones = core.cfg(guildId).zones || [];
-      if (!zones.length) { await interaction.showModal(zoneModal()); return true; }
-      await interaction.reply({
-        content: 'Alege zona:',
-        components: [
-          row(new StringSelectMenuBuilder().setCustomId('rz:s:start').setPlaceholder('Zonă salvată').addOptions(zones.slice(0, 25).map((z) => ({ label: z.slice(0, 100), value: z.slice(0, 100) })))),
-          row(btn('rz:newmodal', 'Altă zonă / minute rămase')),
-        ],
-        ephemeral: true,
-      });
-      return true;
-    }
-
-    if (kind === 'newmodal') { await interaction.showModal(zoneModal()); return true; }
-
-    if (kind === 'cancel') {
-      if (!core.list(guildId).length) {
-        await interaction.reply({ content: 'Niciun timer activ.', ephemeral: true });
+    switch (kind) {
+      case 'role': {
+        const res = await core.toggleRole(interaction.member);
+        await say(!res.ok ? 'Nu pot da rolul (botul are nevoie de Manage Roles, iar rolul lui trebuie să fie deasupra lui @Razie).'
+          : res.has ? 'Ai primit rolul **Razie**, vei primi alertele.' : 'Ți-am scos rolul **Razie**.');
         return true;
       }
-      await interaction.reply({ components: [row(activeTimersMenu(guildId))], ephemeral: true });
-      return true;
+      case 'new': {
+        const zones = core.cfg(guildId).zones || [];
+        if (!zones.length) { await interaction.showModal(zoneModal()); return true; }
+        await interaction.reply({
+          content: 'Alege zona:',
+          components: [
+            row(new StringSelectMenuBuilder().setCustomId('rz:s:start').setPlaceholder('Zonă salvată').addOptions(zoneOptions(zones))),
+            row(btn('rz:newmodal', 'Altă zonă / minute rămase')),
+          ],
+          ephemeral: true,
+        });
+        return true;
+      }
+      case 'newmodal': await interaction.showModal(zoneModal()); return true;
+      case 'cancel':
+        if (!core.list(guildId).length) { await say('Niciun timer activ.'); return true; }
+        await interaction.reply({ components: [row(activeMenu(guildId, 'rz:s:cancel', 'Ce timer anulezi?', true))], ephemeral: true });
+        return true;
+      case 'early':
+        if (!core.list(guildId).length) { await say('Niciun timer activ.'); return true; }
+        await interaction.reply({ content: 'La ce zonă a venit mai repede?', components: [row(activeMenu(guildId, 'rz:s:early', 'Alege zona', false))], ephemeral: true });
+        return true;
+      case 'hist': {
+        const rows = core.recent(guildId, 10);
+        const text = rows.length
+          ? rows.map((h) => `**${h.zone}** · <t:${unix(h.at)}:f> · ${core.STATUS_LABEL[h.status]}${h.early ? ' (mai devreme)' : ''}`).join('\n').slice(0, 3800)
+          : 'Nicio razie în istoric încă.';
+        await interaction.reply({ embeds: [new EmbedBuilder().setColor(BLURPLE).setTitle('Istoric').setDescription(text)], ephemeral: true });
+        return true;
+      }
+      case 'set':
+        if (!isAdmin(interaction)) { await adminOnly(); return true; }
+        await interaction.reply(settingsPayload(guildId));
+        return true;
+      case 't': // toggles: voice | warn
+        if (!isAdmin(interaction)) { await adminOnly(); return true; }
+        if (arg === 'voice' || arg === 'warn') core.setConfig(guildId, { [arg]: core.cfg(guildId)[arg] === false });
+        await interaction.update(settingsPayload(guildId));
+        return true;
+      case 'y': { // raid happened -> restart
+        core.markHistory(guildId, arg, 'pending', 'confirmed');
+        const res = core.start(client, { guildId, zone: arg, userId });
+        await interaction.update({
+          content: '',
+          embeds: [new EmbedBuilder().setColor(GREEN).setTitle('Razie confirmată')
+            .setDescription(`**${arg}** · confirmată de <@${userId}>\n${res.ok ? `Următoarea posibilă ${when(res.entry.endsAt)}` : ''}`)],
+          components: [row(btn(`rz:u:${arg}`, 'Anulează (am apăsat greșit)'))],
+          allowedMentions: NO_PING,
+        });
+        return true;
+      }
+      case 'n': // no raid
+        core.markHistory(guildId, arg, 'pending', 'none');
+        updatePanel(client, guildId).catch(log('panel'));
+        await interaction.update({
+          content: '',
+          embeds: [new EmbedBuilder().setColor(GREY).setTitle("N-a fost razie").setDescription(`**${arg}** · marcat de <@${userId}>`)],
+          components: [row(btn(`rz:u:${arg}`, 'Anulează (am apăsat greșit)'))],
+          allowedMentions: NO_PING,
+        });
+        return true;
+      case 'u': // undo y / n
+        if (!core.markHistory(guildId, arg, 'confirmed', 'pending')) core.markHistory(guildId, arg, 'none', 'pending');
+        core.cancel(client, guildId, arg);
+        await interaction.update({ embeds: [fireEmbed(arg, false)], components: [fireButtons(arg)] });
+        return true;
+      case 'ue': { // undo "came earlier"
+        const [prev, ...zoneParts] = arg.split(':');
+        const zone = zoneParts.join(':');
+        const entry = core.undoEarly(client, { guildId, zone, prevEndsAt: Number(prev), userId });
+        await interaction.update({
+          content: entry ? `Anulat. Timerul vechi e înapoi: **${zone}** · ${when(entry.endsAt)}` : `Anulat. **${zone}** a fost scos din istoric.`,
+          components: [],
+          allowedMentions: NO_PING,
+        });
+        return true;
+      }
+      default:
+        await say('Butonul ăsta e vechi. Folosește panoul actual (`/razie panou`).');
+        return true;
     }
-
-    if (kind === 'early') {
-      const timers = core.list(guildId).slice(0, 25);
-      if (!timers.length) { await interaction.reply({ content: 'Niciun timer activ.', ephemeral: true }); return true; }
-      await interaction.reply({
-        content: 'La ce zonă a venit mai repede?',
-        components: [row(new StringSelectMenuBuilder().setCustomId('rz:s:early').setPlaceholder('Alege zona')
-          .addOptions(timers.map((x) => ({ label: x.zone.slice(0, 100), value: x.zone.slice(0, 100) }))))],
-        ephemeral: true,
-      });
-      return true;
-    }
-
-    if (kind === 'e') { // came earlier, from the start / warning message
-      const res = core.earlyRaid(client, { guildId, zone: arg, channelId: interaction.channelId, userId: interaction.user.id });
-      if (!res.ok) { await interaction.reply({ content: 'Nu mai există timer pentru zona asta.', ephemeral: true }); return true; }
-      await interaction.update(earlyPayload(res, interaction.user.id));
-      return true;
-    }
-
-    if (kind === 'ue') { // undo "came earlier"
-      const [prev, ...zoneParts] = arg.split(':');
-      const zone = zoneParts.join(':');
-      const entry = core.undoEarly(client, { guildId, zone, prevEndsAt: Number(prev), channelId: interaction.channelId, userId: interaction.user.id });
-      await interaction.update(entry
-        ? startPayload({ ok: true, entry, replaced: true })
-        : { embeds: [new EmbedBuilder().setColor(GREY).setTitle('Anulat').setDescription(`**${zone}**: raziea a fost scoasă din istoric.`)], components: [], allowedMentions: NO_PING });
-      return true;
-    }
-
-    if (kind === 'hist') { await interaction.reply({ embeds: [historyEmbed(guildId)], ephemeral: true }); return true; }
-    if (kind === 'stats') { await interaction.reply({ embeds: [statsEmbed(guildId)], ephemeral: true }); return true; }
-
-    if (kind === 'set') {
-      if (!isAdmin(interaction)) { await interaction.reply({ content: 'Doar adminii.', ephemeral: true }); return true; }
-      await interaction.reply(settingsPayload(guildId));
-      return true;
-    }
-
-    if (kind === 't') { // toggles
-      if (!isAdmin(interaction)) { await interaction.reply({ content: 'Doar adminii.', ephemeral: true }); return true; }
-      const current = core.cfg(guildId)[arg];
-      core.setConfig(guildId, { [arg]: current === false });
-      await interaction.update(settingsPayload(guildId));
-      return true;
-    }
-
-    if (kind === 'x') { // cancel from the start message
-      const removed = core.cancel(client, guildId, arg);
-      await interaction.update({
-        embeds: [new EmbedBuilder().setColor(GREY).setTitle('Timer anulat').setDescription(
-          removed ? `**${removed.zone}** a fost anulat de <@${interaction.user.id}>.` : `**${arg}** nu mai avea timer.`)],
-        components: [],
-        allowedMentions: NO_PING,
-      });
-      return true;
-    }
-
-    if (kind === 'r') { // restart from the start message
-      const result = core.start(client, { guildId, zone: arg, channelId: interaction.channelId, userId: interaction.user.id });
-      await interaction.update(startPayload({ ...result, replaced: true }));
-      return true;
-    }
-
-    if (kind === 'y') { // raid happened -> restart
-      core.markHistory(guildId, arg, 'pending', 'confirmed');
-      const res = core.start(client, { guildId, zone: arg, channelId: interaction.channelId, userId: interaction.user.id });
-      const next = res.ok ? `Următoarea posibilă <t:${unix(res.entry.endsAt)}:R> (<t:${unix(res.entry.endsAt)}:t>).` : '';
-      await interaction.update({
-        content: '',
-        embeds: [new EmbedBuilder().setColor(GREEN).setTitle('Razie confirmată').setDescription(`**${arg}**\nConfirmată de <@${interaction.user.id}>.\n${next}`)],
-        components: [row(btn(`rz:u:${arg}`, 'Anulează (am apăsat greșit)'))],
-        allowedMentions: NO_PING,
-      });
-      return true;
-    }
-
-    if (kind === 'n') { // no raid
-      core.markHistory(guildId, arg, 'pending', 'none');
-      updatePanel(client, guildId).catch(log('panel'));
-      await interaction.update({
-        content: '',
-        embeds: [new EmbedBuilder().setColor(GREY).setTitle("N-a fost razie").setDescription(`**${arg}**\nMarcat de <@${interaction.user.id}>.`)],
-        components: [row(btn(`rz:u:${arg}`, 'Anulează (am apăsat greșit)'))],
-        allowedMentions: NO_PING,
-      });
-      return true;
-    }
-
-    if (kind === 'u') { // undo y / n
-      core.markHistory(guildId, arg, 'confirmed', 'pending') || core.markHistory(guildId, arg, 'none', 'pending');
-      core.cancel(client, guildId, arg);
-      await interaction.update({
-        embeds: [fireEmbed(arg, false)],
-        components: [row(
-          btn(`rz:y:${arg}`, `A fost razie, repornește ${core.cooldownLabel()}`, ButtonStyle.Success),
-          btn(`rz:n:${arg}`, "N-a fost"),
-        )],
-      });
-      return true;
-    }
-    return true;
   }
 
   // ---- select menus
   if (interaction.isStringSelectMenu() || interaction.isChannelSelectMenu()) {
     const value = interaction.values[0];
+    if (kind !== 's') return true;
 
-    if (kind === 's' && arg === 'start') {
-      const result = core.start(client, { guildId, zone: value, channelId: interaction.channelId, userId: interaction.user.id });
-      await interaction.update({ content: `Pornit: **${value}**.`, components: [] });
-      await interaction.channel.send(startPayload(result)).catch(log('send'));
-      return true;
-    }
-
-    if (kind === 's' && arg === 'early') {
-      const res = core.earlyRaid(client, { guildId, zone: value, channelId: interaction.channelId, userId: interaction.user.id });
-      if (!res.ok) { await interaction.update({ content: 'Nu mai există timer pentru zona asta.', components: [] }); return true; }
-      await interaction.update({ content: `Marcat: **${value}**.`, components: [] });
-      await interaction.channel.send(earlyPayload(res, interaction.user.id)).catch(log('send'));
-      return true;
-    }
-
-    if (kind === 's' && arg === 'cancel') {
-      let text;
-      if (value === '__all__') text = `${core.cancelAll(client, guildId)} timere șterse.`;
-      else {
-        const removed = core.cancel(client, guildId, value);
-        text = removed ? `Timerul pentru **${removed.zone}** a fost anulat.` : 'Nu mai exista timerul.';
-      }
-      await interaction.update({ content: text, components: [] });
-      return true;
-    }
-
-    if (kind === 's' && (arg === 'chan' || arg === 'delzone')) {
-      if (!isAdmin(interaction)) { await interaction.reply({ content: 'Doar adminii.', ephemeral: true }); return true; }
+    if (arg === 'start') {
+      const res = core.start(client, { guildId, zone: value, userId });
+      await interaction.update({ content: res.ok ? startedText(res) : 'Zonă invalidă.', components: [], allowedMentions: NO_PING });
+    } else if (arg === 'cancel') {
+      const text = value === '__all__'
+        ? `${core.cancelAll(client, guildId)} timere șterse.`
+        : core.cancel(client, guildId, value) ? `Timerul pentru **${value}** a fost anulat.` : 'Timerul nu mai există.';
+      await interaction.update({ content: text, components: [], allowedMentions: NO_PING });
+    } else if (arg === 'early') {
+      const res = core.earlyRaid(client, { guildId, zone: value, userId });
+      await interaction.update(res.ok
+        ? { content: earlyText(res), components: [row(btn(`rz:ue:${res.prevEndsAt}:${res.entry.zone}`, 'Anulează (am apăsat greșit)'))], allowedMentions: NO_PING }
+        : { content: 'Timerul nu mai există.', components: [] });
+    } else if (arg === 'chan' || arg === 'delzone') {
+      if (!isAdmin(interaction)) { await adminOnly(); return true; }
       if (arg === 'chan') core.setConfig(guildId, { channelId: value });
       else core.removeZone(guildId, value);
       await interaction.update(settingsPayload(guildId));
-      return true;
     }
     return true;
   }
 
   // ---- modal
   if (interaction.isModalSubmit() && kind === 'm' && arg === 'start') {
-    const result = core.start(client, {
+    const res = core.start(client, {
       guildId,
       zone: interaction.fields.getTextInputValue('zone'),
       minutes: parseMinutes(interaction.fields.getTextInputValue('mins')),
-      channelId: interaction.channelId,
-      userId: interaction.user.id,
+      userId,
     });
-    if (!result.ok) {
-      await interaction.reply({ content: 'Scrie o zonă.', ephemeral: true });
-      return true;
-    }
-    await interaction.reply(startPayload(result));
+    await say(res.ok ? startedText(res) : 'Scrie o zonă.');
     return true;
   }
-
   return true;
 }
 
-module.exports = {
-  startPayload, panelPayload, updatePanel, refreshPanels, createPanel,
-  announceWarn, announceFire, handleInteraction,
-  historyEmbed, statsEmbed, settingsPayload,
-};
+module.exports = { panelPayload, updatePanel, createPanel, announceWarn, announceFire, clearWarn, handleInteraction };
