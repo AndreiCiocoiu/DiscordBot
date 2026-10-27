@@ -1,6 +1,6 @@
 # MUIE bot
 
-The only slash command is `/craft` (read-only recipe lookup with autocomplete, answer visible only to you). Everything else is buttons on pinned panels plus a few admin text commands. Any other leftover slash commands are removed at every start.
+The only slash command is `/craft` (read-only recipe lookup with autocomplete). Everything else is buttons on pinned panels plus a few admin text commands. Any other leftover slash commands are removed at every start.
 
 ## Setup (once, admin)
 1. Developer Portal -> Bot: enable **Server Members Intent** and **Message Content Intent** (the bot still starts without them, with fewer features, and says so in the logs).
@@ -24,7 +24,9 @@ Panel with buttons: **Porneste** (zone + minutes left), **Anuleaza**, **A venit 
 Admin: `razie panou`, `razie sunet` (+ audio attachment), `razie test`.
 
 ## Craft
-Use `/craft` (autocomplete, private answer) or write `craft cadru pistol` in any channel (the bot posts the recipe and deletes your message) (typos and missing diacritics are fine; several matches give a pick list). `craft panou` (admin) posts a panel with a category menu and a **Cauta** button; those answers are private to whoever pressed. Recipes are in `assets/recipes.json` (name, category, ingredients `[name, qty]`, level, points, time); edit the file and push, no code changes. Optional picture per item: `assets/craft/cadru-pistol.png` (lowercase name with dashes).
+Use `/craft` (autocomplete) or write `craft cadru pistol` in any channel: the recipe is posted in the chat (item picture + a strip with every ingredient and amount); with the text version the bot also deletes your message (typos and missing diacritics are fine; several matches give a pick list). `craft panou` (admin) posts a panel with a category menu and a **Cauta** button; those answers are private to whoever pressed. Recipes are in `assets/recipes.json` (name, category, ingredients `[name, qty]`, level, points, time); edit the file and push, no code changes. Pictures: `assets/craft/<name>.png` (lowercase name with dashes, e.g. `cadru-pistol.png`), used both for the item and as an ingredient icon. A new recipe just needs its row in the JSON; missing pictures are skipped.
+
+At every start the bot writes **Bot pornit** in the adminlog, so you see right away that logging works. If the settings were lost (no Volume), it finds the private `adminlog` channel again by name.
 
 ## Env
 Only `DISCORD_TOKEN`. Optional: `RAZIE_MINUTES` (180), `RAZIE_WARN_MINUTES` (10), `DATA_DIR`.

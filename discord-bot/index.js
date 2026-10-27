@@ -54,6 +54,7 @@ function wire(client, level) {
     console.log(`Logged in as ${c.user.tag}`);
     if (!level.members) console.warn('Server Members Intent is OFF: welcome banner and member logs are disabled. Enable it in the Developer Portal -> Bot.');
     if (!level.content) console.warn('Message Content Intent is OFF: "razie ..." / "server ..." text commands and message logs are disabled.');
+    for (const g of c.guilds.cache.values()) adminlog.action(client, g.id, 'Bot pornit', `Versiune ${require('./package.json').version}`);
     razii.restore(client);
     sessions.restore(client);
     await syncSlashCommands(c);

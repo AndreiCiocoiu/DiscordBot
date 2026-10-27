@@ -9,6 +9,7 @@ const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, PermissionFlagsBits,
   StringSelectMenuBuilder, TextInputBuilder, TextInputStyle, AttachmentBuilder, SlashCommandBuilder,
 } = require('discord.js');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const adminlog = require('./adminlog');
 
 const FILE = path.join(__dirname, '..', '..', 'assets', 'recipes.json');
@@ -16,6 +17,7 @@ const IMG_DIR = path.join(__dirname, '..', '..', 'assets', 'craft');
 const NO_PING = { parse: [], repliedUser: false };
 const COLOR = 0xc8923a;
 const PAGE = 25;
+if (!GlobalFonts.families.some((f) => f.family === 'Rye')) GlobalFonts.registerFromPath(path.join(__dirname, '..', '..', 'assets', 'fonts', 'Rye-Regular.ttf'), 'Rye');
 
 // ---- data ---------------------------------------------------------------
 
@@ -76,15 +78,50 @@ function search(query) {
 
 // ---- rendering ----------------------------------------------------------
 
-function imageFor(recipe) {
+function iconFile(name) {
   for (const ext of ['png', 'jpg', 'jpeg', 'webp']) {
-    const f = path.join(IMG_DIR, `${slug(recipe.name)}.${ext}`);
-    if (fs.existsSync(f)) return { file: f, name: `${slug(recipe.name)}.${ext}` };
+    const f = path.join(IMG_DIR, `${slug(name)}.${ext}`);
+    if (fs.existsSync(f)) return f;
   }
   return null;
 }
 
-function recipePayload(recipe) {
+// One picture with all the ingredients side by side: icon + amount ("x4") under it.
+const stripCache = new Map();
+async function ingredientStrip(recipe) {
+  const key = recipe.name + JSON.stringify(recipe.ingredients);
+  if (stripCache.has(key)) return stripCache.get(key);
+  let buf = null;
+  try {
+    const items = [];
+    for (const [n, q] of recipe.ingredients) {
+      const f = iconFile(n);
+      items.push({ q, img: f ? await loadImage(f) : null });
+    }
+    if (items.some((i) => i.img)) {
+      const CELL = 92, H = 104, BOX = 64;
+      const canvas = createCanvas(Math.max(items.length, 2) * CELL, H);
+      const ctx = canvas.getContext('2d');
+      ctx.textAlign = 'center';
+      items.forEach((it, i) => {
+        const cx = i * CELL + CELL / 2;
+        if (it.img) {
+          const sc = Math.min(BOX / it.img.width, BOX / it.img.height, 2);
+          const w = it.img.width * sc, h = it.img.height * sc;
+          ctx.drawImage(it.img, cx - w / 2, 4 + (BOX - h) / 2, w, h);
+        }
+        ctx.font = '20px Rye';
+        ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(`x${it.q}`, cx, 94);
+        ctx.fillStyle = '#e8b74a'; ctx.fillText(`x${it.q}`, cx, 94);
+      });
+      buf = canvas.toBuffer('image/png');
+    }
+  } catch (err) { console.error('craft: strip failed for', recipe.name, err.message); }
+  stripCache.set(key, buf);
+  return buf;
+}
+
+async function recipePayload(recipe, who) {
   const lines = recipe.ingredients.map(([n, q]) => `**${n}** x${q}`).join('\n');
   const embed = new EmbedBuilder().setColor(COLOR).setTitle(recipe.name)
     .addFields({ name: 'Ingrediente', value: lines || '-' });
@@ -94,12 +131,19 @@ function recipePayload(recipe) {
   if (recipe.points !== undefined) details.push(`Puncte rețetă: ${recipe.points}`);
   if (recipe.time) details.push(`Timp craft: ${recipe.time}`);
   embed.addFields({ name: 'Detalii', value: details.join('\n') });
-  if (recipe.note) embed.setFooter({ text: recipe.note });
+  const foot = [recipe.note, who ? `Cerut de ${who}` : null].filter(Boolean).join(' · ');
+  if (foot) embed.setFooter({ text: foot });
   const payload = { embeds: [embed], allowedMentions: NO_PING, files: [] };
-  const img = imageFor(recipe);
-  if (img) {
-    payload.files.push(new AttachmentBuilder(img.file, { name: img.name }));
-    embed.setThumbnail(`attachment://${img.name}`);
+  const thumb = iconFile(recipe.name);
+  if (thumb) {
+    const ext = path.extname(thumb);
+    payload.files.push(new AttachmentBuilder(thumb, { name: `item${ext}` }));
+    embed.setThumbnail(`attachment://item${ext}`);
+  }
+  const strip = await ingredientStrip(recipe);
+  if (strip) {
+    payload.files.push(new AttachmentBuilder(strip, { name: 'ingrediente.png' }));
+    embed.setImage('attachment://ingrediente.png');
   }
   return payload;
 }
@@ -142,16 +186,18 @@ function categoryView(catIdx, page) {
   return { content: '', embeds: [embed], components: rows };
 }
 
-function searchView(query) {
+async function searchView(query, who) {
   const found = search(query);
   if (!found.length) return { content: `Nu am găsit **${query.slice(0, 60)}**. Încearcă alt nume sau alege din categorii.`, embeds: [], components: [], files: [] };
-  if (found.length === 1) return { content: '', components: [], ...recipePayload(found[0]) };
+  if (found.length === 1) return { content: '', components: [], ...(await recipePayload(found[0], who)) };
   const embed = new EmbedBuilder().setColor(COLOR).setTitle(`Rezultate pentru „${query.slice(0, 60)}”`)
     .setDescription(found.slice(0, PAGE).map((r) => `**${r.name}**: ${r.ingredients.map(([n, q]) => `${n} x${q}`).join(', ')}`).join('\n').slice(0, 4000));
   return { content: '', embeds: [embed], components: [row(itemSelect('cr:pick', found, 'Alege un item pentru detalii'))], files: [] };
 }
 
 // ---- interactions -------------------------------------------------------
+
+const nameOf = (i) => i.member?.displayName || i.user?.username;
 
 const command = new SlashCommandBuilder().setName('craft').setDescription('Arată rețeta unui item')
   .setContexts(0)
@@ -165,8 +211,9 @@ async function handleInteraction(interaction) {
     return true;
   }
   if (interaction.isChatInputCommand?.() && interaction.commandName === 'craft') {
-    // only the person who asked sees the answer: no spam, nothing to clean up
-    await interaction.reply({ ephemeral: true, ...searchView(interaction.options.getString('item', true)) });
+    // the answer goes in the chat for everyone to see
+    await interaction.deferReply();
+    await interaction.editReply(await searchView(interaction.options.getString('item', true)));
     return true;
   }
   const id = interaction.customId;
@@ -179,7 +226,8 @@ async function handleInteraction(interaction) {
     return true;
   }
   if (interaction.isModalSubmit() && kind === 'q') {
-    await interaction.reply({ ephemeral: true, ...searchView(interaction.fields.getTextInputValue('q')) });
+    await interaction.deferReply();
+    await interaction.editReply(await searchView(interaction.fields.getTextInputValue('q'), nameOf(interaction)));
     return true;
   }
   if (interaction.isStringSelectMenu() && kind === 'cat') {
@@ -193,8 +241,16 @@ async function handleInteraction(interaction) {
   if (interaction.isStringSelectMenu() && (kind === 'item' || kind === 'pick')) {
     const r = data().recipes.find((x) => x.name === interaction.values[0]);
     if (!r) { await interaction.update({ content: 'Rețeta nu mai există.', embeds: [], components: [] }); return true; }
-    // new ephemeral message so the list stays available
-    await interaction.reply({ ephemeral: true, ...recipePayload(r) });
+    const payload = await recipePayload(r, nameOf(interaction));
+    if (kind === 'pick') {
+      // the result list in the chat turns into the recipe
+      await interaction.update({ content: '', components: [], attachments: [], ...payload });
+    } else {
+      // picked from the private category list: post it in the chat, keep the list for the next pick
+      await interaction.deferUpdate();
+      const ch = interaction.channel ?? (await interaction.client.channels.fetch(interaction.channelId).catch(() => null));
+      if (ch) await ch.send(payload).catch(() => interaction.followUp({ ephemeral: true, ...payload }).catch(() => {}));
+    }
     return true;
   }
   return true;
@@ -222,9 +278,8 @@ async function handleMessage(message, client) {
   if (now - (lastUse.get(message.author.id) || 0) < 2000) return;
   lastUse.set(message.author.id, now);
 
-  const { content, ...rest } = searchView(arg);
   const who = message.member?.displayName || message.author.username;
-  if (rest.embeds?.[0] && !rest.embeds[0].data.footer) rest.embeds[0].setFooter({ text: `Cerut de ${who}` });
+  const { content, ...rest } = await searchView(arg, who);
   const sent = await message.channel.send({ ...(content ? { content: `${message.author}: ${content}` } : {}), ...rest, allowedMentions: { parse: [], users: [] } }).catch(() => null);
   // remove the request so the channel only keeps the answer
   if (sent) await message.delete().catch(() => {});

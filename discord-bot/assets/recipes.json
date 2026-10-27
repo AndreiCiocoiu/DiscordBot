@@ -1,11 +1,631 @@
 {
-  "categories": ["Componente", "Arme", "Droguri", "Diverse"],
-  "recipes": [
-    { "name": "Cadru Repeater", "category": "Componente", "ingredients": [["Matrita Cadru Repeater", 1], ["Lingou Fier", 4]], "level": 0, "points": 5, "time": "30 secunde" },
-    { "name": "Teava Repeater", "category": "Componente", "ingredients": [["Matrita Teava Repeater", 1], ["Lingou Fier", 4]], "level": 0, "points": 5, "time": "30 secunde" },
-    { "name": "Teava Shotgun", "category": "Componente", "ingredients": [["Matrita Teava Shotgun", 1], ["Lingou Fier", 3]], "level": 0, "points": 5, "time": "30 secunde" },
-    { "name": "Teava Revolver", "category": "Componente", "ingredients": [["Matrita Teava Revolver", 1], ["Lingou Fier", 2]], "level": 0, "points": 5, "time": "30 secunde" },
-    { "name": "Teava Pistol", "category": "Componente", "ingredients": [["Matrita Teava Pistol", 1], ["Lingou Fier", 2]], "level": 0, "points": 5, "time": "30 secunde" },
-    { "name": "Cadru Pistol", "category": "Componente", "ingredients": [["Matrita Cadru Pistol", 1], ["Lingou Fier", 1]], "level": 0, "points": 5, "time": "30 secunde" }
-  ]
+ "categories": [
+  "Componente",
+  "Arme",
+  "Potiuni",
+  "Mancare",
+  "Contrabanda",
+  "Grajd"
+ ],
+ "recipes": [
+  {
+   "name": "Cadru Repeater",
+   "category": "Componente",
+   "ingredients": [
+    [
+     "Matrita Cadru Repeater",
+     1
+    ],
+    [
+     "Lingou Fier",
+     4
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Teava Repeater",
+   "category": "Componente",
+   "ingredients": [
+    [
+     "Matrita Teava Repeater",
+     1
+    ],
+    [
+     "Lingou Fier",
+     4
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Teava Shotgun",
+   "category": "Componente",
+   "ingredients": [
+    [
+     "Matrita Teava Shotgun",
+     1
+    ],
+    [
+     "Lingou Fier",
+     3
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Teava Revolver",
+   "category": "Componente",
+   "ingredients": [
+    [
+     "Matrita Teava Revolver",
+     1
+    ],
+    [
+     "Lingou Fier",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Teava Pistol",
+   "category": "Componente",
+   "ingredients": [
+    [
+     "Matrita Teava Pistol",
+     1
+    ],
+    [
+     "Lingou Fier",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Cadru Pistol",
+   "category": "Componente",
+   "ingredients": [
+    [
+     "Matrita Cadru Pistol",
+     1
+    ],
+    [
+     "Lingou Fier",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Lasou",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Cleste",
+     1
+    ],
+    [
+     "Piele de Urs",
+     1
+    ],
+    [
+     "Corn de Berbec",
+     1
+    ],
+    [
+     "Piele de Puma",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Macheta",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Lingou Fier",
+     2
+    ],
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Scanduri",
+     5
+    ],
+    [
+     "Cleste",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Pistol Semiauto",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Teava Pistol",
+     1
+    ],
+    [
+     "Cadru Pistol",
+     1
+    ],
+    [
+     "Arc Metalic",
+     1
+    ],
+    [
+     "Cleste",
+     1
+    ],
+    [
+     "Pat Pistol",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Shotgun DoubleBarrel",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Teava Shotgun",
+     1
+    ],
+    [
+     "Arc Metalic",
+     1
+    ],
+    [
+     "Cadru Shotgun",
+     1
+    ],
+    [
+     "Pat Shotgun",
+     1
+    ],
+    [
+     "Cleste",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Repeater Evans",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Pat Repeater",
+     1
+    ],
+    [
+     "Arc Metalic",
+     1
+    ],
+    [
+     "Cadru Repeater",
+     1
+    ],
+    [
+     "Teava Repeater",
+     1
+    ],
+    [
+     "Cleste",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Revolver Cattleman",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Pat Revolver",
+     1
+    ],
+    [
+     "Teava Revolver",
+     1
+    ],
+    [
+     "Arc Metalic",
+     1
+    ],
+    [
+     "Cadru Revolver",
+     1
+    ],
+    [
+     "Cleste",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Revolver Double Action",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Jeton Verde",
+     1
+    ],
+    [
+     "Jeton Galben",
+     2
+    ],
+    [
+     "Jeton Rosu",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 0,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Shotgun Exotic",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Jeton Verde",
+     1
+    ],
+    [
+     "Jeton Albastru",
+     1
+    ],
+    [
+     "Jeton Galben",
+     1
+    ],
+    [
+     "Jeton Rosu",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 0,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Shotgun Sawed Off",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Jeton Albastru",
+     1
+    ],
+    [
+     "Jeton Galben",
+     2
+    ],
+    [
+     "Jeton Rosu",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 0,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Bolt Action Rifle",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Pat Rifle",
+     1
+    ],
+    [
+     "Cadru Rifle",
+     2
+    ],
+    [
+     "Teava Rifle",
+     1
+    ],
+    [
+     "Arc Metalic",
+     1
+    ],
+    [
+     "Cleste",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Revolver Lemat",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Pat Revolver",
+     1
+    ],
+    [
+     "Teava Revolver",
+     2
+    ],
+    [
+     "Arc Metalic",
+     1
+    ],
+    [
+     "Cadru Revolver",
+     1
+    ],
+    [
+     "Cleste",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Repeater Carbine",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Pat Repeater",
+     1
+    ],
+    [
+     "Arc Metalic",
+     1
+    ],
+    [
+     "Cadru Repeater",
+     1
+    ],
+    [
+     "Teava Repeater",
+     1
+    ],
+    [
+     "Cleste",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Shotgun Semiauto",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Teava Shotgun",
+     1
+    ],
+    [
+     "Arc Metalic",
+     1
+    ],
+    [
+     "Cadru Shotgun",
+     1
+    ],
+    [
+     "Pat Shotgun",
+     1
+    ],
+    [
+     "Cleste",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Pistol Mauser",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Teava Pistol",
+     1
+    ],
+    [
+     "Cadru Pistol",
+     1
+    ],
+    [
+     "Arc Metalic",
+     1
+    ],
+    [
+     "Cleste",
+     1
+    ],
+    [
+     "Pat Pistol",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Tutun Uscat",
+   "category": "Contrabanda",
+   "ingredients": [
+    [
+     "Frunze Tutun",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 0,
+   "time": "2 secunde"
+  },
+  {
+   "name": "Ulei de Sarpe",
+   "category": "Potiuni",
+   "ingredients": [
+    [
+     "Venin Sarpe",
+     1
+    ],
+    [
+     "Grasime",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "10 secunde"
+  },
+  {
+   "name": "Antidot",
+   "category": "Potiuni",
+   "ingredients": [
+    [
+     "Venin Sarpe",
+     1
+    ],
+    [
+     "Sticla de Apa",
+     1
+    ],
+    [
+     "Zahar",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Plasca",
+   "category": "Grajd",
+   "ingredients": [
+    [
+     "Piele de Iepure",
+     5
+    ],
+    [
+     "Tub",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Adrenalina Cal",
+   "category": "Potiuni",
+   "ingredients": [
+    [
+     "Sticla de Apa",
+     1
+    ],
+    [
+     "Otrava Mexicana",
+     1
+    ],
+    [
+     "Piper",
+     1
+    ],
+    [
+     "Zahar",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 100,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Morfina",
+   "category": "Potiuni",
+   "ingredients": [
+    [
+     "Zahar",
+     1
+    ],
+    [
+     "Sticla de Apa",
+     1
+    ],
+    [
+     "Piper",
+     1
+    ],
+    [
+     "Otrava de Viespe",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 100,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Zahar",
+   "category": "Mancare",
+   "ingredients": [
+    [
+     "Lemne de foc",
+     1
+    ],
+    [
+     "Trestie de Zahar",
+     3
+    ],
+    [
+     "Sticla de Apa",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 10,
+   "time": "3 secunde"
+  }
+ ]
 }
