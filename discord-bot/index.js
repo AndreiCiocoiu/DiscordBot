@@ -7,6 +7,7 @@ const { handleServerMessage } = require('./src/utils/serverText');
 const sessions = require('./src/utils/sessions');
 const welcome = require('./src/utils/welcome');
 const adminlog = require('./src/utils/adminlog');
+const craft = require('./src/utils/craft');
 
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
@@ -61,7 +62,7 @@ function wire(client, level) {
   client.on(Events.InteractionCreate, async (interaction) => {
     if (!(interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit())) return;
     try {
-      (await raziiUi.handleInteraction(interaction, client)) || (await sessions.handleInteraction(interaction, client));
+      (await raziiUi.handleInteraction(interaction, client)) || (await sessions.handleInteraction(interaction, client)) || (await craft.handleInteraction(interaction, client));
     } catch (err) {
       if (err?.code === 10062 || err?.code === 40060) return; // expired / already answered
       console.error('Interaction error:', err);
@@ -73,6 +74,7 @@ function wire(client, level) {
 
   client.on(Events.MessageCreate, (message) => {
     handleMessage(message, client).catch((err) => console.error('Text trigger error:', err));
+    craft.handleMessage(message, client).catch((err) => console.error('Craft error:', err));
     handleServerMessage(message, client).catch((err) => console.error('Server command error:', err));
   });
 }

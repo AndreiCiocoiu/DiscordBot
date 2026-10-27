@@ -23,5 +23,8 @@ Everything goes to the private adminlog: joins (account age, invite used), leave
 Panel with buttons: **Porneste** (zone + minutes left), **Anuleaza**, **A venit mai repede**, **Istoric**, **Alerte on/off**, **Setari**. Shortcut: write `razie Annesburg` in the panel channel. Starting a zone that already has a timer replaces it. 10 minutes before the end: one warning with an @Razie ping (deleted when the timer ends). At the end: one alert with buttons **A fost razie, reporneste 3h** / **N-a fost** (with undo); the bot joins voice and plays the siren plus your recording.
 Admin: `razie panou`, `razie sunet` (+ audio attachment), `razie test`.
 
+## Craft
+Write `craft cadru pistol` in any channel: the bot answers with the recipe (typos and missing diacritics are fine; several matches give a pick list). `craft panou` (admin) posts a panel with a category menu and a **Cauta** button; those answers are private to whoever pressed. Recipes are in `assets/recipes.json` (name, category, ingredients `[name, qty]`, level, points, time); edit the file and push, no code changes. Optional picture per item: `assets/craft/cadru-pistol.png` (lowercase name with dashes).
+
 ## Env
 Only `DISCORD_TOKEN`. Optional: `RAZIE_MINUTES` (180), `RAZIE_WARN_MINUTES` (10), `DATA_DIR`.

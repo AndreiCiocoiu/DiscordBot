@@ -1,0 +1,11 @@
+{
+  "categories": ["Componente", "Arme", "Droguri", "Diverse"],
+  "recipes": [
+    { "name": "Cadru Repeater", "category": "Componente", "ingredients": [["Matrita Cadru Repeater", 1], ["Lingou Fier", 4]], "level": 0, "points": 5, "time": "30 secunde" },
+    { "name": "Teava Repeater", "category": "Componente", "ingredients": [["Matrita Teava Repeater", 1], ["Lingou Fier", 4]], "level": 0, "points": 5, "time": "30 secunde" },
+    { "name": "Teava Shotgun", "category": "Componente", "ingredients": [["Matrita Teava Shotgun", 1], ["Lingou Fier", 3]], "level": 0, "points": 5, "time": "30 secunde" },
+    { "name": "Teava Revolver", "category": "Componente", "ingredients": [["Matrita Teava Revolver", 1], ["Lingou Fier", 2]], "level": 0, "points": 5, "time": "30 secunde" },
+    { "name": "Teava Pistol", "category": "Componente", "ingredients": [["Matrita Teava Pistol", 1], ["Lingou Fier", 2]], "level": 0, "points": 5, "time": "30 secunde" },
+    { "name": "Cadru Pistol", "category": "Componente", "ingredients": [["Matrita Cadru Pistol", 1], ["Lingou Fier", 1]], "level": 0, "points": 5, "time": "30 secunde" }
+  ]
+}

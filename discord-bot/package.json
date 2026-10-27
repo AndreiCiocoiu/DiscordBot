@@ -1,6 +1,6 @@
 {
   "name": "muie-bot",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Discord bot: RDR2 raid timers, game sessions, animated welcome, admin log. No slash commands.",
   "main": "index.js",
   "scripts": {
