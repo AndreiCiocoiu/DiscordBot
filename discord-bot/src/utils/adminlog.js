@@ -35,10 +35,25 @@ function embed(color, title, description, fields = [], user = null) {
   return e;
 }
 
+async function rediscover(client, guildId) {
+  try {
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) return null;
+    const { nameKey } = require('./serverText');
+    const { PermissionFlagsBits } = require('discord.js');
+    const found = guild.channels.cache.find((c) => c.type === ChannelType.GuildText && nameKey(c.name) === 'adminlog'
+      && !c.permissionsFor(guild.roles.everyone)?.has(PermissionFlagsBits.ViewChannel));
+    if (found) { store.setConfig(guildId, { logId: found.id }); console.log(`adminlog: found ${found.name} again and saved it.`); }
+    return found || null;
+  } catch { return null; }
+}
+
 async function post(client, guildId, e, files) {
+  let ch = null;
   const id = store.cfg(guildId).logId;
-  if (!id) return;
-  const ch = await client.channels.fetch(id).catch(() => null);
+  if (id) ch = await client.channels.fetch(id).catch(() => null);
+  // Saved settings lost (e.g. redeploy without a Volume)? Find the private "adminlog" channel again.
+  if (!ch) ch = await rediscover(client, guildId);
   if (!ch?.isTextBased()) return;
   await ch.send({ embeds: [e], files, allowedMentions: { parse: [] } }).catch((err) => {
     if (!warned.has(guildId)) { warned.add(guildId); console.warn(`adminlog: cannot write in the log channel: ${err.message}`); }
