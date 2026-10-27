@@ -1,10 +1,11 @@
 {
   "name": "muie-bot",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Discord bot: RDR2 raid timers, game sessions, animated welcome, admin log. No slash commands.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "deploy": "node -e \"console.log('Nothing to deploy: the bot has no slash commands.')\""
   },
   "dependencies": {
     "@discordjs/voice": "^0.19.2",
