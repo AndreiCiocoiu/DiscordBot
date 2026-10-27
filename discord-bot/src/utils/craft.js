@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, PermissionFlagsBits,
-  StringSelectMenuBuilder, TextInputBuilder, TextInputStyle, AttachmentBuilder,
+  StringSelectMenuBuilder, TextInputBuilder, TextInputStyle, AttachmentBuilder, SlashCommandBuilder,
 } = require('discord.js');
 const adminlog = require('./adminlog');
 
@@ -153,7 +153,22 @@ function searchView(query) {
 
 // ---- interactions -------------------------------------------------------
 
+const command = new SlashCommandBuilder().setName('craft').setDescription('Arată rețeta unui item')
+  .setContexts(0)
+  .addStringOption((o) => o.setName('item').setDescription('Numele itemului (ex: cadru pistol)').setAutocomplete(true).setRequired(true));
+
 async function handleInteraction(interaction) {
+  if (interaction.isAutocomplete?.() && interaction.commandName === 'craft') {
+    const q = interaction.options.getFocused();
+    const list = q.trim() ? search(q) : [...data().recipes].sort((a, b) => a.name.localeCompare(b.name));
+    await interaction.respond(list.slice(0, 25).map((r) => ({ name: `${r.name} (${r.category || 'Diverse'})`.slice(0, 100), value: r.name.slice(0, 100) }))).catch(() => {});
+    return true;
+  }
+  if (interaction.isChatInputCommand?.() && interaction.commandName === 'craft') {
+    // only the person who asked sees the answer: no spam, nothing to clean up
+    await interaction.reply({ ephemeral: true, ...searchView(interaction.options.getString('item', true)) });
+    return true;
+  }
   const id = interaction.customId;
   if (!id || !id.startsWith('cr:')) return false;
   const [, kind, a, b] = id.split(':');
@@ -207,9 +222,12 @@ async function handleMessage(message, client) {
   if (now - (lastUse.get(message.author.id) || 0) < 2000) return;
   lastUse.set(message.author.id, now);
 
-  const view = searchView(arg);
-  const { content, ...rest } = view;
-  await message.reply({ ...(content ? { content } : {}), ...rest, allowedMentions: NO_PING }).catch(() => {});
+  const { content, ...rest } = searchView(arg);
+  const who = message.member?.displayName || message.author.username;
+  if (rest.embeds?.[0] && !rest.embeds[0].data.footer) rest.embeds[0].setFooter({ text: `Cerut de ${who}` });
+  const sent = await message.channel.send({ ...(content ? { content: `${message.author}: ${content}` } : {}), ...rest, allowedMentions: { parse: [], users: [] } }).catch(() => null);
+  // remove the request so the channel only keeps the answer
+  if (sent) await message.delete().catch(() => {});
 }
 
-module.exports = { handleInteraction, handleMessage, search, panelPayload, data };
+module.exports = { command, handleInteraction, handleMessage, search, panelPayload, data };

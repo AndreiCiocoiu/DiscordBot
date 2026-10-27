@@ -35,15 +35,18 @@ function build(level) {
   return client;
 }
 
-// This bot has NO slash commands. Anything left over from older versions is removed at every start.
-async function clearSlashCommands(c) {
-  const managers = [c.application.commands, ...[...c.guilds.cache.values()].map((g) => g.commands)];
-  for (const manager of managers) {
-    try {
-      const current = await manager.fetch();
-      if (current.size) { await manager.set([]); console.log(`Removed ${current.size} slash command(s).`); }
-    } catch (err) { console.error('Could not clear slash commands:', err.message); }
-  }
+// The only slash command is /craft (read-only lookup, answer is private). Everything else
+// left over from older versions (global or per server) is removed at every start.
+async function syncSlashCommands(c) {
+  try {
+    const global = await c.application.commands.fetch();
+    if (global.size) { await c.application.commands.set([]); console.log(`Removed ${global.size} global slash command(s).`); }
+  } catch (err) { console.error('Could not clear global slash commands:', err.message); }
+  for (const guild of c.guilds.cache.values()) await syncGuild(guild);
+}
+async function syncGuild(guild) {
+  try { await guild.commands.set([craft.command.toJSON()]); }
+  catch (err) { console.error(`Could not set /craft in ${guild.name}:`, err.message); }
 }
 
 function wire(client, level) {
@@ -53,20 +56,22 @@ function wire(client, level) {
     if (!level.content) console.warn('Message Content Intent is OFF: "razie ..." / "server ..." text commands and message logs are disabled.');
     razii.restore(client);
     sessions.restore(client);
-    await clearSlashCommands(c);
+    await syncSlashCommands(c);
   });
 
+  client.on(Events.GuildCreate, (guild) => syncGuild(guild));
   adminlog.attach(client);
   client.on(Events.GuildMemberAdd, (member) => welcome.onMemberAdd(client, member).catch((err) => console.error('welcome error:', err)));
 
   client.on(Events.InteractionCreate, async (interaction) => {
-    if (!(interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit())) return;
+    if (!(interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit() || interaction.isChatInputCommand() || interaction.isAutocomplete())) return;
     try {
       (await raziiUi.handleInteraction(interaction, client)) || (await sessions.handleInteraction(interaction, client)) || (await craft.handleInteraction(interaction, client));
     } catch (err) {
       if (err?.code === 10062 || err?.code === 40060) return; // expired / already answered
       console.error('Interaction error:', err);
       const payload = { content: 'Ceva nu a mers, mai încearcă o dată.', ephemeral: true };
+      if (interaction.isAutocomplete()) return;
       if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
       else await interaction.reply(payload).catch(() => {});
     }

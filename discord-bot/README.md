@@ -1,6 +1,6 @@
 # MUIE bot
 
-No slash commands: everything is buttons on pinned panels plus a few admin text commands. Leftover slash commands from older versions are removed at every start.
+The only slash command is `/craft` (read-only recipe lookup with autocomplete, answer visible only to you). Everything else is buttons on pinned panels plus a few admin text commands. Any other leftover slash commands are removed at every start.
 
 ## Setup (once, admin)
 1. Developer Portal -> Bot: enable **Server Members Intent** and **Message Content Intent** (the bot still starts without them, with fewer features, and says so in the logs).
@@ -24,7 +24,7 @@ Panel with buttons: **Porneste** (zone + minutes left), **Anuleaza**, **A venit 
 Admin: `razie panou`, `razie sunet` (+ audio attachment), `razie test`.
 
 ## Craft
-Write `craft cadru pistol` in any channel: the bot answers with the recipe (typos and missing diacritics are fine; several matches give a pick list). `craft panou` (admin) posts a panel with a category menu and a **Cauta** button; those answers are private to whoever pressed. Recipes are in `assets/recipes.json` (name, category, ingredients `[name, qty]`, level, points, time); edit the file and push, no code changes. Optional picture per item: `assets/craft/cadru-pistol.png` (lowercase name with dashes).
+Use `/craft` (autocomplete, private answer) or write `craft cadru pistol` in any channel (the bot posts the recipe and deletes your message) (typos and missing diacritics are fine; several matches give a pick list). `craft panou` (admin) posts a panel with a category menu and a **Cauta** button; those answers are private to whoever pressed. Recipes are in `assets/recipes.json` (name, category, ingredients `[name, qty]`, level, points, time); edit the file and push, no code changes. Optional picture per item: `assets/craft/cadru-pistol.png` (lowercase name with dashes).
 
 ## Env
 Only `DISCORD_TOKEN`. Optional: `RAZIE_MINUTES` (180), `RAZIE_WARN_MINUTES` (10), `DATA_DIR`.
