@@ -1,28 +1,27 @@
 # MUIE bot
 
-Razie (police raid) tracker for RDR2 Online. Everything is done with buttons on one pinned panel.
+No slash commands: everything is buttons on pinned panels plus a few admin text commands. Leftover slash commands from older versions are removed at every start.
 
-## Use
-1. Admin posts the panel once: `/razie panou` (the alerts come to that channel; change it in Setari).
-2. **Porneste**: pick a zone from the menu, or "Alta zona / minute ramase" to type a new one (and the minutes left, if you started late). Starting a zone that already has a timer **replaces** it.
-3. **Anuleaza**: pick a timer (or all). **A venit mai repede**: the raid came before the timer ended, logs it now and restarts the full cooldown (has an undo).
-4. **Istoric**: last 10 raids. **Alerte on/off**: get/drop the @Razie role. **Setari** (admin): siren on/off, 10 min warning on/off, alert channel, remove saved zones.
-5. Text shortcut: write `razie Annesburg` in the panel/alert channel (the bot reacts with a check mark).
+## Setup (once, admin)
+1. Developer Portal -> Bot: enable **Server Members Intent** and **Message Content Intent** (the bot still starts without them, with fewer features, and says so in the logs).
+2. Bot permissions: View Channels, Manage Channels, Manage Roles, Send Messages, Embed Links, Attach Files, Read Message History, Manage Messages, Add Reactions, **View Audit Log**, **Manage Server** (invite tracking), Connect, Speak. The bot's role must sit above the @Razie and @Sesiuni roles.
+3. Write **`server setup`** in any channel. It reuses your existing welcome channel, creates **sesiuni** and a private **adminlog** (only admins see it), and posts the sessions panel.
+4. Write `razie panou` in the channel for the raid panel (see below). Railway: add a **Volume** mounted at `/app/data` so timers, sessions and the recording survive redeploys.
 
-## What the bot posts
-- the panel (edited, never reposted)
-- 10 minutes before the end: one short warning with an @Razie ping (deleted when the timer ends)
-- when the timer ends: one alert with an @Razie ping and the buttons **A fost razie, reporneste 3h** / **N-a fost** (with undo). If someone is in voice the bot joins, plays `assets/siren.wav`, then your recording.
-Everything else (confirmations, menus, history) is private to whoever pressed the button.
+Admin text commands (Administrator only): `server setup`, `server aici welcome|sesiuni|log` (use this channel), `server test` (preview the welcome banner), `server tz Europe/Bucharest` (time zone for sessions, default Europe/London), `server info`.
 
-## Commands (admin)
-- `/razie panou`, `/razie sunet` (upload your "Atentie, razie!" recording, mp3/wav/ogg/m4a max 3 MB), `/razie test` (bot joins your voice channel and plays everything)
-- `/cleanup`: deletes all roles (except @Razie) and every channel except voice channels, the RDR2 category, welcome, general and text channels in the Voice category. Asks for confirmation. Delete `src/commands/cleanup.js` when you don't need it anymore.
+## Welcome
+When someone joins, the bot posts in the welcome channel an embed with an **animated banner** (sunset, embers, glowing avatar ring, gold shimmer) with their name and member number, plus buttons for the razie and session notifications. During a join flood it falls back to text only.
 
-## Setup
-- Commands register automatically at startup (set `GUILD_ID`). Start command: `npm start`.
-- Developer Portal -> Bot: enable **Message Content Intent**.
-- Bot permissions: View Channel, Send Messages, Connect, Speak, Manage Roles, Manage Messages (optional, pins the panel + deletes the warning), Add Reactions (optional).
-- The bot's role must be above @Razie in Server Settings -> Roles.
-- Railway: add a **Volume** mounted at `/app/data`, otherwise a redeploy loses timers, history and the uploaded recording.
-- Optional env: `RAZIE_MINUTES` (default 180), `RAZIE_WARN_MINUTES` (default 10), `DATA_DIR`.
+## Sessions
+In the sessions channel press **Planifica sesiune**: what you play + when (`azi 21:00`, `maine 20:30`, `sambata 22:00`, `28.10 21:00`) + optional details. The bot posts one message with **Vin / Poate / Nu vin** (press again to take it back) and pings the opt-in @Sesiuni role. 30 minutes before it pings everyone who said Vin or Poate. The host or an admin can cancel it. The message is deleted 3 hours after the start. Times show in everyone's own time zone.
+
+## Admin log
+Everything goes to the private adminlog: joins (account age, invite used), leaves, kicks, bans/unbans, nickname/role/timeout changes (with who did it), deleted/edited messages (with content), bulk deletes (attached as a text file), channel/role/server/emoji/sticker changes, invites, threads, webhooks, voice join/leave/move/mute/stream, AutoMod hits, and what the bot itself does (razie, sessions, welcome, setup). Messages sent before the bot started can't show their old content.
+
+## Razie (RDR2 raid timers)
+Panel with buttons: **Porneste** (zone + minutes left), **Anuleaza**, **A venit mai repede**, **Istoric**, **Alerte on/off**, **Setari**. Shortcut: write `razie Annesburg` in the panel channel. Starting a zone that already has a timer replaces it. 10 minutes before the end: one warning with an @Razie ping (deleted when the timer ends). At the end: one alert with buttons **A fost razie, reporneste 3h** / **N-a fost** (with undo); the bot joins voice and plays the siren plus your recording.
+Admin: `razie panou`, `razie sunet` (+ audio attachment), `razie test`.
+
+## Env
+Only `DISCORD_TOKEN`. Optional: `RAZIE_MINUTES` (180), `RAZIE_WARN_MINUTES` (10), `DATA_DIR`.

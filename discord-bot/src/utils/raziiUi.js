@@ -7,6 +7,7 @@ const {
   ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits,
 } = require('discord.js');
 const core = require('./razii');
+const adminlog = require('./adminlog');
 
 const RED = 0xe74c3c, GREEN = 0x2ecc71, GREY = 0x95a5a6, BLURPLE = 0x5865f2;
 const NO_PING = { parse: [] };
@@ -142,6 +143,7 @@ async function announceFire(client, entry, late) {
       allowedMentions: { roles: role ? [role.id] : [], users: role ? [] : [entry.userId] },
     }).catch(log('send'));
   }
+  adminlog.action(client, entry.guildId, 'Razie: alertă trimisă', `**${entry.zone}**${late ? ' (întârziată)' : ''}`);
   updatePanel(client, entry.guildId).catch(log('panel'));
 }
 
@@ -163,7 +165,7 @@ function settingsPayload(guildId) {
     { name: 'Canal alerte', value: c.channelId ? `<#${c.channelId}>` : c.panel ? `<#${c.panel.channelId}> (canalul panoului)` : '-', inline: true },
     { name: 'Sirenă pe voice', value: state(c.voice), inline: true },
     { name: `Avertizare (${core.WARN_MINUTES} min)`, value: state(c.warn), inline: true },
-    { name: 'Vocea ta', value: core.findVoiceRecording() ? 'încărcată' : 'neîncărcată (`/razie sunet`)', inline: true },
+    { name: 'Vocea ta', value: core.findVoiceRecording() ? 'încărcată' : 'neîncărcată (scrie `razie sunet` cu un fișier audio)', inline: true },
     { name: 'Zone salvate', value: (c.zones || []).join(', ').slice(0, 900) || '-' },
   );
   const rows = [
@@ -206,6 +208,7 @@ async function handleInteraction(interaction, client) {
   const userId = interaction.user.id;
   const say = (content) => interaction.reply({ content, ephemeral: true, allowedMentions: NO_PING });
   const adminOnly = () => say('Doar adminii.');
+  const alog = (title, text) => adminlog.action(client, guildId, title, text, userId);
 
   // ---- buttons
   if (interaction.isButton()) {
@@ -252,11 +255,15 @@ async function handleInteraction(interaction, client) {
         return true;
       case 't': // toggles: voice | warn
         if (!isAdmin(interaction)) { await adminOnly(); return true; }
-        if (arg === 'voice' || arg === 'warn') core.setConfig(guildId, { [arg]: core.cfg(guildId)[arg] === false });
+        if (arg === 'voice' || arg === 'warn') {
+          core.setConfig(guildId, { [arg]: core.cfg(guildId)[arg] === false });
+          alog('Setare razie', `${arg === 'voice' ? 'Sirenă' : 'Avertizare'}: ${core.cfg(guildId)[arg] === false ? 'oprită' : 'pornită'}`);
+        }
         await interaction.update(settingsPayload(guildId));
         return true;
       case 'y': { // raid happened -> restart
         core.markHistory(guildId, arg, 'pending', 'confirmed');
+        alog('Razie confirmată', `**${arg}**`);
         const res = core.start(client, { guildId, zone: arg, userId });
         await interaction.update({
           content: '',
@@ -269,6 +276,7 @@ async function handleInteraction(interaction, client) {
       }
       case 'n': // no raid
         core.markHistory(guildId, arg, 'pending', 'none');
+        alog("Razie: n-a fost", `**${arg}**`);
         updatePanel(client, guildId).catch(log('panel'));
         await interaction.update({
           content: '',
@@ -278,6 +286,7 @@ async function handleInteraction(interaction, client) {
         });
         return true;
       case 'u': // undo y / n
+        alog('Razie: anulat (apăsat greșit)', `**${arg}**`);
         if (!core.markHistory(guildId, arg, 'confirmed', 'pending')) core.markHistory(guildId, arg, 'none', 'pending');
         core.cancel(client, guildId, arg);
         await interaction.update({ embeds: [fireEmbed(arg, false)], components: [fireButtons(arg)] });
@@ -285,6 +294,7 @@ async function handleInteraction(interaction, client) {
       case 'ue': { // undo "came earlier"
         const [prev, ...zoneParts] = arg.split(':');
         const zone = zoneParts.join(':');
+        alog('Razie: anulat „a venit mai repede”', `**${zone}**`);
         const entry = core.undoEarly(client, { guildId, zone, prevEndsAt: Number(prev), userId });
         await interaction.update({
           content: entry ? `Anulat. Timerul vechi e înapoi: **${zone}** · ${when(entry.endsAt)}` : `Anulat. **${zone}** a fost scos din istoric.`,
@@ -294,7 +304,7 @@ async function handleInteraction(interaction, client) {
         return true;
       }
       default:
-        await say('Butonul ăsta e vechi. Folosește panoul actual (`/razie panou`).');
+        await say('Butonul ăsta e vechi. Folosește panoul actual (un admin scrie `razie panou`).');
         return true;
     }
   }
@@ -306,14 +316,17 @@ async function handleInteraction(interaction, client) {
 
     if (arg === 'start') {
       const res = core.start(client, { guildId, zone: value, userId });
+      if (res.ok) alog(res.replaced ? 'Razie: timer repornit' : 'Razie: timer pornit', `**${res.entry.zone}** · ${when(res.entry.endsAt)}`);
       await interaction.update({ content: res.ok ? startedText(res) : 'Zonă invalidă.', components: [], allowedMentions: NO_PING });
     } else if (arg === 'cancel') {
+      alog('Razie: timer anulat', value === '__all__' ? 'toate timerele' : `**${value}**`);
       const text = value === '__all__'
         ? `${core.cancelAll(client, guildId)} timere șterse.`
         : core.cancel(client, guildId, value) ? `Timerul pentru **${value}** a fost anulat.` : 'Timerul nu mai există.';
       await interaction.update({ content: text, components: [], allowedMentions: NO_PING });
     } else if (arg === 'early') {
       const res = core.earlyRaid(client, { guildId, zone: value, userId });
+      if (res.ok) alog('Razie: a venit mai repede', `**${res.entry.zone}**`);
       await interaction.update(res.ok
         ? { content: earlyText(res), components: [row(btn(`rz:ue:${res.prevEndsAt}:${res.entry.zone}`, 'Anulează (am apăsat greșit)'))], allowedMentions: NO_PING }
         : { content: 'Timerul nu mai există.', components: [] });
@@ -321,6 +334,7 @@ async function handleInteraction(interaction, client) {
       if (!isAdmin(interaction)) { await adminOnly(); return true; }
       if (arg === 'chan') core.setConfig(guildId, { channelId: value });
       else core.removeZone(guildId, value);
+      alog('Setare razie', arg === 'chan' ? `Canal alerte: <#${value}>` : `Zonă ștearsă: **${value}**`);
       await interaction.update(settingsPayload(guildId));
     }
     return true;
@@ -334,6 +348,7 @@ async function handleInteraction(interaction, client) {
       minutes: parseMinutes(interaction.fields.getTextInputValue('mins')),
       userId,
     });
+    if (res.ok) alog(res.replaced ? 'Razie: timer repornit' : 'Razie: timer pornit', `**${res.entry.zone}** · ${when(res.entry.endsAt)}`);
     await say(res.ok ? startedText(res) : 'Scrie o zonă.');
     return true;
   }

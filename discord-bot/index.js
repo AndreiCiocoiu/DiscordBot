@@ -1,98 +1,94 @@
 require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
-const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Events } = require('discord.js');
 const razii = require('./src/utils/razii');
 const raziiUi = require('./src/utils/raziiUi');
+const { handleMessage } = require('./src/utils/raziiText');
+const { handleServerMessage } = require('./src/utils/serverText');
+const sessions = require('./src/utils/sessions');
+const welcome = require('./src/utils/welcome');
+const adminlog = require('./src/utils/adminlog');
 
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent, // for the "razie <zona>" text trigger
-  ],
-});
-client.commands = new Collection();
+const G = GatewayIntentBits;
+const BASE_INTENTS = [
+  G.Guilds, G.GuildModeration, G.GuildExpressions ?? G.GuildEmojisAndStickers, G.GuildInvites, G.GuildWebhooks,
+  G.GuildVoiceStates, G.GuildMessages, G.GuildScheduledEvents, G.AutoModerationExecution,
+];
 
-const commandsPath = path.join(__dirname, 'src', 'commands');
-for (const file of fs.readdirSync(commandsPath).filter((f) => f.endsWith('.js'))) {
-  const command = require(path.join(commandsPath, file));
-  if (command?.data?.name) client.commands.set(command.data.name, command);
+// Privileged intents must be switched on in the Developer Portal. If one is
+// off, the bot starts anyway with fewer features instead of not starting.
+const LEVELS = [
+  { members: true, content: true },
+  { members: false, content: true },
+  { members: false, content: false },
+];
+
+function build(level) {
+  const intents = [...BASE_INTENTS];
+  if (level.members) intents.push(G.GuildMembers);
+  if (level.content) intents.push(G.MessageContent);
+  const client = new Client({ intents, partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User] });
+  wire(client, level);
+  return client;
 }
 
-client.once(Events.ClientReady, async (c) => {
-  console.log(`Logged in as ${c.user.tag}`);
-  razii.restore(client);
-
-  // Register the slash commands on every start (anything not in src/commands is removed).
-  const body = [...client.commands.values()].map((cmd) => cmd.data.toJSON());
-  try {
-    if (process.env.GUILD_ID) {
-      const guild = await c.guilds.fetch(process.env.GUILD_ID);
-      await guild.commands.set(body);
-      await c.application.commands.set([]); // clear old global commands so nothing shows twice
-      console.log(`Registered ${body.length} command(s) in guild ${guild.name}.`);
-    } else {
-      await c.application.commands.set(body);
-      console.log(`Registered ${body.length} global command(s). Set GUILD_ID for instant updates.`);
-    }
-  } catch (err) {
-    console.error('Failed to register commands:', err);
+// This bot has NO slash commands. Anything left over from older versions is removed at every start.
+async function clearSlashCommands(c) {
+  const managers = [c.application.commands, ...[...c.guilds.cache.values()].map((g) => g.commands)];
+  for (const manager of managers) {
+    try {
+      const current = await manager.fetch();
+      if (current.size) { await manager.set([]); console.log(`Removed ${current.size} slash command(s).`); }
+    } catch (err) { console.error('Could not clear slash commands:', err.message); }
   }
-});
-
-async function fail(interaction, err) {
-  if (err?.code === 10062 || err?.code === 40060) return; // expired / already answered
-  console.error('Interaction error:', err);
-  const payload = { content: 'Ceva nu a mers, mai încearcă o dată.', ephemeral: true };
-  if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
-  else await interaction.reply(payload).catch(() => {});
 }
 
-client.on(Events.InteractionCreate, async (interaction) => {
-  try {
-    if (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) {
-      await raziiUi.handleInteraction(interaction, client); // ignores components that aren't ours
-    } else if (interaction.isChatInputCommand()) {
-      const command = client.commands.get(interaction.commandName);
-      if (command) await command.execute(interaction, client);
+function wire(client, level) {
+  client.once(Events.ClientReady, async (c) => {
+    console.log(`Logged in as ${c.user.tag}`);
+    if (!level.members) console.warn('Server Members Intent is OFF: welcome banner and member logs are disabled. Enable it in the Developer Portal -> Bot.');
+    if (!level.content) console.warn('Message Content Intent is OFF: "razie ..." / "server ..." text commands and message logs are disabled.');
+    razii.restore(client);
+    sessions.restore(client);
+    await clearSlashCommands(c);
+  });
+
+  adminlog.attach(client);
+  client.on(Events.GuildMemberAdd, (member) => welcome.onMemberAdd(client, member).catch((err) => console.error('welcome error:', err)));
+
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (!(interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit())) return;
+    try {
+      (await raziiUi.handleInteraction(interaction, client)) || (await sessions.handleInteraction(interaction, client));
+    } catch (err) {
+      if (err?.code === 10062 || err?.code === 40060) return; // expired / already answered
+      console.error('Interaction error:', err);
+      const payload = { content: 'Ceva nu a mers, mai încearcă o dată.', ephemeral: true };
+      if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
+      else await interaction.reply(payload).catch(() => {});
     }
-  } catch (err) {
-    await fail(interaction, err);
-  }
-});
+  });
 
-// Text trigger: "razie Valentine". Only works in the panel / alert channel
-// (or anywhere if no panel exists yet), at most once every 2 seconds per user.
-const lastUse = new Map();
-client.on(Events.MessageCreate, async (message) => {
-  try {
-    if (message.author.bot || !message.guild) return;
-    const m = message.content.trim().match(/^razie\s+(.+)$/i);
-    if (!m) return;
+  client.on(Events.MessageCreate, (message) => {
+    handleMessage(message, client).catch((err) => console.error('Text trigger error:', err));
+    handleServerMessage(message, client).catch((err) => console.error('Server command error:', err));
+  });
+}
 
-    const c = razii.cfg(message.guild.id);
-    const allowed = [c.panel?.channelId, c.channelId].filter(Boolean);
-    if (allowed.length && !allowed.includes(message.channel.id)) return;
-
-    const now = Date.now();
-    if (now - (lastUse.get(message.author.id) || 0) < 2000) return;
-    lastUse.set(message.author.id, now);
-
-    const res = razii.start(client, { guildId: message.guild.id, zone: m[1], userId: message.author.id });
-    if (!res.ok) return;
-    if (c.panel) {
-      await message.react('✅').catch(() => message.reply({ content: `Pornit: **${res.entry.zone}**`, allowedMentions: { parse: [] } }).catch(() => {}));
-    } else {
-      await message.reply({ content: `Pornit: **${res.entry.zone}** · <t:${Math.floor(res.entry.endsAt / 1000)}:R>`, allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
+async function main() {
+  for (const level of LEVELS) {
+    const client = build(level);
+    try {
+      await client.login(process.env.DISCORD_TOKEN);
+      return;
+    } catch (err) {
+      client.destroy();
+      if (!/disallowed intents/i.test(String(err?.message)) || level === LEVELS[LEVELS.length - 1]) throw err;
+      console.warn('A privileged intent is not enabled in the Developer Portal, retrying with fewer features...');
     }
-  } catch (err) {
-    console.error('Text trigger error:', err);
   }
-});
+}
 
-client.login(process.env.DISCORD_TOKEN);
+main().catch((err) => { console.error('Failed to start:', err); process.exit(1); });
