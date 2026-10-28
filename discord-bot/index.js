@@ -8,6 +8,7 @@ const sessions = require('./src/utils/sessions');
 const welcome = require('./src/utils/welcome');
 const adminlog = require('./src/utils/adminlog');
 const craft = require('./src/utils/craft');
+const commands = require('./src/utils/commands');
 
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
@@ -35,7 +36,7 @@ function build(level) {
   return client;
 }
 
-// The only slash command is /craft (read-only lookup, answer is private). Everything else
+// Slash commands: /craft and /catalog (read-only lookups), /panou (admins only). Everything else
 // left over from older versions (global or per server) is removed at every start.
 async function syncSlashCommands(c) {
   try {
@@ -45,8 +46,8 @@ async function syncSlashCommands(c) {
   for (const guild of c.guilds.cache.values()) await syncGuild(guild);
 }
 async function syncGuild(guild) {
-  try { await guild.commands.set([craft.command.toJSON()]); }
-  catch (err) { console.error(`Could not set /craft in ${guild.name}:`, err.message); }
+  try { await guild.commands.set(commands.list.map((c) => c.toJSON())); }
+  catch (err) { console.error(`Could not set slash commands in ${guild.name}:`, err.message); }
 }
 
 function wire(client, level) {
@@ -67,7 +68,7 @@ function wire(client, level) {
   client.on(Events.InteractionCreate, async (interaction) => {
     if (!(interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit() || interaction.isChatInputCommand() || interaction.isAutocomplete())) return;
     try {
-      (await raziiUi.handleInteraction(interaction, client)) || (await sessions.handleInteraction(interaction, client)) || (await craft.handleInteraction(interaction, client));
+      (await raziiUi.handleInteraction(interaction, client)) || (await sessions.handleInteraction(interaction, client)) || (await craft.handleInteraction(interaction, client)) || (await commands.handleInteraction(interaction, client));
     } catch (err) {
       if (err?.code === 10062 || err?.code === 40060) return; // expired / already answered
       console.error('Interaction error:', err);

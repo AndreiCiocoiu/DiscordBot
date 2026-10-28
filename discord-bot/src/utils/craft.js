@@ -191,7 +191,7 @@ function itemSelect(customId, recipes, placeholder) {
 function panelPayload() {
   const { recipes } = data();
   const embed = new EmbedBuilder().setColor(COLOR).setTitle('Crafting')
-    .setDescription('**Catalog**: răsfoiești itemele pe categorii cu săgeți, iar ce alegi apare în chat.\n**Caută**: scrii numele itemului.\nPoți scrie și direct în chat: `craft cadru pistol` sau `/craft`.')
+    .setDescription('**Catalog**: răsfoiești itemele pe categorii cu săgeți, iar ce alegi apare în chat.\n**Caută**: scrii numele itemului.\nPoți folosi și `/craft`, `/catalog`, sau poți scrie direct în chat: `craft cadru pistol`.')
     .setFooter({ text: `${recipes.length} rețete` });
   return { embeds: [embed], components: [row(btn('cr:open', 'Catalog', ButtonStyle.Success), btn('cr:find', 'Caută'))], allowedMentions: NO_PING };
 }
@@ -414,4 +414,4 @@ async function handleMessage(message, client) {
   if (sent) await message.delete().catch(() => {});
 }
 
-module.exports = { command, handleInteraction, handleMessage, search, panelPayload, data };
+module.exports = { command, handleInteraction, handleMessage, search, panelPayload, catalogView, data };

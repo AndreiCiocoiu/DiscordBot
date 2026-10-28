@@ -1,6 +1,6 @@
 # MUIE bot
 
-The only slash command is `/craft` (read-only recipe lookup with autocomplete). Everything else is buttons on pinned panels plus a few admin text commands. Any other leftover slash commands are removed at every start.
+Slash commands: `/craft` (recipe with autocomplete) and `/catalog` for everyone, `/panou` (crafting / razii / sesiuni panel in the current channel) for admins only: Discord hides it from everyone else and the bot re-checks Manage Server. Everything else is buttons on pinned panels plus a few admin text commands. Any other leftover slash commands are removed at every start.
 
 ## Setup (once, admin)
 1. Developer Portal -> Bot: enable **Server Members Intent** and **Message Content Intent** (the bot still starts without them, with fewer features, and says so in the logs).
