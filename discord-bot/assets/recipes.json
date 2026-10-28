@@ -4,10 +4,18 @@
   "Arme",
   "Ustensile",
   "Mobila",
+  "Mobila Tabara",
+  "Materiale",
   "Potiuni",
   "Mancare",
   "Contrabanda",
   "Grajd"
+ ],
+ "reusable": [
+  "Ciocan",
+  "Cleste",
+  "Lopata",
+  "Matrita Lingou"
  ],
  "recipes": [
   {
@@ -542,7 +550,7 @@
    "time": "30 secunde"
   },
   {
-   "name": "Plasca",
+   "name": "Plosca",
    "category": "Grajd",
    "ingredients": [
     [
@@ -1415,6 +1423,440 @@
    "level": 0,
    "points": 5,
    "time": "5 secunde"
+  },
+  {
+   "name": "Porumb Copt",
+   "category": "Mancare",
+   "ingredients": [
+    [
+     "Porumb",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 10,
+   "time": "10 secunde"
+  },
+  {
+   "name": "Sunca Afumata",
+   "category": "Mancare",
+   "ingredients": [
+    [
+     "Sare",
+     1
+    ],
+    [
+     "Grasime",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Carne Uscata",
+   "category": "Mancare",
+   "ingredients": [
+    [
+     "Carne Rosie",
+     1
+    ],
+    [
+     "Sare",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 10,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Carne Rosie Prajita",
+   "category": "Mancare",
+   "ingredients": [
+    [
+     "Carne Rosie",
+     1
+    ],
+    [
+     "Sare",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 10,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Carne Alba Prajita",
+   "category": "Mancare",
+   "ingredients": [
+    [
+     "Carne Alba",
+     1
+    ],
+    [
+     "Sare",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 10,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Carbune",
+   "category": "Materiale",
+   "ingredients": [
+    [
+     "Lopata",
+     1
+    ],
+    [
+     "Bucati de Lemn",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde",
+   "yield": 2
+  },
+  {
+   "name": "Lampa Tabara 1",
+   "category": "Mobila Tabara",
+   "ingredients": [
+    [
+     "Scanduri",
+     4
+    ],
+    [
+     "Cuie",
+     4
+    ],
+    [
+     "Lanterna",
+     1
+    ],
+    [
+     "Coada de Lemn",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 100,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Lampa Tabara 2",
+   "category": "Mobila Tabara",
+   "ingredients": [
+    [
+     "Scanduri",
+     8
+    ],
+    [
+     "Cuie",
+     4
+    ],
+    [
+     "Lanterna",
+     1
+    ],
+    [
+     "Coada de Lemn",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 100,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Foc de Tabara",
+   "category": "Mobila Tabara",
+   "ingredients": [
+    [
+     "Piatra",
+     1
+    ],
+    [
+     "Lemne de foc",
+     6
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Lanterna",
+   "category": "Mobila Tabara",
+   "ingredients": [
+    [
+     "Lingou Fier",
+     1
+    ],
+    [
+     "Grasime",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Pepita Aur",
+   "category": "Materiale",
+   "ingredients": [
+    [
+     "Dinte de Aur",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "5 secunde"
+  },
+  {
+   "name": "Cuie",
+   "category": "Materiale",
+   "ingredients": [
+    [
+     "Lingou Fier",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde",
+   "yield": 4
+  },
+  {
+   "name": "Lingou Fier",
+   "category": "Materiale",
+   "ingredients": [
+    [
+     "Matrita Lingou",
+     1
+    ],
+    [
+     "Fier",
+     4
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Fier",
+   "category": "Materiale",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Minereu Fier",
+     5
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Cupru",
+   "category": "Materiale",
+   "ingredients": [
+    [
+     "Minereu Cupru",
+     5
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Sulf",
+   "category": "Materiale",
+   "ingredients": [
+    [
+     "Minereu Sulf",
+     5
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Lingou Cupru",
+   "category": "Materiale",
+   "ingredients": [
+    [
+     "Matrita Lingou",
+     1
+    ],
+    [
+     "Cupru",
+     4
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Lingou Aur",
+   "category": "Materiale",
+   "ingredients": [
+    [
+     "Matrita Lingou",
+     1
+    ],
+    [
+     "Pepita Aur",
+     5
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Lingou Argint",
+   "category": "Materiale",
+   "ingredients": [
+    [
+     "Pepita Argint",
+     5
+    ],
+    [
+     "Matrita Lingou",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "5 secunde"
+  },
+  {
+   "name": "Teava Cupru",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Lingou Cupru",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Cazan fara butoi",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Lingou Cupru",
+     10
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "60 secunde"
+  },
+  {
+   "name": "Plasa Insecte",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Sac Gol",
+     2
+    ],
+    [
+     "Coada de Lemn",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 0,
+   "time": "10 secunde"
+  },
+  {
+   "name": "Matrita Lingou",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Minereu Fier",
+     10
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Pompa apa",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Lingou Fier",
+     4
+    ],
+    [
+     "Tub",
+     4
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Lockpick",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Matrita Lockpick",
+     1
+    ],
+    [
+     "Lingou Fier",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "5 secunde",
+   "yield": 5
+  },
+  {
+   "name": "Potcoave",
+   "category": "Grajd",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Lingou Fier",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "15 secunde",
+   "yield": 4
   }
  ]
 }

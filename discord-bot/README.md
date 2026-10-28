@@ -28,5 +28,7 @@ Use `/craft` (autocomplete) or write `craft cadru pistol` in any channel: the re
 
 At every start the bot writes **Bot pornit** in the adminlog, so you see right away that logging works. If the settings were lost (no Volume), it finds the private `adminlog` channel again by name.
 
+Calculator: `/craft Cuie 5` (the `cantitate` option) or `craft cuie 5` in chat gives the total materials: crafts needed (rounded up to whole crafts, with the leftover), intermediate crafts and the raw materials, plus total time. Tools/moulds that you keep and reuse (hammer, pliers, moulds) can be listed in `assets/recipes.json` under `"reusable"` (e.g. `["Ciocan", "Cleste", "Matrita*"]`, `*` = any name starting with that); they are then counted once instead of per craft. Currently: Ciocan, Cleste, Lopata and Matrita Lingou. Moulds for parts (Matrita Cadru/Teava/Lockpick) are consumed and counted per craft.
+
 ## Env
 Only `DISCORD_TOKEN`. Optional: `RAZIE_MINUTES` (180), `RAZIE_WARN_MINUTES` (10), `DATA_DIR`.

@@ -22,7 +22,7 @@ if (!GlobalFonts.families.some((f) => f.family === 'Rye')) GlobalFonts.registerF
 
 // ---- data ---------------------------------------------------------------
 
-let cache = { mtime: 0, recipes: [], categories: [] };
+let cache = { mtime: 0, recipes: [], categories: [], reusable: [] };
 function data() {
   try {
     const mtime = fs.statSync(FILE).mtimeMs;
@@ -31,7 +31,7 @@ function data() {
       const recipes = (raw.recipes || []).filter((r) => r?.name && Array.isArray(r.ingredients));
       const cats = [...new Set([...(raw.categories || []), ...recipes.map((r) => r.category || 'Diverse')])]
         .filter((c) => recipes.some((r) => (r.category || 'Diverse') === c));
-      cache = { mtime, recipes, categories: cats };
+      cache = { mtime, recipes, categories: cats, reusable: (raw.reusable || []).map((x) => norm(x)) };
     }
   } catch (err) { console.error('craft: could not read recipes.json:', err.message); }
   return cache;
@@ -191,7 +191,7 @@ function itemSelect(customId, recipes, placeholder) {
 function panelPayload() {
   const { recipes } = data();
   const embed = new EmbedBuilder().setColor(COLOR).setTitle('Crafting')
-    .setDescription('**Catalog**: răsfoiești itemele pe categorii cu săgeți, iar ce alegi apare în chat.\n**Caută**: scrii numele itemului.\nPoți folosi și `/craft`, `/catalog`, sau poți scrie direct în chat: `craft cadru pistol`.')
+    .setDescription('**Catalog**: răsfoiești itemele pe categorii cu săgeți, iar ce alegi apare în chat.\n**Caută**: scrii numele itemului.\n**Calculator**: `/craft Cuie 5` îți dă materialele totale.\nPoți folosi și `/craft`, `/catalog`, sau poți scrie direct în chat: `craft cadru pistol`.')
     .setFooter({ text: `${recipes.length} rețete` });
   return { embeds: [embed], components: [row(btn('cr:open', 'Catalog', ButtonStyle.Success), btn('cr:find', 'Caută'))], allowedMentions: NO_PING };
 }
@@ -215,12 +215,106 @@ function categoryView(catIdx, page) {
 async function searchView(query, who) {
   const found = search(query);
   if (!found.length) return { content: `Nu am găsit **${query.slice(0, 60)}**. Încearcă alt nume sau alege din categorii.`, embeds: [], components: [], files: [] };
+  // an exact name wins even if other items look similar (e.g. "carbune" vs "Repeater Carbine")
+  const exact = found.filter((r) => norm(r.name) === norm(query));
+  if (exact.length === 1) found.splice(0, found.length, exact[0]);
   if (found.length === 1) return { content: '', components: [], ...(await recipePayload(found[0], who)) };
   const embed = new EmbedBuilder().setColor(COLOR).setTitle(`Rezultate pentru „${query.slice(0, 60)}”`)
     .setDescription(found.slice(0, PAGE).map((r) => `**${r.name}**: ${r.ingredients.map(([n, q]) => `${n} x${q}`).join(', ')}`).join('\n').slice(0, 4000));
   return { content: '', embeds: [embed], components: [row(itemSelect('cr:pick', found, 'Alege un item pentru detalii'))], files: [] };
 }
 
+
+
+// ---- calculator: "/craft Cuie 5" -> total materials ------------------------
+
+const nameKeyMap = () => new Map(data().recipes.map((r) => [norm(r.name), r]));
+
+// Walks the recipe tree once, parents before children, so every shared intermediate
+// (e.g. Lingou Fier needed twice) is rounded up to whole crafts only once.
+function expand(root, qty) {
+  const byName = nameKeyMap();
+  const order = [], state = new Map();
+  (function dfs(r) {
+    state.set(r.name, 1);
+    for (const [n] of r.ingredients) {
+      const c = byName.get(norm(n));
+      if (c && !state.has(c.name)) dfs(c);
+    }
+    state.set(r.name, 2);
+    order.push(r);
+  })(root);
+  order.reverse();
+  const need = new Map([[root.name, qty]]), base = new Map(), steps = [], tools = new Map();
+  // "reusable" in recipes.json: tools/moulds you keep, so they count once, not per craft
+  const isTool = (n) => data().reusable.some((x) => (x.endsWith('*') ? norm(n).startsWith(x.slice(0, -1).trim()) : norm(n) === x));
+  for (const r of order) {
+    const q = need.get(r.name) || 0;
+    if (!q) continue;
+    const y = r.yield || 1, crafts = Math.ceil(q / y);
+    steps.push({ r, crafts, made: crafts * y, need: q });
+    for (const [n, k] of r.ingredients) {
+      if (isTool(n)) { tools.set(n, 1); continue; }
+      const c = byName.get(norm(n));
+      const isParent = c && order.indexOf(c) <= order.indexOf(r); // would loop back: treat as raw
+      if (c && !isParent) need.set(c.name, (need.get(c.name) || 0) + k * crafts);
+      else base.set(n, (base.get(n) || 0) + k * crafts);
+    }
+  }
+  return { steps, base, tools };
+}
+
+const secs = (t) => Number(String(t || '').match(/\d+/)?.[0] || 0);
+const fmtTime = (s) => (s >= 120 ? `~${Math.round(s / 60)} min` : `${s} sec`);
+const lines = (pairs) => pairs.map(([n, q]) => `**${n}** x${q}`).join('\n') || '-';
+
+async function calcPayload(recipe, qty, who) {
+  const { steps, base, tools } = expand(recipe, qty);
+  const rootStep = steps[0];
+  const toolNames = new Set(tools.keys());
+  const direct = recipe.ingredients.filter(([n]) => !toolNames.has(n)).map(([n, q]) => [n, q * rootStep.crafts]);
+  const rawList = [...base].sort((a, b) => b[1] - a[1]);
+  const deeper = steps.length > 1;
+  const embed = new EmbedBuilder().setColor(COLOR).setTitle(`${recipe.name} x${qty}`);
+  const made = rootStep.crafts * (recipe.yield || 1);
+  const head = [`${rootStep.crafts} craft${rootStep.crafts === 1 ? '' : '-uri'} → ${made} buc${made > qty ? ` (${made - qty} în plus)` : ''}`];
+  const total = steps.reduce((a, st) => a + st.crafts * secs(st.r.time), 0);
+  if (total) head.push(`Timp total: ${fmtTime(total)}`);
+  embed.setDescription(head.join('\n'));
+  embed.addFields({ name: deeper ? 'Materiale pentru acest craft' : 'Materiale', value: clipField(lines(direct)) });
+  if (deeper) {
+    embed.addFields(
+      { name: 'De craftat înainte', value: clipField(steps.slice(1).map((st) => `**${st.r.name}**: ${st.crafts} craft${st.crafts === 1 ? '' : '-uri'} (${st.made} buc)`).join('\n')) },
+      { name: 'Materii de bază, total', value: clipField(lines(rawList)) },
+    );
+  }
+  if (tools.size) embed.addFields({ name: 'Unelte (le folosești de mai multe ori)', value: clipField([...tools.keys()].map((n) => `**${n}** x1`).join('\n')) });
+  embed.setFooter({ text: `${who ? `Cerut de ${who} · ` : ''}${tools.size ? 'Uneltele nu sunt numărate la fiecare craft' : 'Totalul numără tot ce apare în rețete, inclusiv matrițele și uneltele'}` });
+  const payload = { embeds: [embed], allowedMentions: NO_PING, files: [] };
+  const thumb = await icon(recipe.name);
+  if (thumb) {
+    payload.files.push(new AttachmentBuilder(thumb.buf(), { name: `item${thumb.ext}` }));
+    embed.setThumbnail(`attachment://item${thumb.ext}`);
+  }
+  const strip = await ingredientStrip({ name: `calc:${recipe.name}:${qty}`, ingredients: (deeper ? rawList : direct).slice(0, 8) });
+  if (strip) {
+    payload.files.push(new AttachmentBuilder(strip, { name: 'ingrediente.png' }));
+    embed.setImage('attachment://ingrediente.png');
+  }
+  return payload;
+}
+const clipField = (t) => (t.length > 1000 ? `${t.slice(0, 997)}…` : t);
+
+async function calcView(query, qty, who) {
+  const found = search(query);
+  if (!found.length) return { content: `Nu am găsit **${query.slice(0, 60)}**. Încearcă alt nume.`, embeds: [], components: [], files: [] };
+  const exact = found.filter((r) => norm(r.name) === norm(query));
+  if (exact.length === 1) found.splice(0, found.length, exact[0]);
+  if (found.length === 1) return { content: '', components: [], ...(await calcPayload(found[0], qty, who)) };
+  const embed = new EmbedBuilder().setColor(COLOR).setTitle(`Calculator x${qty}: alege itemul`)
+    .setDescription(found.slice(0, PAGE).map((r) => `**${r.name}**`).join('\n').slice(0, 4000));
+  return { content: '', embeds: [embed], components: [row(itemSelect(`cr:pickq:${qty}`, found, 'Alege itemul'))], files: [] };
+}
 
 // ---- catalog: category pages with arrows ---------------------------------
 
@@ -312,7 +406,8 @@ const nameOf = (i) => i.member?.displayName || i.user?.username;
 
 const command = new SlashCommandBuilder().setName('craft').setDescription('Arată rețeta unui item')
   .setContexts(0)
-  .addStringOption((o) => o.setName('item').setDescription('Numele itemului (ex: cadru pistol)').setAutocomplete(true).setRequired(true));
+  .addStringOption((o) => o.setName('item').setDescription('Numele itemului (ex: cadru pistol)').setAutocomplete(true).setRequired(true))
+  .addIntegerOption((o) => o.setName('cantitate').setDescription('Câte vrei să faci: calculez materialele totale').setMinValue(1).setMaxValue(1000));
 
 async function handleInteraction(interaction) {
   if (interaction.isAutocomplete?.() && interaction.commandName === 'craft') {
@@ -324,7 +419,9 @@ async function handleInteraction(interaction) {
   if (interaction.isChatInputCommand?.() && interaction.commandName === 'craft') {
     // the answer goes in the chat for everyone to see
     await interaction.deferReply();
-    await interaction.editReply(await searchView(interaction.options.getString('item', true)));
+    const qty = interaction.options.getInteger('cantitate');
+    const item = interaction.options.getString('item', true);
+    await interaction.editReply(qty ? await calcView(item, qty, nameOf(interaction)) : await searchView(item));
     return true;
   }
   const id = interaction.customId;
@@ -365,6 +462,12 @@ async function handleInteraction(interaction) {
   }
   if (interaction.isButton() && kind === 'pg') {
     await interaction.update(categoryView(Number(a), Number(b)));
+    return true;
+  }
+  if (interaction.isStringSelectMenu() && kind === 'pickq') {
+    const r = data().recipes.find((x) => x.name === interaction.values[0]);
+    if (!r) { await interaction.update({ content: 'Rețeta nu mai există.', embeds: [], components: [] }); return true; }
+    await interaction.update({ content: '', components: [], attachments: [], ...(await calcPayload(r, Number(a) || 1, nameOf(interaction))) });
     return true;
   }
   if (interaction.isStringSelectMenu() && (kind === 'item' || kind === 'pick')) {
@@ -408,10 +511,15 @@ async function handleMessage(message, client) {
   lastUse.set(message.author.id, now);
 
   const who = message.member?.displayName || message.author.username;
-  const { content, ...rest } = await searchView(arg, who);
+  // "craft cuie 5" = calculator. A name that already ends in a number ("cufar 1500") stays a plain lookup.
+  const calc = arg.match(/^(.*\S)\s+(\d{1,4})$/);
+  const wholeIsItem = search(arg).some((r) => norm(r.name) === norm(arg));
+  const { content, ...rest } = calc && !wholeIsItem && Number(calc[2]) >= 1
+    ? await calcView(calc[1], Number(calc[2]), who)
+    : await searchView(arg, who);
   const sent = await message.channel.send({ ...(content ? { content: `${message.author}: ${content}` } : {}), ...rest, allowedMentions: { parse: [], users: [] } }).catch(() => null);
   // remove the request so the channel only keeps the answer
   if (sent) await message.delete().catch(() => {});
 }
 
-module.exports = { command, handleInteraction, handleMessage, search, panelPayload, catalogView, data };
+module.exports = { expand, calcView, command, handleInteraction, handleMessage, search, panelPayload, catalogView, data };
