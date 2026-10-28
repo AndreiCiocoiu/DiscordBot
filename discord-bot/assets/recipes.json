@@ -2,6 +2,8 @@
  "categories": [
   "Componente",
   "Arme",
+  "Ustensile",
+  "Mobila",
   "Potiuni",
   "Mancare",
   "Contrabanda",
@@ -626,6 +628,793 @@
    "level": 0,
    "points": 10,
    "time": "3 secunde"
+  },
+  {
+   "name": "Pat Rifle",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Scanduri Stejar",
+     6
+    ],
+    [
+     "Piele Armadillo",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Pat Pistol",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Scanduri",
+     4
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Pat Shotgun",
+   "category": "Arme",
+   "ingredients": [
+    [
+     "Piele de Mistret",
+     1
+    ],
+    [
+     "Scanduri Pin",
+     6
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Tarnacop",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Lingou Fier",
+     1
+    ],
+    [
+     "Coada de Lemn",
+     4
+    ]
+   ],
+   "level": 0,
+   "points": 30,
+   "time": "10 secunde",
+   "yield": 4
+  },
+  {
+   "name": "Topor",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Lingou Fier",
+     1
+    ],
+    [
+     "Coada de Lemn",
+     4
+    ]
+   ],
+   "level": 0,
+   "points": 30,
+   "time": "10 secunde",
+   "yield": 4
+  },
+  {
+   "name": "Topor Greu",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Rindea",
+     1
+    ],
+    [
+     "Scanduri Cedru",
+     2
+    ],
+    [
+     "Lingou Fier",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 30,
+   "time": "10 secunde",
+   "yield": 4
+  },
+  {
+   "name": "Fierastrau",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Scanduri Stejar",
+     2
+    ],
+    [
+     "Lingou Fier",
+     1
+    ],
+    [
+     "Rindea",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 30,
+   "time": "10 secunde",
+   "yield": 4
+  },
+  {
+   "name": "Rindea",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Scanduri Pin",
+     2
+    ],
+    [
+     "Lingou Fier",
+     1
+    ],
+    [
+     "Fierastrau",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 30,
+   "time": "10 secunde",
+   "yield": 4
+  },
+  {
+   "name": "Topor Cherestea",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Rindea",
+     1
+    ],
+    [
+     "Scanduri Pin",
+     2
+    ],
+    [
+     "Lingou Fier",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 30,
+   "time": "10 secunde",
+   "yield": 4
+  },
+  {
+   "name": "Chibrite",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Sulf",
+     1
+    ],
+    [
+     "Bucati de Lemn",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 0,
+   "time": "20 secunde",
+   "yield": 8
+  },
+  {
+   "name": "Mojar",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Scanduri",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 0,
+   "time": "10 secunde"
+  },
+  {
+   "name": "Polonic",
+   "category": "Ustensile",
+   "ingredients": [
+    [
+     "Scanduri",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 0,
+   "time": "10 secunde"
+  },
+  {
+   "name": "Stup",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Cuie",
+     16
+    ],
+    [
+     "Scanduri",
+     30
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Scut Nativi",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Piele de Puma",
+     1
+    ],
+    [
+     "Cuie",
+     4
+    ],
+    [
+     "Crengi",
+     10
+    ],
+    [
+     "Coada de Lemn",
+     2
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Dream Catcher",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Fulgi",
+     3
+    ],
+    [
+     "Crengi",
+     3
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Gard de Lemn",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Cuie",
+     4
+    ],
+    [
+     "Scanduri",
+     6
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Pat din Piei",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Piele de Puma",
+     1
+    ],
+    [
+     "Piele de Bizon",
+     3
+    ],
+    [
+     "Cuie",
+     12
+    ],
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Coada de Lemn",
+     8
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Cort Vanator",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Cuie",
+     8
+    ],
+    [
+     "Scanduri",
+     5
+    ],
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Crengi",
+     10
+    ],
+    [
+     "Piele de Lup",
+     20
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Cort Negustor",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Cuie",
+     8
+    ],
+    [
+     "Scanduri",
+     5
+    ],
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Crengi",
+     10
+    ],
+    [
+     "Piele de Lup",
+     20
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Cort Colectionar",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Cuie",
+     8
+    ],
+    [
+     "Scanduri",
+     5
+    ],
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Crengi",
+     10
+    ],
+    [
+     "Piele de Lup",
+     20
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Cort din Prelata",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Piele de Bizon",
+     4
+    ],
+    [
+     "Cuie",
+     8
+    ],
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Coada de Lemn",
+     8
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Cufar 1500",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Lingou Fier",
+     15
+    ],
+    [
+     "Piele de Puma",
+     3
+    ],
+    [
+     "Scanduri",
+     40
+    ]
+   ],
+   "level": 0,
+   "points": 0,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Masa Macelar Mica",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Butoi Apa",
+     1
+    ],
+    [
+     "Cufar 500",
+     1
+    ],
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Crengi",
+     5
+    ],
+    [
+     "Piele de Urs",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Masa Macelar Medie",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Cufar 1000",
+     1
+    ],
+    [
+     "Butoi Apa",
+     2
+    ],
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Crengi",
+     10
+    ],
+    [
+     "Piele de Urs",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Masa Macelar Mare",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Butoi Apa",
+     3
+    ],
+    [
+     "Cufar 1500",
+     1
+    ],
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Crengi",
+     15
+    ],
+    [
+     "Piele de Urs",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Cufar 1000",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Lingou Fier",
+     10
+    ],
+    [
+     "Piele de Puma",
+     2
+    ],
+    [
+     "Scanduri",
+     30
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Cufar 500",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Lingou Fier",
+     5
+    ],
+    [
+     "Piele de Puma",
+     1
+    ],
+    [
+     "Scanduri",
+     20
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Cort Nativi",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Piele de Urs",
+     1
+    ],
+    [
+     "Cuie",
+     8
+    ],
+    [
+     "Scanduri",
+     5
+    ],
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Crengi",
+     10
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Tinta de Tragere",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Lingou Fier",
+     1
+    ],
+    [
+     "Scanduri",
+     2
+    ],
+    [
+     "Fan",
+     1
+    ],
+    [
+     "Sac Gol",
+     4
+    ],
+    [
+     "Ciocan",
+     1
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "30 secunde"
+  },
+  {
+   "name": "Roti Caruta",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Scanduri",
+     5
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Butoi Apa",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Lingou Fier",
+     1
+    ],
+    [
+     "Scanduri",
+     14
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Banca de Lemn",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Scanduri",
+     20
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Masa de Lemn",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Scanduri",
+     20
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Scaun de Lemn",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Ciocan",
+     1
+    ],
+    [
+     "Piele de Berbec",
+     1
+    ],
+    [
+     "Scanduri",
+     10
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "20 secunde"
+  },
+  {
+   "name": "Franghie Rufe",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Sac Gol",
+     1
+    ],
+    [
+     "Scanduri",
+     4
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "3 secunde"
+  },
+  {
+   "name": "Cos Surcele",
+   "category": "Mobila",
+   "ingredients": [
+    [
+     "Sac Gol",
+     1
+    ],
+    [
+     "Crengi",
+     10
+    ]
+   ],
+   "level": 0,
+   "points": 5,
+   "time": "5 secunde"
   }
  ]
 }

@@ -17,6 +17,7 @@ const IMG_DIR = path.join(__dirname, '..', '..', 'assets', 'craft');
 const NO_PING = { parse: [], repliedUser: false };
 const COLOR = 0xc8923a;
 const PAGE = 25;
+if (!GlobalFonts.families.some((f) => f.family === 'DejaVu')) GlobalFonts.registerFromPath(path.join(__dirname, '..', '..', 'assets', 'fonts', 'DejaVuSans-Bold.ttf'), 'DejaVu');
 if (!GlobalFonts.families.some((f) => f.family === 'Rye')) GlobalFonts.registerFromPath(path.join(__dirname, '..', '..', 'assets', 'fonts', 'Rye-Regular.ttf'), 'Rye');
 
 // ---- data ---------------------------------------------------------------
@@ -60,7 +61,7 @@ function score(recipe, q) {
   let total = 0;
   for (const t of qt) {
     const best = Math.min(...nt.map((w) => (w.startsWith(t) ? 0 : lev(w, t))));
-    if (best > (t.length > 5 ? 2 : 1)) return null;
+    if (best > (t.length > 4 ? 2 : 1)) return null;
     total += best;
   }
   return 3 + total;
@@ -77,6 +78,37 @@ function search(query) {
 }
 
 // ---- rendering ----------------------------------------------------------
+
+// All pictures live in one atlas (assets/craft-atlas.png + .json) so the repo stays small.
+// A loose file assets/craft/<name>.png still wins over the atlas, for quick additions.
+let atlas = null;
+async function loadAtlas() {
+  if (atlas) return atlas;
+  try {
+    const dir = path.join(__dirname, '..', '..', 'assets');
+    atlas = { map: JSON.parse(fs.readFileSync(path.join(dir, 'craft-atlas.json'), 'utf8')), img: await loadImage(path.join(dir, 'craft-atlas.png')) };
+  } catch (err) { console.error('craft: atlas not available:', err.message); atlas = { map: {}, img: null }; }
+  return atlas;
+}
+const iconCache = new Map();
+async function icon(name) {
+  const k = slug(name);
+  if (iconCache.has(k)) return iconCache.get(k);
+  let res = null;
+  const f = iconFile(name);
+  if (f) res = { img: await loadImage(f), buf: () => fs.readFileSync(f), ext: path.extname(f) };
+  else {
+    const a = await loadAtlas();
+    const r = a.map[k];
+    if (r && a.img) {
+      const c = createCanvas(r[2], r[3]);
+      c.getContext('2d').drawImage(a.img, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]);
+      res = { img: c, buf: () => c.toBuffer('image/png'), ext: '.png' };
+    }
+  }
+  iconCache.set(k, res);
+  return res;
+}
 
 function iconFile(name) {
   for (const ext of ['png', 'jpg', 'jpeg', 'webp']) {
@@ -95,8 +127,8 @@ async function ingredientStrip(recipe) {
   try {
     const items = [];
     for (const [n, q] of recipe.ingredients) {
-      const f = iconFile(n);
-      items.push({ q, img: f ? await loadImage(f) : null });
+      const ic = await icon(n);
+      items.push({ q, img: ic ? ic.img : null });
     }
     if (items.some((i) => i.img)) {
       const CELL = 92, H = 104, BOX = 64;
@@ -130,15 +162,15 @@ async function recipePayload(recipe, who) {
   if (recipe.level !== undefined) details.push(`Nivel rețetă: ${recipe.level}`);
   if (recipe.points !== undefined) details.push(`Puncte rețetă: ${recipe.points}`);
   if (recipe.time) details.push(`Timp craft: ${recipe.time}`);
+  if (recipe.yield > 1) details.push(`Se obțin: ${recipe.yield} buc`);
   embed.addFields({ name: 'Detalii', value: details.join('\n') });
   const foot = [recipe.note, who ? `Cerut de ${who}` : null].filter(Boolean).join(' · ');
   if (foot) embed.setFooter({ text: foot });
   const payload = { embeds: [embed], allowedMentions: NO_PING, files: [] };
-  const thumb = iconFile(recipe.name);
+  const thumb = await icon(recipe.name);
   if (thumb) {
-    const ext = path.extname(thumb);
-    payload.files.push(new AttachmentBuilder(thumb, { name: `item${ext}` }));
-    embed.setThumbnail(`attachment://item${ext}`);
+    payload.files.push(new AttachmentBuilder(thumb.buf(), { name: `item${thumb.ext}` }));
+    embed.setThumbnail(`attachment://item${thumb.ext}`);
   }
   const strip = await ingredientStrip(recipe);
   if (strip) {
@@ -157,17 +189,11 @@ function itemSelect(customId, recipes, placeholder) {
 }
 
 function panelPayload() {
-  const { categories, recipes } = data();
+  const { recipes } = data();
   const embed = new EmbedBuilder().setColor(COLOR).setTitle('Crafting')
-    .setDescription('Caută o rețetă (**Caută**) sau alege o categorie din listă. Poți scrie și direct în chat: `craft cadru pistol`.')
+    .setDescription('**Catalog**: răsfoiești itemele pe categorii cu săgeți, iar ce alegi apare în chat.\n**Caută**: scrii numele itemului.\nPoți scrie și direct în chat: `craft cadru pistol` sau `/craft`.')
     .setFooter({ text: `${recipes.length} rețete` });
-  const rows = [];
-  if (categories.length) {
-    rows.push(row(new StringSelectMenuBuilder().setCustomId('cr:cat').setPlaceholder('Alege categoria')
-      .addOptions(categories.slice(0, 25).map((c, i) => ({ label: c, value: String(i), description: `${recipes.filter((r) => (r.category || 'Diverse') === c).length} iteme` })))));
-  }
-  rows.push(row(btn('cr:find', 'Caută', ButtonStyle.Success)));
-  return { embeds: [embed], components: rows, allowedMentions: NO_PING };
+  return { embeds: [embed], components: [row(btn('cr:open', 'Catalog', ButtonStyle.Success), btn('cr:find', 'Caută'))], allowedMentions: NO_PING };
 }
 
 function categoryView(catIdx, page) {
@@ -193,6 +219,91 @@ async function searchView(query, who) {
   const embed = new EmbedBuilder().setColor(COLOR).setTitle(`Rezultate pentru „${query.slice(0, 60)}”`)
     .setDescription(found.slice(0, PAGE).map((r) => `**${r.name}**: ${r.ingredients.map(([n, q]) => `${n} x${q}`).join(', ')}`).join('\n').slice(0, 4000));
   return { content: '', embeds: [embed], components: [row(itemSelect('cr:pick', found, 'Alege un item pentru detalii'))], files: [] };
+}
+
+
+// ---- catalog: category pages with arrows ---------------------------------
+
+const PER_PAGE = 12;
+
+function catalogPages() {
+  const { categories, recipes } = data();
+  const pages = [];
+  for (const cat of categories) {
+    const items = recipes.filter((r) => (r.category || 'Diverse') === cat).sort((a, b) => a.name.localeCompare(b.name));
+    const parts = Math.max(1, Math.ceil(items.length / PER_PAGE));
+    const size = Math.ceil(items.length / parts);
+    for (let k = 0; k < parts; k++) pages.push({ cat, part: k + 1, parts, items: items.slice(k * size, (k + 1) * size) });
+  }
+  return pages;
+}
+
+// Grid with the item pictures and names for one catalog page.
+const gridCache = new Map();
+async function catalogImage(page) {
+  const key = page.items.map((r) => r.name).join('|');
+  if (gridCache.has(key)) return gridCache.get(key);
+  let buf = null;
+  try {
+    const COLS = Math.min(4, Math.max(2, page.items.length)), CW = 150, CH = 112;
+    const rows = Math.ceil(page.items.length / COLS);
+    const canvas = createCanvas(COLS * CW, rows * CH);
+    const ctx = canvas.getContext('2d');
+    ctx.textAlign = 'center';
+    let any = false;
+    for (let i = 0; i < page.items.length; i++) {
+      const r = page.items[i];
+      const cx = (i % COLS) * CW + CW / 2, top = Math.floor(i / COLS) * CH;
+      const ic = await icon(r.name);
+      if (ic) {
+        const img = ic.img;
+        const sc = Math.min(70 / img.width, 70 / img.height, 2);
+        const w = img.width * sc, h = img.height * sc;
+        ctx.drawImage(img, cx - w / 2, top + 6 + (70 - h) / 2, w, h);
+        any = true;
+      }
+      // name, shrunk to fit the cell
+      let size = 14;
+      do { ctx.font = `${size}px DejaVu`; size -= 1; } while (ctx.measureText(r.name).width > CW - 10 && size > 9);
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.strokeText(r.name, cx, top + 100);
+      ctx.fillStyle = '#f0e6d2'; ctx.fillText(r.name, cx, top + 100);
+    }
+    if (any) buf = canvas.toBuffer('image/png');
+  } catch (err) { console.error('craft: catalog image failed:', err.message); }
+  gridCache.set(key, buf);
+  return buf;
+}
+
+async function catalogView(index) {
+  const pages = catalogPages();
+  if (!pages.length) return { content: 'Catalogul e gol.', embeds: [], components: [], files: [], attachments: [] };
+  const i = Math.min(Math.max(0, index), pages.length - 1);
+  const pg = pages[i];
+  const embed = new EmbedBuilder().setColor(COLOR)
+    .setTitle(`${pg.cat}${pg.parts > 1 ? ` (${pg.part}/${pg.parts})` : ''}`)
+    .setFooter({ text: `Pagina ${i + 1}/${pages.length} · ${pg.items.length} iteme` });
+  const half = Math.ceil(pg.items.length / 2);
+  embed.addFields(
+    { name: '​', value: pg.items.slice(0, half).map((r) => `• ${r.name}`).join('\n') || '-', inline: true },
+    { name: '​', value: pg.items.slice(half).map((r) => `• ${r.name}`).join('\n') || '​', inline: true },
+  );
+  const files = [];
+  const grid = await catalogImage(pg);
+  if (grid) { files.push(new AttachmentBuilder(grid, { name: 'catalog.png' })); embed.setImage('attachment://catalog.png'); }
+
+  // category jump menu: value = first page of that category
+  const firstOf = new Map();
+  pages.forEach((p, k) => { if (!firstOf.has(p.cat)) firstOf.set(p.cat, k); });
+  const catMenu = new StringSelectMenuBuilder().setCustomId('cr:cgc').setPlaceholder('Sari la o categorie')
+    .addOptions([...firstOf].slice(0, 25).map(([cat, k]) => ({ label: cat, value: String(k), default: cat === pg.cat })));
+  const itemMenu = itemSelect('cr:item:0', pg.items, 'Alege un item: îl postez în chat');
+  const nav = row(
+    btn(`cr:cg:${i - 1}`, '◀').setDisabled(i === 0),
+    btn('cr:noop', `${i + 1}/${pages.length}`).setDisabled(true),
+    btn(`cr:cg:${i + 1}`, '▶').setDisabled(i >= pages.length - 1),
+    btn('cr:find', 'Caută', ButtonStyle.Success),
+  );
+  return { content: '', embeds: [embed], components: [row(catMenu), row(itemMenu), nav], files, attachments: [] };
 }
 
 // ---- interactions -------------------------------------------------------
@@ -230,8 +341,26 @@ async function handleInteraction(interaction) {
     await interaction.editReply(await searchView(interaction.fields.getTextInputValue('q'), nameOf(interaction)));
     return true;
   }
+  if (interaction.isButton() && kind === 'open') {
+    await interaction.deferReply({ ephemeral: true });
+    await interaction.editReply(await catalogView(0));
+    return true;
+  }
+  if (interaction.isButton() && kind === 'cg') {
+    await interaction.update(await catalogView(Number(a)));
+    return true;
+  }
+  if (interaction.isStringSelectMenu() && kind === 'cgc') {
+    await interaction.update(await catalogView(Number(interaction.values[0])));
+    return true;
+  }
+  if (interaction.isButton() && kind === 'noop') { await interaction.deferUpdate(); return true; }
   if (interaction.isStringSelectMenu() && kind === 'cat') {
-    await interaction.reply({ ephemeral: true, ...categoryView(Number(interaction.values[0]), 0) });
+    // old panels: category menu -> open the catalog at that category
+    const cats = data().categories;
+    const first = catalogPages().findIndex((p) => p.cat === cats[Number(interaction.values[0])]);
+    await interaction.deferReply({ ephemeral: true });
+    await interaction.editReply(await catalogView(Math.max(0, first)));
     return true;
   }
   if (interaction.isButton() && kind === 'pg') {
