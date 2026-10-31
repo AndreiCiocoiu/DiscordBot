@@ -1,1862 +1,517 @@
 {
  "categories": [
-  "Componente",
-  "Arme",
-  "Ustensile",
-  "Mobila",
-  "Mobila Tabara",
-  "Materiale",
-  "Potiuni",
-  "Mancare",
-  "Contrabanda",
-  "Grajd"
+  "Revolver",
+  "Repeater",
+  "Shotgun",
+  "Rifle",
+  "Sniper"
  ],
- "reusable": [
-  "Ciocan",
-  "Cleste",
-  "Lopata",
-  "Matrita Lingou"
- ],
- "recipes": [
+ "processes": [
   {
-   "name": "Cadru Repeater",
-   "category": "Componente",
-   "ingredients": [
+   "name": "Teava Metalica",
+   "from": [
     [
-     "Matrita Cadru Repeater",
+     "Otel",
      1
-    ],
-    [
-     "Lingou Fier",
-     4
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Teava Repeater",
-   "category": "Componente",
-   "ingredients": [
-    [
-     "Matrita Teava Repeater",
-     1
-    ],
-    [
-     "Lingou Fier",
-     4
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Teava Shotgun",
-   "category": "Componente",
-   "ingredients": [
-    [
-     "Matrita Teava Shotgun",
-     1
-    ],
-    [
-     "Lingou Fier",
-     3
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Teava Revolver",
-   "category": "Componente",
-   "ingredients": [
-    [
-     "Matrita Teava Revolver",
-     1
-    ],
-    [
-     "Lingou Fier",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Teava Pistol",
-   "category": "Componente",
-   "ingredients": [
-    [
-     "Matrita Teava Pistol",
-     1
-    ],
-    [
-     "Lingou Fier",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Cadru Pistol",
-   "category": "Componente",
-   "ingredients": [
-    [
-     "Matrita Cadru Pistol",
-     1
-    ],
-    [
-     "Lingou Fier",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Lasou",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Cleste",
-     1
-    ],
-    [
-     "Piele de Urs",
-     1
-    ],
-    [
-     "Corn de Berbec",
-     1
-    ],
-    [
-     "Piele de Puma",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Macheta",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Lingou Fier",
-     2
-    ],
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Scanduri",
-     5
-    ],
-    [
-     "Cleste",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Pistol Semiauto",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Teava Pistol",
-     1
-    ],
-    [
-     "Cadru Pistol",
-     1
-    ],
-    [
-     "Arc Metalic",
-     1
-    ],
-    [
-     "Cleste",
-     1
-    ],
-    [
-     "Pat Pistol",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Shotgun DoubleBarrel",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Teava Shotgun",
-     1
-    ],
-    [
-     "Arc Metalic",
-     1
-    ],
-    [
-     "Cadru Shotgun",
-     1
-    ],
-    [
-     "Pat Shotgun",
-     1
-    ],
-    [
-     "Cleste",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Repeater Evans",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Pat Repeater",
-     1
-    ],
-    [
-     "Arc Metalic",
-     1
-    ],
-    [
-     "Cadru Repeater",
-     1
-    ],
-    [
-     "Teava Repeater",
-     1
-    ],
-    [
-     "Cleste",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Revolver Cattleman",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Pat Revolver",
-     1
-    ],
-    [
-     "Teava Revolver",
-     1
-    ],
-    [
-     "Arc Metalic",
-     1
-    ],
-    [
-     "Cadru Revolver",
-     1
-    ],
-    [
-     "Cleste",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Revolver Double Action",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Jeton Verde",
-     1
-    ],
-    [
-     "Jeton Galben",
-     2
-    ],
-    [
-     "Jeton Rosu",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 0,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Shotgun Exotic",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Jeton Verde",
-     1
-    ],
-    [
-     "Jeton Albastru",
-     1
-    ],
-    [
-     "Jeton Galben",
-     1
-    ],
-    [
-     "Jeton Rosu",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 0,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Shotgun Sawed Off",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Jeton Albastru",
-     1
-    ],
-    [
-     "Jeton Galben",
-     2
-    ],
-    [
-     "Jeton Rosu",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 0,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Bolt Action Rifle",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Pat Rifle",
-     1
-    ],
-    [
-     "Cadru Rifle",
-     2
-    ],
-    [
-     "Teava Rifle",
-     1
-    ],
-    [
-     "Arc Metalic",
-     1
-    ],
-    [
-     "Cleste",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Revolver Lemat",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Pat Revolver",
-     1
-    ],
-    [
-     "Teava Revolver",
-     2
-    ],
-    [
-     "Arc Metalic",
-     1
-    ],
-    [
-     "Cadru Revolver",
-     1
-    ],
-    [
-     "Cleste",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Repeater Carbine",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Pat Repeater",
-     1
-    ],
-    [
-     "Arc Metalic",
-     1
-    ],
-    [
-     "Cadru Repeater",
-     1
-    ],
-    [
-     "Teava Repeater",
-     1
-    ],
-    [
-     "Cleste",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Shotgun Semiauto",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Teava Shotgun",
-     1
-    ],
-    [
-     "Arc Metalic",
-     1
-    ],
-    [
-     "Cadru Shotgun",
-     1
-    ],
-    [
-     "Pat Shotgun",
-     1
-    ],
-    [
-     "Cleste",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Pistol Mauser",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Teava Pistol",
-     1
-    ],
-    [
-     "Cadru Pistol",
-     1
-    ],
-    [
-     "Arc Metalic",
-     1
-    ],
-    [
-     "Cleste",
-     1
-    ],
-    [
-     "Pat Pistol",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Tutun Uscat",
-   "category": "Contrabanda",
-   "ingredients": [
-    [
-     "Frunze Tutun",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 0,
-   "time": "2 secunde"
-  },
-  {
-   "name": "Ulei de Sarpe",
-   "category": "Potiuni",
-   "ingredients": [
-    [
-     "Venin Sarpe",
-     1
-    ],
-    [
-     "Grasime",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "10 secunde"
-  },
-  {
-   "name": "Antidot",
-   "category": "Potiuni",
-   "ingredients": [
-    [
-     "Venin Sarpe",
-     1
-    ],
-    [
-     "Sticla de Apa",
-     1
-    ],
-    [
-     "Zahar",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Plosca",
-   "category": "Grajd",
-   "ingredients": [
-    [
-     "Piele de Iepure",
-     5
-    ],
-    [
-     "Tub",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Adrenalina Cal",
-   "category": "Potiuni",
-   "ingredients": [
-    [
-     "Sticla de Apa",
-     1
-    ],
-    [
-     "Otrava Mexicana",
-     1
-    ],
-    [
-     "Piper",
-     1
-    ],
-    [
-     "Zahar",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 100,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Morfina",
-   "category": "Potiuni",
-   "ingredients": [
-    [
-     "Zahar",
-     1
-    ],
-    [
-     "Sticla de Apa",
-     1
-    ],
-    [
-     "Piper",
-     1
-    ],
-    [
-     "Otrava de Viespe",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 100,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Zahar",
-   "category": "Mancare",
-   "ingredients": [
-    [
-     "Lemne de foc",
-     1
-    ],
-    [
-     "Trestie de Zahar",
-     3
-    ],
-    [
-     "Sticla de Apa",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 10,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Pat Rifle",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Scanduri Stejar",
-     6
-    ],
-    [
-     "Piele Armadillo",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Pat Pistol",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Scanduri",
-     4
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Pat Shotgun",
-   "category": "Arme",
-   "ingredients": [
-    [
-     "Piele de Mistret",
-     1
-    ],
-    [
-     "Scanduri Pin",
-     6
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Tarnacop",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Lingou Fier",
-     1
-    ],
-    [
-     "Coada de Lemn",
-     4
-    ]
-   ],
-   "level": 0,
-   "points": 30,
-   "time": "10 secunde",
-   "yield": 4
-  },
-  {
-   "name": "Topor",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Lingou Fier",
-     1
-    ],
-    [
-     "Coada de Lemn",
-     4
-    ]
-   ],
-   "level": 0,
-   "points": 30,
-   "time": "10 secunde",
-   "yield": 4
-  },
-  {
-   "name": "Topor Greu",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Rindea",
-     1
-    ],
-    [
-     "Scanduri Cedru",
-     2
-    ],
-    [
-     "Lingou Fier",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 30,
-   "time": "10 secunde",
-   "yield": 4
-  },
-  {
-   "name": "Fierastrau",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Scanduri Stejar",
-     2
-    ],
-    [
-     "Lingou Fier",
-     1
-    ],
-    [
-     "Rindea",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 30,
-   "time": "10 secunde",
-   "yield": 4
-  },
-  {
-   "name": "Rindea",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Scanduri Pin",
-     2
-    ],
-    [
-     "Lingou Fier",
-     1
-    ],
-    [
-     "Fierastrau",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 30,
-   "time": "10 secunde",
-   "yield": 4
-  },
-  {
-   "name": "Topor Cherestea",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Rindea",
-     1
-    ],
-    [
-     "Scanduri Pin",
-     2
-    ],
-    [
-     "Lingou Fier",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 30,
-   "time": "10 secunde",
-   "yield": 4
-  },
-  {
-   "name": "Chibrite",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Sulf",
-     1
-    ],
-    [
-     "Bucati de Lemn",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 0,
-   "time": "20 secunde",
-   "yield": 8
-  },
-  {
-   "name": "Mojar",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Scanduri",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 0,
-   "time": "10 secunde"
-  },
-  {
-   "name": "Polonic",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Scanduri",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 0,
-   "time": "10 secunde"
-  },
-  {
-   "name": "Stup",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Cuie",
-     16
-    ],
-    [
-     "Scanduri",
-     30
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Scut Nativi",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Piele de Puma",
-     1
-    ],
-    [
-     "Cuie",
-     4
-    ],
-    [
-     "Crengi",
-     10
-    ],
-    [
-     "Coada de Lemn",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Dream Catcher",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Fulgi",
-     3
-    ],
-    [
-     "Crengi",
-     3
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Gard de Lemn",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Cuie",
-     4
-    ],
-    [
-     "Scanduri",
-     6
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Pat din Piei",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Piele de Puma",
-     1
-    ],
-    [
-     "Piele de Bizon",
-     3
-    ],
-    [
-     "Cuie",
-     12
-    ],
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Coada de Lemn",
-     8
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Cort Vanator",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Cuie",
-     8
-    ],
-    [
-     "Scanduri",
-     5
-    ],
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Crengi",
-     10
-    ],
-    [
-     "Piele de Lup",
-     20
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Cort Negustor",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Cuie",
-     8
-    ],
-    [
-     "Scanduri",
-     5
-    ],
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Crengi",
-     10
-    ],
-    [
-     "Piele de Lup",
-     20
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Cort Colectionar",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Cuie",
-     8
-    ],
-    [
-     "Scanduri",
-     5
-    ],
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Crengi",
-     10
-    ],
-    [
-     "Piele de Lup",
-     20
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Cort din Prelata",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Piele de Bizon",
-     4
-    ],
-    [
-     "Cuie",
-     8
-    ],
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Coada de Lemn",
-     8
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Cufar 1500",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Lingou Fier",
-     15
-    ],
-    [
-     "Piele de Puma",
-     3
-    ],
-    [
-     "Scanduri",
-     40
-    ]
-   ],
-   "level": 0,
-   "points": 0,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Masa Macelar Mica",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Butoi Apa",
-     1
-    ],
-    [
-     "Cufar 500",
-     1
-    ],
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Crengi",
-     5
-    ],
-    [
-     "Piele de Urs",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Masa Macelar Medie",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Cufar 1000",
-     1
-    ],
-    [
-     "Butoi Apa",
-     2
-    ],
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Crengi",
-     10
-    ],
-    [
-     "Piele de Urs",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Masa Macelar Mare",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Butoi Apa",
-     3
-    ],
-    [
-     "Cufar 1500",
-     1
-    ],
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Crengi",
-     15
-    ],
-    [
-     "Piele de Urs",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Cufar 1000",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Lingou Fier",
-     10
-    ],
-    [
-     "Piele de Puma",
-     2
-    ],
-    [
-     "Scanduri",
-     30
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Cufar 500",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Lingou Fier",
-     5
-    ],
-    [
-     "Piele de Puma",
-     1
-    ],
-    [
-     "Scanduri",
-     20
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Cort Nativi",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Piele de Urs",
-     1
-    ],
-    [
-     "Cuie",
-     8
-    ],
-    [
-     "Scanduri",
-     5
-    ],
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Crengi",
-     10
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Tinta de Tragere",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Lingou Fier",
-     1
-    ],
-    [
-     "Scanduri",
-     2
-    ],
-    [
-     "Fan",
-     1
-    ],
-    [
-     "Sac Gol",
-     4
-    ],
-    [
-     "Ciocan",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Roti Caruta",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Scanduri",
-     5
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Butoi Apa",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Lingou Fier",
-     1
-    ],
-    [
-     "Scanduri",
-     14
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Banca de Lemn",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Scanduri",
-     20
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Masa de Lemn",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Scanduri",
-     20
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Scaun de Lemn",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Piele de Berbec",
-     1
-    ],
-    [
-     "Scanduri",
-     10
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Franghie Rufe",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Sac Gol",
-     1
-    ],
-    [
-     "Scanduri",
-     4
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Cos Surcele",
-   "category": "Mobila",
-   "ingredients": [
-    [
-     "Sac Gol",
-     1
-    ],
-    [
-     "Crengi",
-     10
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "5 secunde"
-  },
-  {
-   "name": "Porumb Copt",
-   "category": "Mancare",
-   "ingredients": [
-    [
-     "Porumb",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 10,
-   "time": "10 secunde"
-  },
-  {
-   "name": "Sunca Afumata",
-   "category": "Mancare",
-   "ingredients": [
-    [
-     "Sare",
-     1
-    ],
-    [
-     "Grasime",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Carne Uscata",
-   "category": "Mancare",
-   "ingredients": [
-    [
-     "Carne Rosie",
-     1
-    ],
-    [
-     "Sare",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 10,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Carne Rosie Prajita",
-   "category": "Mancare",
-   "ingredients": [
-    [
-     "Carne Rosie",
-     1
-    ],
-    [
-     "Sare",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 10,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Carne Alba Prajita",
-   "category": "Mancare",
-   "ingredients": [
-    [
-     "Carne Alba",
-     1
-    ],
-    [
-     "Sare",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 10,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Carbune",
-   "category": "Materiale",
-   "ingredients": [
-    [
-     "Lopata",
-     1
-    ],
-    [
-     "Bucati de Lemn",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde",
-   "yield": 2
-  },
-  {
-   "name": "Lampa Tabara 1",
-   "category": "Mobila Tabara",
-   "ingredients": [
-    [
-     "Scanduri",
-     4
-    ],
-    [
-     "Cuie",
-     4
-    ],
-    [
-     "Lanterna",
-     1
-    ],
-    [
-     "Coada de Lemn",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 100,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Lampa Tabara 2",
-   "category": "Mobila Tabara",
-   "ingredients": [
-    [
-     "Scanduri",
-     8
-    ],
-    [
-     "Cuie",
-     4
-    ],
-    [
-     "Lanterna",
-     1
-    ],
-    [
-     "Coada de Lemn",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 100,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Foc de Tabara",
-   "category": "Mobila Tabara",
-   "ingredients": [
-    [
-     "Piatra",
-     1
-    ],
-    [
-     "Lemne de foc",
-     6
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Lanterna",
-   "category": "Mobila Tabara",
-   "ingredients": [
-    [
-     "Lingou Fier",
-     1
-    ],
-    [
-     "Grasime",
-     2
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Pepita Aur",
-   "category": "Materiale",
-   "ingredients": [
-    [
-     "Dinte de Aur",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "5 secunde"
-  },
-  {
-   "name": "Cuie",
-   "category": "Materiale",
-   "ingredients": [
-    [
-     "Lingou Fier",
-     1
     ]
    ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde",
-   "yield": 4
+   "yield": 1,
+   "where": "Gunshop",
+   "free": 1,
+   "intermediate": true
   },
   {
-   "name": "Lingou Fier",
-   "category": "Materiale",
-   "ingredients": [
-    [
-     "Matrita Lingou",
-     1
-    ],
+   "name": "Suruburi",
+   "from": [
     [
      "Fier",
-     4
+     1
     ]
    ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde"
+   "yield": 10,
+   "where": "Gunshop",
+   "intermediate": true
+  },
+  {
+   "name": "Arc Metalic",
+   "from": [
+    [
+     "Fier",
+     1
+    ]
+   ],
+   "yield": 2,
+   "where": "Gunshop",
+   "intermediate": true
+  },
+  {
+   "name": "Otel",
+   "from": [
+    [
+     "Fier",
+     2
+    ],
+    [
+     "Carbune",
+     1
+    ]
+   ],
+   "yield": 1,
+   "where": "Rafinărie",
+   "intermediate": true
+  },
+  {
+   "name": "Cupru",
+   "from": [
+    [
+     "Minereu de Cupru",
+     2
+    ]
+   ],
+   "yield": 1,
+   "where": "Rafinărie"
   },
   {
    "name": "Fier",
-   "category": "Materiale",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
+   "from": [
     [
      "Minereu Fier",
      5
     ]
    ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde"
-  },
+   "yield": 1,
+   "where": "Rafinărie"
+  }
+ ],
+ "weapons": [
   {
-   "name": "Cupru",
-   "category": "Materiale",
+   "name": "Revolver Double Action",
+   "category": "Revolver",
    "ingredients": [
     [
-     "Minereu Cupru",
-     5
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Sulf",
-   "category": "Materiale",
-   "ingredients": [
+     "Teava Metalica",
+     1
+    ],
     [
-     "Minereu Sulf",
-     5
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Lingou Cupru",
-   "category": "Materiale",
-   "ingredients": [
+     "Suruburi",
+     10
+    ],
     [
-     "Matrita Lingou",
+     "Otel",
      1
     ],
     [
      "Cupru",
-     4
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde"
-  },
-  {
-   "name": "Lingou Aur",
-   "category": "Materiale",
-   "ingredients": [
-    [
-     "Matrita Lingou",
      1
     ],
     [
-     "Pepita Aur",
-     5
+     "Lemn",
+     1
     ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "3 secunde"
+   ]
   },
   {
-   "name": "Lingou Argint",
-   "category": "Materiale",
+   "name": "Revolver Cattleman",
+   "category": "Revolver",
    "ingredients": [
     [
-     "Pepita Argint",
-     5
+     "Arc Metalic",
+     1
     ],
     [
-     "Matrita Lingou",
+     "Teava Metalica",
+     1
+    ],
+    [
+     "Suruburi",
+     15
+    ],
+    [
+     "Otel",
+     1
+    ],
+    [
+     "Cupru",
+     1
+    ],
+    [
+     "Lemn",
      1
     ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "5 secunde"
+   ]
   },
   {
-   "name": "Teava Cupru",
-   "category": "Ustensile",
+   "name": "Revolver Lemat",
+   "category": "Revolver",
    "ingredients": [
     [
-     "Lingou Cupru",
+     "Arc Metalic",
      1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Cazan fara butoi",
-   "category": "Ustensile",
-   "ingredients": [
+    ],
     [
-     "Lingou Cupru",
-     10
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "60 secunde"
-  },
-  {
-   "name": "Plasa Insecte",
-   "category": "Ustensile",
-   "ingredients": [
+     "Teava Metalica",
+     1
+    ],
     [
-     "Sac Gol",
+     "Suruburi",
+     15
+    ],
+    [
+     "Otel",
      2
     ],
     [
-     "Coada de Lemn",
+     "Cupru",
+     1
+    ],
+    [
+     "Lemn",
+     1
+    ]
+   ]
+  },
+  {
+   "name": "Revolver Schofield",
+   "category": "Revolver",
+   "ingredients": [
+    [
+     "Arc Metalic",
+     1
+    ],
+    [
+     "Teava Metalica",
+     1
+    ],
+    [
+     "Suruburi",
+     25
+    ],
+    [
+     "Otel",
+     2
+    ],
+    [
+     "Cupru",
+     1
+    ],
+    [
+     "Lemn",
+     1
+    ]
+   ],
+   "badge": "BANDA"
+  },
+  {
+   "name": "Evans Repeater",
+   "category": "Repeater",
+   "ingredients": [
+    [
+     "Arc Metalic",
+     2
+    ],
+    [
+     "Teava Metalica",
+     1
+    ],
+    [
+     "Suruburi",
+     20
+    ],
+    [
+     "Otel",
+     3
+    ],
+    [
+     "Cupru",
+     2
+    ],
+    [
+     "Lemn",
+     3
+    ]
+   ]
+  },
+  {
+   "name": "Winchester Repeater",
+   "category": "Repeater",
+   "ingredients": [
+    [
+     "Arc Metalic",
+     2
+    ],
+    [
+     "Teava Metalica",
+     2
+    ],
+    [
+     "Suruburi",
+     30
+    ],
+    [
+     "Otel",
+     3
+    ],
+    [
+     "Cupru",
+     2
+    ],
+    [
+     "Lemn",
+     3
+    ]
+   ],
+   "badge": "BANDA"
+  },
+  {
+   "name": "Henry Repeater",
+   "category": "Repeater",
+   "ingredients": [
+    [
+     "Arc Metalic",
+     2
+    ],
+    [
+     "Teava Metalica",
+     2
+    ],
+    [
+     "Suruburi",
+     35
+    ],
+    [
+     "Otel",
+     3
+    ],
+    [
+     "Cupru",
+     2
+    ],
+    [
+     "Lemn",
+     3
+    ]
+   ],
+   "badge": "BANDA"
+  },
+  {
+   "name": "Sawedoff Shotgun",
+   "category": "Shotgun",
+   "ingredients": [
+    [
+     "Arc Metalic",
+     2
+    ],
+    [
+     "Teava Metalica",
+     1
+    ],
+    [
+     "Suruburi",
+     25
+    ],
+    [
+     "Otel",
+     3
+    ],
+    [
+     "Cupru",
+     2
+    ],
+    [
+     "Lemn",
      2
     ]
    ],
-   "level": 0,
-   "points": 0,
-   "time": "10 secunde"
+   "badge": "BANDA"
   },
   {
-   "name": "Matrita Lingou",
-   "category": "Ustensile",
+   "name": "Double Barrel Shotgun",
+   "category": "Shotgun",
    "ingredients": [
     [
-     "Minereu Fier",
+     "Arc Metalic",
+     2
+    ],
+    [
+     "Teava Metalica",
+     2
+    ],
+    [
+     "Suruburi",
+     20
+    ],
+    [
+     "Otel",
+     3
+    ],
+    [
+     "Cupru",
+     2
+    ],
+    [
+     "Lemn",
+     4
+    ]
+   ]
+  },
+  {
+   "name": "Repeating Shotgun",
+   "category": "Shotgun",
+   "ingredients": [
+    [
+     "Arc Metalic",
+     2
+    ],
+    [
+     "Teava Metalica",
+     2
+    ],
+    [
+     "Suruburi",
+     25
+    ],
+    [
+     "Otel",
+     4
+    ],
+    [
+     "Cupru",
+     3
+    ],
+    [
+     "Lemn",
+     4
+    ]
+   ],
+   "badge": "BANDA"
+  },
+  {
+   "name": "Semi-Auto Shotgun",
+   "category": "Shotgun",
+   "ingredients": [
+    [
+     "Arc Metalic",
+     2
+    ],
+    [
+     "Teava Metalica",
+     2
+    ],
+    [
+     "Suruburi",
+     30
+    ],
+    [
+     "Otel",
+     5
+    ],
+    [
+     "Cupru",
+     3
+    ],
+    [
+     "Lemn",
+     4
+    ]
+   ],
+   "badge": "OFICIALA"
+  },
+  {
+   "name": "Springfield Rifle",
+   "category": "Rifle",
+   "ingredients": [
+    [
+     "Arc Metalic",
+     2
+    ],
+    [
+     "Teava Metalica",
+     2
+    ],
+    [
+     "Suruburi",
+     30
+    ],
+    [
+     "Otel",
+     6
+    ],
+    [
+     "Cupru",
+     4
+    ],
+    [
+     "Lemn",
+     5
+    ]
+   ],
+   "badge": "BANDA"
+  },
+  {
+   "name": "BoltAction Rifle",
+   "category": "Rifle",
+   "ingredients": [
+    [
+     "Arc Metalic",
+     2
+    ],
+    [
+     "Teava Metalica",
+     2
+    ],
+    [
+     "Suruburi",
+     35
+    ],
+    [
+     "Otel",
+     7
+    ],
+    [
+     "Cupru",
+     4
+    ],
+    [
+     "Lemn",
+     5
+    ]
+   ],
+   "badge": "BANDA"
+  },
+  {
+   "name": "Carcano Rifle",
+   "category": "Sniper",
+   "ingredients": [
+    [
+     "Arc Metalic",
+     4
+    ],
+    [
+     "Teava Metalica",
+     4
+    ],
+    [
+     "Suruburi",
+     60
+    ],
+    [
+     "Otel",
      10
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "30 secunde"
-  },
-  {
-   "name": "Pompa apa",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
     ],
     [
-     "Lingou Fier",
-     4
+     "Cupru",
+     5
     ],
     [
-     "Tub",
-     4
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "20 secunde"
-  },
-  {
-   "name": "Lockpick",
-   "category": "Ustensile",
-   "ingredients": [
-    [
-     "Matrita Lockpick",
-     1
+     "Lemn",
+     6
     ],
     [
-     "Lingou Fier",
+     "Matrita Carcano",
      1
     ]
    ],
-   "level": 0,
-   "points": 5,
-   "time": "5 secunde",
-   "yield": 5
-  },
-  {
-   "name": "Potcoave",
-   "category": "Grajd",
-   "ingredients": [
-    [
-     "Ciocan",
-     1
-    ],
-    [
-     "Lingou Fier",
-     1
-    ]
-   ],
-   "level": 0,
-   "points": 5,
-   "time": "15 secunde",
-   "yield": 4
+   "badge": "BANDA"
   }
  ]
 }

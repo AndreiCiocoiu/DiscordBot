@@ -1,44 +1,38 @@
-// Crafting lookup (no slash commands):
-//   craft <item>      text trigger, answers with the recipe (anyone)
-//   craft panou       post the panel with categories + search (admin)
-// Recipes live in assets/recipes.json. Optional picture per item: assets/craft/<slug>.png|jpg|webp
-// where <slug> is the item name in lowercase with dashes (e.g. cadru-pistol.png).
+// Crafting calculator (RedZone weapons). Data: assets/recipes.json
+//   /craft <arma> [cantitate]    result in the chat (autocomplete)
+//   craft <arma> [cantitate]     same, as text; the bot deletes your message
+//   craft panou                  post the panel (admin)
+// Panel buttons: Catalog (weapons per category, with arrows) and Calculator (several weapons at once).
+// The answer has the same sections as the website: ORDER, MATERIALS, MADE ON THE WAY, ORE, CRAFT ORDER.
 const fs = require('fs');
 const path = require('path');
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, PermissionFlagsBits,
-  StringSelectMenuBuilder, TextInputBuilder, TextInputStyle, AttachmentBuilder, SlashCommandBuilder,
+  StringSelectMenuBuilder, TextInputBuilder, TextInputStyle, SlashCommandBuilder,
 } = require('discord.js');
-const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const adminlog = require('./adminlog');
 
 const FILE = path.join(__dirname, '..', '..', 'assets', 'recipes.json');
-const IMG_DIR = path.join(__dirname, '..', '..', 'assets', 'craft');
 const NO_PING = { parse: [], repliedUser: false };
-const COLOR = 0xc8923a;
-const PAGE = 25;
-if (!GlobalFonts.families.some((f) => f.family === 'DejaVu')) GlobalFonts.registerFromPath(path.join(__dirname, '..', '..', 'assets', 'fonts', 'DejaVuSans-Bold.ttf'), 'DejaVu');
-if (!GlobalFonts.families.some((f) => f.family === 'Rye')) GlobalFonts.registerFromPath(path.join(__dirname, '..', '..', 'assets', 'fonts', 'Rye-Regular.ttf'), 'Rye');
+const COLOR = 0xb3202a;
+const MAX_QTY = 200;
 
 // ---- data ---------------------------------------------------------------
 
-let cache = { mtime: 0, recipes: [], categories: [], reusable: [] };
+let cache = { mtime: 0, weapons: [], processes: [], categories: [] };
 function data() {
   try {
     const mtime = fs.statSync(FILE).mtimeMs;
     if (mtime !== cache.mtime) {
       const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-      const recipes = (raw.recipes || []).filter((r) => r?.name && Array.isArray(r.ingredients));
-      const cats = [...new Set([...(raw.categories || []), ...recipes.map((r) => r.category || 'Diverse')])]
-        .filter((c) => recipes.some((r) => (r.category || 'Diverse') === c));
-      cache = { mtime, recipes, categories: cats, reusable: (raw.reusable || []).map((x) => norm(x)) };
+      const weapons = (raw.weapons || []).filter((w) => w?.name && Array.isArray(w.ingredients));
+      cache = { mtime, weapons, processes: raw.processes || [], categories: raw.categories || [...new Set(weapons.map((w) => w.category))] };
     }
   } catch (err) { console.error('craft: could not read recipes.json:', err.message); }
   return cache;
 }
 
 const norm = (s) => String(s).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-const slug = (s) => norm(s).replace(/ /g, '-');
 
 function lev(a, b) {
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
@@ -49,18 +43,15 @@ function lev(a, b) {
   return d[a.length][b.length];
 }
 
-// score: lower is better, null = no match
-function score(recipe, q) {
-  const name = norm(recipe.name);
+function score(w, q) {
+  const name = norm(w.name);
   if (name === q) return 0;
   if (name.startsWith(q)) return 1;
-  const qt = q.split(' ');
-  const nt = name.split(' ');
+  const qt = q.split(' '), nt = name.split(' ');
   if (qt.every((t) => name.includes(t))) return 2;
-  // typo tolerance, word by word
   let total = 0;
   for (const t of qt) {
-    const best = Math.min(...nt.map((w) => (w.startsWith(t) ? 0 : lev(w, t))));
+    const best = Math.min(...nt.map((x) => (x.startsWith(t) ? 0 : lev(x, t))));
     if (best > (t.length > 4 ? 2 : 1)) return null;
     total += best;
   }
@@ -70,372 +61,211 @@ function score(recipe, q) {
 function search(query) {
   const q = norm(query);
   if (!q) return [];
-  return data().recipes
-    .map((r) => ({ r, s: score(r, q) }))
+  return data().weapons
+    .map((w) => ({ w, s: score(w, q) }))
     .filter((x) => x.s !== null)
-    .sort((a, b) => a.s - b.s || a.r.name.localeCompare(b.r.name))
-    .map((x) => x.r);
+    .sort((a, b) => a.s - b.s || a.w.name.localeCompare(b.w.name))
+    .map((x) => x.w);
 }
 
-// ---- rendering ----------------------------------------------------------
-
-// All pictures live in one atlas (assets/craft-atlas.png + .json) so the repo stays small.
-// A loose file assets/craft/<name>.png still wins over the atlas, for quick additions.
-let atlas = null;
-async function loadAtlas() {
-  if (atlas) return atlas;
-  try {
-    const dir = path.join(__dirname, '..', '..', 'assets');
-    atlas = { map: JSON.parse(fs.readFileSync(path.join(dir, 'craft-atlas.json'), 'utf8')), img: await loadImage(path.join(dir, 'craft-atlas.png')) };
-  } catch (err) { console.error('craft: atlas not available:', err.message); atlas = { map: {}, img: null }; }
-  return atlas;
+// best match for a typed name: exact wins, otherwise the first result
+function resolve(query) {
+  const found = search(query);
+  const exact = found.filter((w) => norm(w.name) === norm(query));
+  return exact[0] || found[0] || null;
 }
-const iconCache = new Map();
-async function icon(name) {
-  const k = slug(name);
-  if (iconCache.has(k)) return iconCache.get(k);
-  let res = null;
-  const f = iconFile(name);
-  if (f) res = { img: await loadImage(f), buf: () => fs.readFileSync(f), ext: path.extname(f) };
-  else {
-    const a = await loadAtlas();
-    const r = a.map[k];
-    if (r && a.img) {
-      const c = createCanvas(r[2], r[3]);
-      c.getContext('2d').drawImage(a.img, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]);
-      res = { img: c, buf: () => c.toBuffer('image/png'), ext: '.png' };
+
+// ---- calculator ---------------------------------------------------------
+
+// orders: [{ w, qty }]. Same logic as the website: the intermediate items (Otel, Arc, Suruburi, Teava)
+// are crafted in whole batches (leftovers are shown), Fier/Cupru come from ore.
+function calc(orders) {
+  const { processes } = data();
+  const need = new Map(), free = new Map();
+  const add = (m, k, v) => m.set(k, (m.get(k) || 0) + v);
+  for (const { w, qty } of orders) {
+    for (const [n, k] of w.ingredients) {
+      add(need, n, k * qty);
+      const p = processes.find((x) => x.name === n);
+      if (p?.free) add(free, n, Math.min(k, p.free) * qty); // e.g. each weapon already comes with one barrel
     }
   }
-  iconCache.set(k, res);
-  return res;
-}
-
-function iconFile(name) {
-  for (const ext of ['png', 'jpg', 'jpeg', 'webp']) {
-    const f = path.join(IMG_DIR, `${slug(name)}.${ext}`);
-    if (fs.existsSync(f)) return f;
-  }
-  return null;
-}
-
-// One picture with all the ingredients side by side: icon + amount ("x4") under it.
-const stripCache = new Map();
-async function ingredientStrip(recipe) {
-  const key = recipe.name + JSON.stringify(recipe.ingredients);
-  if (stripCache.has(key)) return stripCache.get(key);
-  let buf = null;
-  try {
-    const items = [];
-    for (const [n, q] of recipe.ingredients) {
-      const ic = await icon(n);
-      items.push({ q, img: ic ? ic.img : null });
+  const steps = [], ore = new Map();
+  for (const p of processes) { // listed consumers-first, so every need is known when we get to it
+    const n = (need.get(p.name) || 0) - (free.get(p.name) || 0);
+    if (n <= 0) continue;
+    const crafts = Math.ceil(n / p.yield), made = crafts * p.yield;
+    steps.push({ p, crafts, made, left: made - n });
+    for (const [i, k] of p.from) {
+      add(need, i, k * crafts);
+      if (/^minereu/i.test(i)) add(ore, i, k * crafts);
     }
-    if (items.some((i) => i.img)) {
-      const CELL = 92, H = 104, BOX = 64;
-      const canvas = createCanvas(Math.max(items.length, 2) * CELL, H);
-      const ctx = canvas.getContext('2d');
-      ctx.textAlign = 'center';
-      items.forEach((it, i) => {
-        const cx = i * CELL + CELL / 2;
-        if (it.img) {
-          const sc = Math.min(BOX / it.img.width, BOX / it.img.height, 2);
-          const w = it.img.width * sc, h = it.img.height * sc;
-          ctx.drawImage(it.img, cx - w / 2, 4 + (BOX - h) / 2, w, h);
-        }
-        ctx.font = '20px Rye';
-        ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(`x${it.q}`, cx, 94);
-        ctx.fillStyle = '#e8b74a'; ctx.fillText(`x${it.q}`, cx, 94);
-      });
-      buf = canvas.toBuffer('image/png');
-    }
-  } catch (err) { console.error('craft: strip failed for', recipe.name, err.message); }
-  stripCache.set(key, buf);
-  return buf;
+  }
+  steps.reverse();
+  const inter = new Set(processes.filter((p) => p.intermediate).map((p) => p.name));
+  const onTheWay = processes.filter((p) => p.intermediate && (need.get(p.name) || 0) > 0)
+    .map((p) => [p.name, (need.get(p.name) || 0) - (free.get(p.name) || 0)])
+    .reverse(); // Otel, Arc, Suruburi, Teava
+  const head = ['Fier', 'Cupru', 'Carbune', 'Lemn'];
+  const materials = [...need].filter(([n]) => !inter.has(n) && !/^minereu/i.test(n))
+    .sort((a, b) => {
+      const ia = head.indexOf(a[0]), ib = head.indexOf(b[0]);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+  return { steps, ore: [...ore].sort((a, b) => b[0].length - a[0].length || a[0].localeCompare(b[0])), materials, onTheWay };
 }
 
-async function recipePayload(recipe, who) {
-  const lines = recipe.ingredients.map(([n, q]) => `**${n}** x${q}`).join('\n');
-  const embed = new EmbedBuilder().setColor(COLOR).setTitle(recipe.name)
-    .addFields({ name: 'Ingrediente', value: lines || '-' });
-  const details = [];
-  if (recipe.category) details.push(`Categorie: ${recipe.category}`);
-  if (recipe.level !== undefined) details.push(`Nivel rețetă: ${recipe.level}`);
-  if (recipe.points !== undefined) details.push(`Puncte rețetă: ${recipe.points}`);
-  if (recipe.time) details.push(`Timp craft: ${recipe.time}`);
-  if (recipe.yield > 1) details.push(`Se obțin: ${recipe.yield} buc`);
-  embed.addFields({ name: 'Detalii', value: details.join('\n') });
-  const foot = [recipe.note, who ? `Cerut de ${who}` : null].filter(Boolean).join(' · ');
-  if (foot) embed.setFooter({ text: foot });
-  const payload = { embeds: [embed], allowedMentions: NO_PING, files: [] };
-  const thumb = await icon(recipe.name);
-  if (thumb) {
-    payload.files.push(new AttachmentBuilder(thumb.buf(), { name: `item${thumb.ext}` }));
-    embed.setThumbnail(`attachment://item${thumb.ext}`);
+const list = (pairs) => pairs.map(([n, q]) => `${n}: ${q}`).join('\n') || '-';
+
+function calcEmbed(orders, who, notes = []) {
+  const r = calc(orders);
+  const parts = [];
+  parts.push(`**COMANDA**\n${orders.map(({ w, qty }) => `- ${qty}x ${w.name}`).join('\n')}`);
+  parts.push(`**MATERIALE NECESARE**\n${list(r.materials)}`);
+  if (r.onTheWay.length) parts.push(`**FĂCUTE PE PARCURS**\n${list(r.onTheWay)}`);
+  if (r.ore.length) parts.push(`**MINEREU DE ADUNAT**\n${list(r.ore)}`);
+  const order = r.steps.map((s, i) => {
+    const out = s.p.yield > 1 ? `iese ${s.made}${s.left ? `, rămân ${s.left}` : ''} - ` : '';
+    return `${i + 1}. ${s.p.name} - ${s.crafts}x craft (${s.p.where}) - ${out}folosește ${s.p.from.map(([n, k]) => `${k * s.crafts} ${n}`).join(', ')}`;
+  });
+  orders.forEach(({ w, qty }) => {
+    order.push(`${order.length + 1}. ${w.name} - ${qty}x craft - folosește ${w.ingredients.map(([n, k]) => `${k * qty} ${n}`).join(', ')}`);
+  });
+  parts.push(`**ORDINEA DE CRAFT**\n${order.join('\n')}`);
+  let desc = parts.join('\n\n');
+  if (desc.length > 4000) desc = `${desc.slice(0, 3990)}…`;
+  const embed = new EmbedBuilder().setColor(COLOR).setTitle(orders.length === 1 ? `${orders[0].w.name} x${orders[0].qty}` : 'Calculator crafting').setDescription(desc);
+  const foot = [who ? `Cerut de ${who}` : null, ...notes].filter(Boolean).join(' · ');
+  if (foot) embed.setFooter({ text: foot.slice(0, 200) });
+  return embed;
+}
+
+const calcPayload = (orders, who, notes) => ({ content: '', embeds: [calcEmbed(orders, who, notes)], components: [], files: [], attachments: [], allowedMentions: NO_PING });
+
+const clampQty = (n) => Math.min(MAX_QTY, Math.max(1, Math.floor(Number(n) || 1)));
+
+// "Revolver Cattleman 2", "2x cattleman", "carcano"
+function parseLine(line) {
+  const t = line.trim();
+  if (!t) return null;
+  let m = t.match(/^(.*\S)\s+x?(\d{1,3})x?$/i);
+  if (m) return { name: m[1], qty: clampQty(m[2]) };
+  m = t.match(/^(\d{1,3})\s*x?\s+(.+)$/i);
+  if (m) return { name: m[2], qty: clampQty(m[1]) };
+  return { name: t, qty: 1 };
+}
+
+// text -> merged orders (+ the lines that matched nothing)
+function ordersFromText(text) {
+  const map = new Map(), missing = [];
+  for (const line of text.split(/\n|;/)) {
+    const p = parseLine(line);
+    if (!p) continue;
+    const w = resolve(p.name);
+    if (!w) { missing.push(p.name.slice(0, 40)); continue; }
+    map.set(w.name, { w, qty: clampQty((map.get(w.name)?.qty || 0) + p.qty) });
   }
-  const strip = await ingredientStrip(recipe);
-  if (strip) {
-    payload.files.push(new AttachmentBuilder(strip, { name: 'ingrediente.png' }));
-    embed.setImage('attachment://ingrediente.png');
-  }
-  return payload;
+  return { orders: [...map.values()].slice(0, 10), missing };
 }
 
 const row = (...c) => new ActionRowBuilder().addComponents(...c);
 const btn = (id, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
 
-function itemSelect(customId, recipes, placeholder) {
+function weaponSelect(customId, weapons, placeholder) {
   return new StringSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder)
-    .addOptions(recipes.slice(0, PAGE).map((r) => ({ label: r.name.slice(0, 100), value: r.name.slice(0, 100), description: r.ingredients.map(([n, q]) => `${n} x${q}`).join(', ').slice(0, 100) })));
+    .addOptions(weapons.slice(0, 25).map((w) => ({
+      label: w.name.slice(0, 100), value: w.name.slice(0, 100),
+      description: `${w.badge ? `${w.badge} · ` : ''}${w.category}`.slice(0, 100),
+    })));
 }
+
+// "/craft Revolver Cattleman 2" -> answer, or a pick list when the name is ambiguous
+function lookup(query, qty, who) {
+  const found = search(query);
+  if (!found.length) return { content: `Nu am găsit **${query.slice(0, 60)}**. Încearcă alt nume sau deschide catalogul.`, embeds: [], components: [], files: [], attachments: [] };
+  const exact = found.filter((w) => norm(w.name) === norm(query));
+  if (exact.length === 1) return calcPayload([{ w: exact[0], qty }], who);
+  if (found.length === 1) return calcPayload([{ w: found[0], qty }], who);
+  const embed = new EmbedBuilder().setColor(COLOR).setTitle(`Care dintre ele? (x${qty})`)
+    .setDescription(found.slice(0, 25).map((w) => `**${w.name}**`).join('\n'));
+  return { content: '', embeds: [embed], components: [row(weaponSelect(`cr:pickq:${qty}`, found, 'Alege arma'))], files: [], attachments: [] };
+}
+
+// ---- panel + catalog ----------------------------------------------------
 
 function panelPayload() {
-  const { recipes } = data();
   const embed = new EmbedBuilder().setColor(COLOR).setTitle('Crafting')
-    .setDescription('**Catalog**: răsfoiești itemele pe categorii cu săgeți, iar ce alegi apare în chat.\n**Caută**: scrii numele itemului.\n**Calculator**: `/craft Cuie 5` îți dă materialele totale.\nPoți folosi și `/craft`, `/catalog`, sau poți scrie direct în chat: `craft cadru pistol`.')
-    .setFooter({ text: `${recipes.length} rețete` });
-  return { embeds: [embed], components: [row(btn('cr:open', 'Catalog', ButtonStyle.Success), btn('cr:find', 'Caută'))], allowedMentions: NO_PING };
+    .setDescription('**Catalog**: armele pe categorii, cu săgeți stânga/dreapta.\n**Calculator**: scrii armele și cantitățile și primești materialele, minereul de adunat și ordinea de craft.\nPoți folosi și `/craft Revolver Cattleman 2`.')
+    .setFooter({ text: `${data().weapons.length} arme` });
+  return { embeds: [embed], components: [row(btn('cr:open', 'Catalog', ButtonStyle.Success), btn('cr:calc', 'Calculator'))], allowedMentions: NO_PING };
 }
-
-function categoryView(catIdx, page) {
-  const { categories, recipes } = data();
-  const cat = categories[catIdx];
-  if (!cat) return { content: 'Categoria nu mai există.', embeds: [], components: [] };
-  const items = recipes.filter((r) => (r.category || 'Diverse') === cat).sort((a, b) => a.name.localeCompare(b.name));
-  const pages = Math.max(1, Math.ceil(items.length / PAGE));
-  const p = Math.min(Math.max(0, page), pages - 1);
-  const slice = items.slice(p * PAGE, p * PAGE + PAGE);
-  const embed = new EmbedBuilder().setColor(COLOR).setTitle(cat)
-    .setDescription(slice.map((r) => `**${r.name}**: ${r.ingredients.map(([n, q]) => `${n} x${q}`).join(', ')}`).join('\n').slice(0, 4000) || '-')
-    .setFooter({ text: `Pagina ${p + 1}/${pages} · ${items.length} iteme` });
-  const rows = [row(itemSelect(`cr:item:${catIdx}`, slice, 'Alege un item pentru detalii'))];
-  if (pages > 1) rows.push(row(btn(`cr:pg:${catIdx}:${p - 1}`, 'Înapoi').setDisabled(p === 0), btn(`cr:pg:${catIdx}:${p + 1}`, 'Înainte').setDisabled(p >= pages - 1)));
-  return { content: '', embeds: [embed], components: rows };
-}
-
-async function searchView(query, who) {
-  const found = search(query);
-  if (!found.length) return { content: `Nu am găsit **${query.slice(0, 60)}**. Încearcă alt nume sau alege din categorii.`, embeds: [], components: [], files: [] };
-  // an exact name wins even if other items look similar (e.g. "carbune" vs "Repeater Carbine")
-  const exact = found.filter((r) => norm(r.name) === norm(query));
-  if (exact.length === 1) found.splice(0, found.length, exact[0]);
-  if (found.length === 1) return { content: '', components: [], ...(await recipePayload(found[0], who)) };
-  const embed = new EmbedBuilder().setColor(COLOR).setTitle(`Rezultate pentru „${query.slice(0, 60)}”`)
-    .setDescription(found.slice(0, PAGE).map((r) => `**${r.name}**: ${r.ingredients.map(([n, q]) => `${n} x${q}`).join(', ')}`).join('\n').slice(0, 4000));
-  return { content: '', embeds: [embed], components: [row(itemSelect('cr:pick', found, 'Alege un item pentru detalii'))], files: [] };
-}
-
-
-
-// ---- calculator: "/craft Cuie 5" -> total materials ------------------------
-
-const nameKeyMap = () => new Map(data().recipes.map((r) => [norm(r.name), r]));
-
-// Walks the recipe tree once, parents before children, so every shared intermediate
-// (e.g. Lingou Fier needed twice) is rounded up to whole crafts only once.
-function expand(root, qty) {
-  const byName = nameKeyMap();
-  const order = [], state = new Map();
-  (function dfs(r) {
-    state.set(r.name, 1);
-    for (const [n] of r.ingredients) {
-      const c = byName.get(norm(n));
-      if (c && !state.has(c.name)) dfs(c);
-    }
-    state.set(r.name, 2);
-    order.push(r);
-  })(root);
-  order.reverse();
-  const need = new Map([[root.name, qty]]), base = new Map(), steps = [], tools = new Map();
-  // "reusable" in recipes.json: tools/moulds you keep, so they count once, not per craft
-  const isTool = (n) => data().reusable.some((x) => (x.endsWith('*') ? norm(n).startsWith(x.slice(0, -1).trim()) : norm(n) === x));
-  for (const r of order) {
-    const q = need.get(r.name) || 0;
-    if (!q) continue;
-    const y = r.yield || 1, crafts = Math.ceil(q / y);
-    steps.push({ r, crafts, made: crafts * y, need: q });
-    for (const [n, k] of r.ingredients) {
-      if (isTool(n)) { tools.set(n, 1); continue; }
-      const c = byName.get(norm(n));
-      const isParent = c && order.indexOf(c) <= order.indexOf(r); // would loop back: treat as raw
-      if (c && !isParent) need.set(c.name, (need.get(c.name) || 0) + k * crafts);
-      else base.set(n, (base.get(n) || 0) + k * crafts);
-    }
-  }
-  return { steps, base, tools };
-}
-
-const secs = (t) => Number(String(t || '').match(/\d+/)?.[0] || 0);
-const fmtTime = (s) => (s >= 120 ? `~${Math.round(s / 60)} min` : `${s} sec`);
-const lines = (pairs) => pairs.map(([n, q]) => `**${n}** x${q}`).join('\n') || '-';
-
-async function calcPayload(recipe, qty, who) {
-  const { steps, base, tools } = expand(recipe, qty);
-  const rootStep = steps[0];
-  const toolNames = new Set(tools.keys());
-  const direct = recipe.ingredients.filter(([n]) => !toolNames.has(n)).map(([n, q]) => [n, q * rootStep.crafts]);
-  const rawList = [...base].sort((a, b) => b[1] - a[1]);
-  const deeper = steps.length > 1;
-  const embed = new EmbedBuilder().setColor(COLOR).setTitle(`${recipe.name} x${qty}`);
-  const made = rootStep.crafts * (recipe.yield || 1);
-  const head = [`${rootStep.crafts} craft${rootStep.crafts === 1 ? '' : '-uri'} → ${made} buc${made > qty ? ` (${made - qty} în plus)` : ''}`];
-  const total = steps.reduce((a, st) => a + st.crafts * secs(st.r.time), 0);
-  if (total) head.push(`Timp total: ${fmtTime(total)}`);
-  embed.setDescription(head.join('\n'));
-  embed.addFields({ name: deeper ? 'Materiale pentru acest craft' : 'Materiale', value: clipField(lines(direct)) });
-  if (deeper) {
-    embed.addFields(
-      { name: 'De craftat înainte', value: clipField(steps.slice(1).map((st) => `**${st.r.name}**: ${st.crafts} craft${st.crafts === 1 ? '' : '-uri'} (${st.made} buc)`).join('\n')) },
-      { name: 'Materii de bază, total', value: clipField(lines(rawList)) },
-    );
-  }
-  if (tools.size) embed.addFields({ name: 'Unelte (le folosești de mai multe ori)', value: clipField([...tools.keys()].map((n) => `**${n}** x1`).join('\n')) });
-  embed.setFooter({ text: `${who ? `Cerut de ${who} · ` : ''}${tools.size ? 'Uneltele nu sunt numărate la fiecare craft' : 'Totalul numără tot ce apare în rețete, inclusiv matrițele și uneltele'}` });
-  const payload = { embeds: [embed], allowedMentions: NO_PING, files: [] };
-  const thumb = await icon(recipe.name);
-  if (thumb) {
-    payload.files.push(new AttachmentBuilder(thumb.buf(), { name: `item${thumb.ext}` }));
-    embed.setThumbnail(`attachment://item${thumb.ext}`);
-  }
-  const strip = await ingredientStrip({ name: `calc:${recipe.name}:${qty}`, ingredients: (deeper ? rawList : direct).slice(0, 8) });
-  if (strip) {
-    payload.files.push(new AttachmentBuilder(strip, { name: 'ingrediente.png' }));
-    embed.setImage('attachment://ingrediente.png');
-  }
-  return payload;
-}
-const clipField = (t) => (t.length > 1000 ? `${t.slice(0, 997)}…` : t);
-
-async function calcView(query, qty, who) {
-  const found = search(query);
-  if (!found.length) return { content: `Nu am găsit **${query.slice(0, 60)}**. Încearcă alt nume.`, embeds: [], components: [], files: [] };
-  const exact = found.filter((r) => norm(r.name) === norm(query));
-  if (exact.length === 1) found.splice(0, found.length, exact[0]);
-  if (found.length === 1) return { content: '', components: [], ...(await calcPayload(found[0], qty, who)) };
-  const embed = new EmbedBuilder().setColor(COLOR).setTitle(`Calculator x${qty}: alege itemul`)
-    .setDescription(found.slice(0, PAGE).map((r) => `**${r.name}**`).join('\n').slice(0, 4000));
-  return { content: '', embeds: [embed], components: [row(itemSelect(`cr:pickq:${qty}`, found, 'Alege itemul'))], files: [] };
-}
-
-// ---- catalog: category pages with arrows ---------------------------------
-
-const PER_PAGE = 12;
 
 function catalogPages() {
-  const { categories, recipes } = data();
-  const pages = [];
-  for (const cat of categories) {
-    const items = recipes.filter((r) => (r.category || 'Diverse') === cat).sort((a, b) => a.name.localeCompare(b.name));
-    const parts = Math.max(1, Math.ceil(items.length / PER_PAGE));
-    const size = Math.ceil(items.length / parts);
-    for (let k = 0; k < parts; k++) pages.push({ cat, part: k + 1, parts, items: items.slice(k * size, (k + 1) * size) });
-  }
-  return pages;
-}
-
-// Grid with the item pictures and names for one catalog page.
-const gridCache = new Map();
-async function catalogImage(page) {
-  const key = page.items.map((r) => r.name).join('|');
-  if (gridCache.has(key)) return gridCache.get(key);
-  let buf = null;
-  try {
-    const COLS = Math.min(4, Math.max(2, page.items.length)), CW = 150, CH = 112;
-    const rows = Math.ceil(page.items.length / COLS);
-    const canvas = createCanvas(COLS * CW, rows * CH);
-    const ctx = canvas.getContext('2d');
-    ctx.textAlign = 'center';
-    let any = false;
-    for (let i = 0; i < page.items.length; i++) {
-      const r = page.items[i];
-      const cx = (i % COLS) * CW + CW / 2, top = Math.floor(i / COLS) * CH;
-      const ic = await icon(r.name);
-      if (ic) {
-        const img = ic.img;
-        const sc = Math.min(70 / img.width, 70 / img.height, 2);
-        const w = img.width * sc, h = img.height * sc;
-        ctx.drawImage(img, cx - w / 2, top + 6 + (70 - h) / 2, w, h);
-        any = true;
-      }
-      // name, shrunk to fit the cell
-      let size = 14;
-      do { ctx.font = `${size}px DejaVu`; size -= 1; } while (ctx.measureText(r.name).width > CW - 10 && size > 9);
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.strokeText(r.name, cx, top + 100);
-      ctx.fillStyle = '#f0e6d2'; ctx.fillText(r.name, cx, top + 100);
-    }
-    if (any) buf = canvas.toBuffer('image/png');
-  } catch (err) { console.error('craft: catalog image failed:', err.message); }
-  gridCache.set(key, buf);
-  return buf;
+  const { categories, weapons } = data();
+  return categories.map((c) => ({ cat: c, items: weapons.filter((w) => w.category === c) })).filter((p) => p.items.length);
 }
 
 async function catalogView(index) {
   const pages = catalogPages();
   if (!pages.length) return { content: 'Catalogul e gol.', embeds: [], components: [], files: [], attachments: [] };
-  const i = Math.min(Math.max(0, index), pages.length - 1);
+  const i = Math.min(Math.max(0, Number(index) || 0), pages.length - 1);
   const pg = pages[i];
-  const embed = new EmbedBuilder().setColor(COLOR)
-    .setTitle(`${pg.cat}${pg.parts > 1 ? ` (${pg.part}/${pg.parts})` : ''}`)
-    .setFooter({ text: `Pagina ${i + 1}/${pages.length} · ${pg.items.length} iteme` });
-  const half = Math.ceil(pg.items.length / 2);
-  embed.addFields(
-    { name: '​', value: pg.items.slice(0, half).map((r) => `• ${r.name}`).join('\n') || '-', inline: true },
-    { name: '​', value: pg.items.slice(half).map((r) => `• ${r.name}`).join('\n') || '​', inline: true },
-  );
-  const files = [];
-  const grid = await catalogImage(pg);
-  if (grid) { files.push(new AttachmentBuilder(grid, { name: 'catalog.png' })); embed.setImage('attachment://catalog.png'); }
-
-  // category jump menu: value = first page of that category
-  const firstOf = new Map();
-  pages.forEach((p, k) => { if (!firstOf.has(p.cat)) firstOf.set(p.cat, k); });
+  const embed = new EmbedBuilder().setColor(COLOR).setTitle(pg.cat.toUpperCase()).setFooter({ text: `Pagina ${i + 1}/${pages.length} · ${pg.items.length} arme` });
+  for (const w of pg.items) {
+    embed.addFields({
+      name: `${w.name}${w.badge ? `  [${w.badge}]` : ''}`.slice(0, 256),
+      value: w.ingredients.map(([n, q]) => `${q}× ${n}`).join(' + ').slice(0, 1000),
+    });
+  }
   const catMenu = new StringSelectMenuBuilder().setCustomId('cr:cgc').setPlaceholder('Sari la o categorie')
-    .addOptions([...firstOf].slice(0, 25).map(([cat, k]) => ({ label: cat, value: String(k), default: cat === pg.cat })));
-  const itemMenu = itemSelect('cr:item:0', pg.items, 'Alege un item: îl postez în chat');
+    .addOptions(pages.slice(0, 25).map((p, k) => ({ label: p.cat, value: String(k), default: k === i })));
   const nav = row(
     btn(`cr:cg:${i - 1}`, '◀').setDisabled(i === 0),
     btn('cr:noop', `${i + 1}/${pages.length}`).setDisabled(true),
     btn(`cr:cg:${i + 1}`, '▶').setDisabled(i >= pages.length - 1),
-    btn('cr:find', 'Caută', ButtonStyle.Success),
+    btn('cr:calc', 'Calculator', ButtonStyle.Success),
   );
-  return { content: '', embeds: [embed], components: [row(catMenu), row(itemMenu), nav], files, attachments: [] };
+  return { content: '', embeds: [embed], components: [row(catMenu), row(weaponSelect('cr:item', pg.items, 'Alege o armă: calculez materialele în chat')), nav], files: [], attachments: [] };
 }
 
 // ---- interactions -------------------------------------------------------
 
 const nameOf = (i) => i.member?.displayName || i.user?.username;
 
-const command = new SlashCommandBuilder().setName('craft').setDescription('Arată rețeta unui item')
-  .setContexts(0)
-  .addStringOption((o) => o.setName('item').setDescription('Numele itemului (ex: cadru pistol)').setAutocomplete(true).setRequired(true))
-  .addIntegerOption((o) => o.setName('cantitate').setDescription('Câte vrei să faci: calculez materialele totale').setMinValue(1).setMaxValue(1000));
+const command = new SlashCommandBuilder().setName('craft').setDescription('Materiale, minereu și ordinea de craft pentru o armă').setContexts(0)
+  .addStringOption((o) => o.setName('item').setDescription('Arma (ex: Revolver Cattleman)').setAutocomplete(true).setRequired(true))
+  .addIntegerOption((o) => o.setName('cantitate').setDescription('Câte vrei să faci').setMinValue(1).setMaxValue(MAX_QTY));
+
+function calcModal() {
+  return new ModalBuilder().setCustomId('cr:m').setTitle('Calculator crafting').addComponents(
+    row(new TextInputBuilder().setCustomId('orders').setLabel('Arme, una pe rând, cu cantitate')
+      .setPlaceholder('Revolver Cattleman 2\nCarcano Rifle 1').setStyle(TextInputStyle.Paragraph).setMaxLength(400).setRequired(true)));
+}
 
 async function handleInteraction(interaction) {
   if (interaction.isAutocomplete?.() && interaction.commandName === 'craft') {
     const q = interaction.options.getFocused();
-    const list = q.trim() ? search(q) : [...data().recipes].sort((a, b) => a.name.localeCompare(b.name));
-    await interaction.respond(list.slice(0, 25).map((r) => ({ name: `${r.name} (${r.category || 'Diverse'})`.slice(0, 100), value: r.name.slice(0, 100) }))).catch(() => {});
+    const all = data().weapons;
+    const found = q.trim() ? search(q) : [...all].sort((a, b) => a.name.localeCompare(b.name));
+    await interaction.respond(found.slice(0, 25).map((w) => ({ name: `${w.name} (${w.category})`.slice(0, 100), value: w.name.slice(0, 100) }))).catch(() => {});
     return true;
   }
   if (interaction.isChatInputCommand?.() && interaction.commandName === 'craft') {
-    // the answer goes in the chat for everyone to see
-    await interaction.deferReply();
-    const qty = interaction.options.getInteger('cantitate');
-    const item = interaction.options.getString('item', true);
-    await interaction.editReply(qty ? await calcView(item, qty, nameOf(interaction)) : await searchView(item));
+    await interaction.deferReply(); // public: everyone in the channel sees it
+    await interaction.editReply(lookup(interaction.options.getString('item', true), clampQty(interaction.options.getInteger('cantitate') || 1), nameOf(interaction)));
     return true;
   }
+
   const id = interaction.customId;
   if (!id || !id.startsWith('cr:')) return false;
-  const [, kind, a, b] = id.split(':');
+  const [, kind, a] = id.split(':');
 
-  if (interaction.isButton() && kind === 'find') {
-    await interaction.showModal(new ModalBuilder().setCustomId('cr:q').setTitle('Caută rețetă').addComponents(
-      row(new TextInputBuilder().setCustomId('q').setLabel('Ce item cauți?').setPlaceholder('ex: cadru pistol').setStyle(TextInputStyle.Short).setMaxLength(60).setRequired(true))));
-    return true;
-  }
-  if (interaction.isModalSubmit() && kind === 'q') {
+  if (interaction.isButton() && (kind === 'calc' || kind === 'find')) { await interaction.showModal(calcModal()); return true; }
+  if (interaction.isModalSubmit() && kind === 'm') {
+    const { orders, missing } = ordersFromText(interaction.fields.getTextInputValue('orders'));
+    if (!orders.length) { await interaction.reply({ content: `Nu am găsit nicio armă${missing.length ? ` (${missing.join(', ')})` : ''}.`, ephemeral: true }); return true; }
     await interaction.deferReply();
-    await interaction.editReply(await searchView(interaction.fields.getTextInputValue('q'), nameOf(interaction)));
+    await interaction.editReply(calcPayload(orders, nameOf(interaction), missing.length ? [`nu am găsit: ${missing.join(', ')}`] : []));
     return true;
   }
   if (interaction.isButton() && kind === 'open') {
@@ -443,46 +273,32 @@ async function handleInteraction(interaction) {
     await interaction.editReply(await catalogView(0));
     return true;
   }
-  if (interaction.isButton() && kind === 'cg') {
-    await interaction.update(await catalogView(Number(a)));
-    return true;
-  }
-  if (interaction.isStringSelectMenu() && kind === 'cgc') {
-    await interaction.update(await catalogView(Number(interaction.values[0])));
-    return true;
-  }
-  if (interaction.isButton() && kind === 'noop') { await interaction.deferUpdate(); return true; }
-  if (interaction.isStringSelectMenu() && kind === 'cat') {
-    // old panels: category menu -> open the catalog at that category
-    const cats = data().categories;
-    const first = catalogPages().findIndex((p) => p.cat === cats[Number(interaction.values[0])]);
+  if (interaction.isStringSelectMenu() && kind === 'cat') { // old panels
     await interaction.deferReply({ ephemeral: true });
-    await interaction.editReply(await catalogView(Math.max(0, first)));
+    await interaction.editReply(await catalogView(0));
     return true;
   }
-  if (interaction.isButton() && kind === 'pg') {
-    await interaction.update(categoryView(Number(a), Number(b)));
-    return true;
-  }
-  if (interaction.isStringSelectMenu() && kind === 'pickq') {
-    const r = data().recipes.find((x) => x.name === interaction.values[0]);
-    if (!r) { await interaction.update({ content: 'Rețeta nu mai există.', embeds: [], components: [] }); return true; }
-    await interaction.update({ content: '', components: [], attachments: [], ...(await calcPayload(r, Number(a) || 1, nameOf(interaction))) });
+  if (interaction.isButton() && kind === 'cg') { await interaction.update(await catalogView(Number(a))); return true; }
+  if (interaction.isButton() && kind === 'pg') { await interaction.update(await catalogView(0)); return true; }
+  if (interaction.isStringSelectMenu() && kind === 'cgc') { await interaction.update(await catalogView(Number(interaction.values[0]))); return true; }
+  if (interaction.isButton() && kind === 'noop') { await interaction.deferUpdate(); return true; }
+
+  if (interaction.isStringSelectMenu() && kind === 'pickq') { // ambiguous /craft: the list turns into the answer
+    const w = data().weapons.find((x) => x.name === interaction.values[0]);
+    if (!w) { await interaction.update({ content: 'Arma nu mai există.', embeds: [], components: [] }); return true; }
+    await interaction.update(calcPayload([{ w, qty: clampQty(a) }], nameOf(interaction)));
     return true;
   }
   if (interaction.isStringSelectMenu() && (kind === 'item' || kind === 'pick')) {
-    const r = data().recipes.find((x) => x.name === interaction.values[0]);
-    if (!r) { await interaction.update({ content: 'Rețeta nu mai există.', embeds: [], components: [] }); return true; }
-    const payload = await recipePayload(r, nameOf(interaction));
-    if (kind === 'pick') {
-      // the result list in the chat turns into the recipe
-      await interaction.update({ content: '', components: [], attachments: [], ...payload });
-    } else {
-      // picked from the private category list: post it in the chat, keep the list for the next pick
-      await interaction.deferUpdate();
-      const ch = interaction.channel ?? (await interaction.client.channels.fetch(interaction.channelId).catch(() => null));
-      if (ch) await ch.send(payload).catch(() => interaction.followUp({ ephemeral: true, ...payload }).catch(() => {}));
-    }
+    const w = data().weapons.find((x) => x.name === interaction.values[0]);
+    if (!w) { await interaction.update({ content: 'Arma nu mai există.', embeds: [], components: [] }); return true; }
+    const payload = calcPayload([{ w, qty: 1 }], nameOf(interaction));
+    if (kind === 'pick') { await interaction.update(payload); return true; }
+    // picked from the private catalog: post it in the chat, keep the catalog open for the next pick
+    await interaction.deferUpdate();
+    const ch = interaction.channel ?? (await interaction.client.channels.fetch(interaction.channelId).catch(() => null));
+    const { attachments, ...pub } = payload;
+    if (ch) await ch.send(pub).catch(() => interaction.followUp({ ephemeral: true, ...pub }).catch(() => {}));
     return true;
   }
   return true;
@@ -511,15 +327,11 @@ async function handleMessage(message, client) {
   lastUse.set(message.author.id, now);
 
   const who = message.member?.displayName || message.author.username;
-  // "craft cuie 5" = calculator. A name that already ends in a number ("cufar 1500") stays a plain lookup.
-  const calc = arg.match(/^(.*\S)\s+(\d{1,4})$/);
-  const wholeIsItem = search(arg).some((r) => norm(r.name) === norm(arg));
-  const { content, ...rest } = calc && !wholeIsItem && Number(calc[2]) >= 1
-    ? await calcView(calc[1], Number(calc[2]), who)
-    : await searchView(arg, who);
+  const p = parseLine(arg);
+  const view = lookup(p.name, p.qty, who);
+  const { attachments, content, ...rest } = view;
   const sent = await message.channel.send({ ...(content ? { content: `${message.author}: ${content}` } : {}), ...rest, allowedMentions: { parse: [], users: [] } }).catch(() => null);
-  // remove the request so the channel only keeps the answer
-  if (sent) await message.delete().catch(() => {});
+  if (sent) await message.delete().catch(() => {}); // only the answer stays in the channel
 }
 
-module.exports = { expand, calcView, command, handleInteraction, handleMessage, search, panelPayload, catalogView, data };
+module.exports = { command, handleInteraction, handleMessage, search, panelPayload, catalogView, calc, data };
