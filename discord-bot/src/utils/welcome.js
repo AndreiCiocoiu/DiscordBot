@@ -22,7 +22,7 @@ async function buildWelcome(member, { banner = true } = {}) {
     .setColor(0xf2a33d)
     .setDescription(
       `Bine ai venit pe **${guild.name}**, ${member}!\nEști membrul **#${guild.memberCount}**.\n\n` +
-      'Intră pe voice, vezi planurile din sesiuni și apasă un buton de mai jos dacă vrei alerte.'
+      'Intră pe voice, vezi planurile din evenimente și apasă un buton de mai jos dacă vrei alerte.'
     );
   const files = [];
 
@@ -48,7 +48,6 @@ async function buildWelcome(member, { banner = true } = {}) {
     files,
     components: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('rz:role').setLabel('Alerte razie').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('se:role').setLabel('Notificări sesiuni').setStyle(ButtonStyle.Secondary),
     )],
     allowedMentions: { users: [member.id] },
   };

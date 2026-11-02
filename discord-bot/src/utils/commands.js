@@ -1,7 +1,9 @@
 // Slash commands (the only ones this bot has):
 //   /craft <item>     recipe in the chat (autocomplete)          everyone  -> craft.js
 //   /catalog          private catalog with arrows                everyone
-//   /panou <tip>      post a panel here (craft / razie / sesiuni)   admins only (Manage Server)
+//   /setup <funcție>  configurare ușoară (welcome, evenimente, anunturi, log, razii, crafting, fus, info, tot)  admins only
+//   /anunt            parchment announcement + hidden @everyone     admins only
+//   /panou <tip>      post a panel here (craft / razie / evenimente)   admins only (Manage Server)
 // Admin commands are hidden from everyone else by Discord AND re-checked here.
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const craft = require('./craft');
@@ -9,6 +11,8 @@ const raziiUi = require('./raziiUi');
 const sessions = require('./sessions');
 const store = require('./store');
 const adminlog = require('./adminlog');
+const announce = require('./announce');
+const setupCmd = require('./setup');
 
 const catalogCommand = new SlashCommandBuilder().setName('catalog').setDescription('Catalogul de crafting pe categorii').setContexts(0);
 
@@ -18,12 +22,14 @@ const panelCommand = new SlashCommandBuilder().setName('panou').setDescription('
   .addStringOption((o) => o.setName('tip').setDescription('Ce panou').setRequired(true).addChoices(
     { name: 'Crafting', value: 'craft' },
     { name: 'Razii', value: 'razie' },
-    { name: 'Sesiuni', value: 'sesiuni' },
+    { name: 'Evenimente', value: 'sesiuni' },
   ));
 
-const list = [craft.command, catalogCommand, panelCommand];
+const list = [craft.command, catalogCommand, panelCommand, announce.command, setupCmd.command];
 
 async function handleInteraction(interaction, client) {
+  if (await announce.handleInteraction(interaction, client)) return true;
+  if (await setupCmd.handleInteraction(interaction, client)) return true;
   if (!interaction.isChatInputCommand?.()) return false;
 
   if (interaction.commandName === 'catalog') {

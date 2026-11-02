@@ -7,8 +7,10 @@ const {
 const store = require('./store');
 const { parseWhen, REASONS } = require('./timeparse');
 const adminlog = require('./adminlog');
+const { AttachmentBuilder } = require('discord.js');
+const { render } = require('./announce');
 
-const GREEN = 0x2ecc71, GREY = 0x95a5a6;
+const GREEN = 0x8a5a2b, GREY = 0x95a5a6; // western brown
 const NO_PING = { parse: [] };
 const REMIND_MIN = 30;
 const KEEP_AFTER_START_MS = 3 * 3600_000;
@@ -28,10 +30,14 @@ async function ensureRole(guild) {
   let role = c.sessionsRoleId ? await guild.roles.fetch(c.sessionsRoleId).catch(() => null) : null;
   if (!role) {
     await guild.roles.fetch().catch(() => {});
-    role = guild.roles.cache.find((r) => r.name.toLowerCase() === 'sesiuni') || null;
+    role = guild.roles.cache.find((r) => r.name.toLowerCase() === 'evenimente') || null;
+    if (!role) { // old name: rename it, members keep it
+      const old = guild.roles.cache.find((r) => r.name.toLowerCase() === 'sesiuni');
+      if (old) role = await old.setName('Evenimente', 'Sesiuni -> Evenimente').catch(() => old);
+    }
   }
   if (!role) {
-    role = await guild.roles.create({ name: 'Sesiuni', color: 0x2ecc71, mentionable: true, reason: 'Notificări sesiuni' })
+    role = await guild.roles.create({ name: 'Evenimente', color: 0x2ecc71, mentionable: true, reason: 'Notificări evenimente' })
       .catch((err) => { console.warn('sessions: could not create role:', err.message); return null; });
   }
   if (role && c.sessionsRoleId !== role.id) store.setConfig(guild.id, { sessionsRoleId: role.id });
@@ -43,34 +49,44 @@ async function ensureRole(guild) {
 const names = (s, status) => Object.entries(s.rsvp).filter(([, v]) => v === status).map(([id]) => `<@${id}>`);
 const field = (title, list) => ({ name: `${title} (${list.length})`, value: list.join(' ').slice(0, 1000) || '-', inline: true });
 
+function whenText(s) {
+  try {
+    return new Intl.DateTimeFormat('ro-RO', { timeZone: tzOf(s.guildId), weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(s.startsAt));
+  } catch { return new Date(s.startsAt).toISOString(); }
+}
+
+// The parchment sheet (title, when, details, organizer). Hours are shown in the server time zone;
+// the "Când" field under it shows the time in each person's own time zone.
+function sheet(s) {
+  const text = `Când: ${whenText(s)} (${tzOf(s.guildId)})${s.details ? `\n\n${s.details}` : ''}`;
+  return new AttachmentBuilder(render({ title: s.title.toUpperCase().slice(0, 40), text, author: s.hostName }), { name: 'eveniment.png', description: `${s.title}: ${text}`.slice(0, 1000) });
+}
+
 function sessionEmbed(s) {
-  const embed = new EmbedBuilder()
+  return new EmbedBuilder()
     .setColor(GREEN)
-    .setTitle(s.title)
+    .setImage('attachment://eveniment.png')
     .addFields(
-      { name: 'Când', value: `<t:${unix(s.startsAt)}:F>\n<t:${unix(s.startsAt)}:R>`, inline: false },
+      { name: 'Când', value: `<t:${unix(s.startsAt)}:F> · <t:${unix(s.startsAt)}:R>`, inline: false },
       field('Vin', names(s, 'y')),
       field('Poate', names(s, 'm')),
       field('Nu vin', names(s, 'n')),
-    )
-    .setFooter({ text: `Organizator: ${s.hostName}` });
-  if (s.details) embed.setDescription(s.details.slice(0, 1500));
-  return embed;
+    );
 }
 
 const sessionRows = (s) => [
   row(btn(`se:y:${s.id}`, 'Vin', ButtonStyle.Success), btn(`se:m:${s.id}`, 'Poate'), btn(`se:n:${s.id}`, 'Nu vin', ButtonStyle.Danger)),
-  row(btn(`se:x:${s.id}`, 'Anulează sesiunea')),
+  row(btn(`se:x:${s.id}`, 'Anulează evenimentul')),
 ];
 
 function panelPayload() {
   const embed = new EmbedBuilder()
     .setColor(GREEN)
-    .setTitle('Sesiuni de joc')
-    .setDescription('Apasă **Planifică sesiune**, scrie ce jucați și când (ex: `azi 21:00`, `mâine 20:30`, `sâmbătă 22:00`, `28.10 21:00`). Apare un mesaj unde fiecare spune dacă vine.');
+    .setTitle('Evenimente')
+    .setDescription('Apasă **Planifică eveniment**, scrie ce faceți și când (ex: `azi 21:00`, `mâine 20:30`, `sâmbătă 22:00`, `28.10 21:00`). Apare o foaie western cu @everyone ascuns, iar fiecare spune dacă vine.');
   return {
     embeds: [embed],
-    components: [row(btn('se:new', 'Planifică sesiune', ButtonStyle.Success), btn('se:role', 'Notificări sesiuni on/off'))],
+    components: [row(btn('se:new', 'Planifică eveniment', ButtonStyle.Success))],
     allowedMentions: NO_PING,
   };
 }
@@ -132,7 +148,7 @@ function restore(client) {
 // ---- interactions -------------------------------------------------------
 
 const sessionModal = () =>
-  new ModalBuilder().setCustomId('se:m').setTitle('Planifică sesiune').addComponents(
+  new ModalBuilder().setCustomId('se:m').setTitle('Planifică eveniment').addComponents(
     row(new TextInputBuilder().setCustomId('title').setLabel('Ce jucăm / ce facem').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80).setPlaceholder('ex: RDR2 Online, jaf la bancă')),
     row(new TextInputBuilder().setCustomId('when').setLabel('Când').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setPlaceholder('azi 21:00 · mâine 20:30 · sâmbătă 22:00 · 28.10 21:00')),
     row(new TextInputBuilder().setCustomId('details').setLabel('Detalii (opțional)').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(500)),
@@ -149,11 +165,11 @@ async function createSession(interaction, client) {
     return reply(`${REASONS[when.reason]} Exemple: \`azi 21:00\`, \`mâine 20:30\`, \`sâmbătă 22:00\`, \`28.10 21:00\`. (Fus orar: ${tzOf(guildId)})`);
   }
   if (Object.keys(store.db.sessions).filter((id) => store.db.sessions[id].guildId === guildId).length >= MAX_ACTIVE) {
-    return reply(`Sunt deja ${MAX_ACTIVE} sesiuni active. Anulează una veche.`);
+    return reply(`Sunt deja ${MAX_ACTIVE} evenimente active. Anulează unul vechi.`);
   }
 
   const channel = await client.channels.fetch(channelId).catch(() => null);
-  if (!channel?.isTextBased()) return reply('Nu găsesc canalul de sesiuni. Un admin scrie `server setup`.');
+  if (!channel?.isTextBased()) return reply('Nu găsesc canalul de evenimente. Un admin scrie `server setup`.');
 
   const s = {
     id: Date.now().toString(36),
@@ -167,20 +183,20 @@ async function createSession(interaction, client) {
     reminded: false,
   };
 
-  const role = await ensureRole(interaction.guild);
   const msg = await channel.send({
-    content: role ? `<@&${role.id}>` : undefined,
+    content: '||@everyone||', // hidden, but it still pings everyone
     embeds: [sessionEmbed(s)],
+    files: [sheet(s)],
     components: sessionRows(s),
-    allowedMentions: { roles: role ? [role.id] : [] },
+    allowedMentions: { parse: ['everyone'] },
   }).catch(log('send'));
-  if (!msg) return reply('Nu pot scrie în canalul de sesiuni (verifică permisiunile botului).');
+  if (!msg) return reply('Nu pot scrie în canalul de evenimente (verifică permisiunile botului).');
 
   s.messageId = msg.id;
   store.db.sessions[s.id] = s;
   store.save();
   schedule(client, s);
-  adminlog.action(client, guildId, 'Sesiune planificată', `**${s.title}** · <t:${unix(s.startsAt)}:F>`, interaction.user.id);
+  adminlog.action(client, guildId, 'Eveniment planificat', `**${s.title}** · <t:${unix(s.startsAt)}:F>`, interaction.user.id);
   return reply(`Postat în <#${channelId}>.`);
 }
 
@@ -197,29 +213,29 @@ async function handleInteraction(interaction, client) {
 
   if (kind === 'role') {
     const role = await ensureRole(interaction.guild);
-    if (!role) { await say('Nu pot da rolul (botul are nevoie de Manage Roles, iar rolul lui trebuie să fie deasupra lui @Sesiuni).'); return true; }
+    if (!role) { await say('Nu pot da rolul (botul are nevoie de Manage Roles, iar rolul lui trebuie să fie deasupra lui @Evenimente).'); return true; }
     const has = interaction.member.roles.cache.has(role.id);
     await (has ? interaction.member.roles.remove(role) : interaction.member.roles.add(role));
-    await say(has ? 'Ți-am scos rolul **Sesiuni**.' : 'Ai primit rolul **Sesiuni**, vei fi anunțat la sesiuni noi.');
+    await say(has ? 'Ți-am scos rolul **Evenimente**.' : 'Ai primit rolul **Evenimente**, vei fi anunțat la evenimente noi.');
     return true;
   }
 
   const s = store.db.sessions[sid];
-  if (!s) { await say('Sesiunea asta nu mai există.'); return true; }
+  if (!s) { await say('Evenimentul ăsta nu mai există.'); return true; }
 
   if (kind === 'y' || kind === 'm' || kind === 'n') {
     if (s.rsvp[interaction.user.id] === kind) delete s.rsvp[interaction.user.id]; // press again = take it back
     else s.rsvp[interaction.user.id] = kind;
     store.save();
-    await interaction.update({ embeds: [sessionEmbed(s)], components: sessionRows(s), allowedMentions: NO_PING });
+    await interaction.update({ embeds: [sessionEmbed(s)], files: [sheet(s)], attachments: [], components: sessionRows(s), allowedMentions: NO_PING });
     return true;
   }
 
   if (kind === 'x') {
     const allowed = interaction.user.id === s.hostId || interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
-    if (!allowed) { await say('Doar organizatorul sau un admin poate anula sesiunea.'); return true; }
-    adminlog.action(client, s.guildId, 'Sesiune anulată', `**${s.title}**`, interaction.user.id);
-    await say('Sesiunea a fost anulată.');
+    if (!allowed) { await say('Doar organizatorul sau un admin poate anula evenimentul.'); return true; }
+    adminlog.action(client, s.guildId, 'Eveniment anulat', `**${s.title}**`, interaction.user.id);
+    await say('Evenimentul a fost anulat.');
     await removeSession(client, s, { deleteMessage: true });
     return true;
   }

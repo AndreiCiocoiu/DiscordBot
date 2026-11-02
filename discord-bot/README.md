@@ -2,19 +2,25 @@
 
 Slash commands: `/craft` (recipe with autocomplete) and `/catalog` for everyone, `/panou` (crafting / razii / sesiuni panel in the current channel) for admins only: Discord hides it from everyone else and the bot re-checks Manage Server. Everything else is buttons on pinned panels plus a few admin text commands. Any other leftover slash commands are removed at every start.
 
-## Setup (once, admin)
-1. Developer Portal -> Bot: enable **Server Members Intent** and **Message Content Intent** (the bot still starts without them, with fewer features, and says so in the logs).
-2. Bot permissions: View Channels, Manage Channels, Manage Roles, Send Messages, Embed Links, Attach Files, Read Message History, Manage Messages, Add Reactions, **View Audit Log**, **Manage Server** (invite tracking), Connect, Speak. The bot's role must sit above the @Razie and @Sesiuni roles.
-3. Write **`server setup`** in any channel. It reuses your existing welcome channel, creates **sesiuni** and a private **adminlog** (only admins see it), and posts the sessions panel.
-4. Write `razie panou` in the channel for the raid panel (see below). Railway: add a **Volume** mounted at `/app/data` so timers, sessions and the recording survive redeploys.
+## Setup on a new server (admin, once)
+1. Developer Portal -> your app -> **Installation / OAuth2 URL Generator**: scopes `bot` + `applications.commands`; permissions: View Channels, Manage Channels, Manage Roles, Send Messages, Embed Links, Attach Files, Read Message History, Manage Messages, Add Reactions, **Mention Everyone**, **View Audit Log**, **Manage Server**, Connect, Speak. Open the link and pick the server. (If the invite is refused, turn on **Public Bot** under Bot.)
+2. Developer Portal -> Bot: enable **Server Members Intent** and **Message Content Intent** (the bot still starts without them, with fewer features).
+3. In the server: drag the bot's role **above** @Razie and @Evenimente (Server Settings -> Roles).
+4. Run **`/setup tot`** (admins only): it configures everything below in one go. Or one feature at a time: `/setup welcome`, `/setup evenimente`, `/setup anunturi`, `/setup log`, `/setup razii`, `/setup crafting`. Each one reuses the channel it already knows (or one with the right name), creates it only if missing, and posts the panel where needed. Add the `canal` option to use a channel you choose. `/setup fus Europe/Bucharest` sets the event time zone, `/setup info` shows what is set and which bot permissions are missing. (The old text command `server setup` does the same as `/setup tot`.)
+5. Then, once: `razie sunet` with your audio file attached (the voice for raid alerts).
+6. Test: `/anunt`, `/craft`, **Planifica eveniment**, the raid panel buttons.
+7. Railway: one Volume mounted at `/app/data`. One bot instance serves any number of servers, each keeps its own settings.
 
-Admin text commands (Administrator only): `server setup`, `server aici welcome|sesiuni|log` (use this channel), `server test` (preview the welcome banner), `server tz Europe/Bucharest` (time zone for sessions, default Europe/London), `server info`.
+Other admin text commands (Administrator only): `server aici welcome|evenimente|anunturi|log` (use the channel you are in), `server test` (preview the welcome banner), `server tz <fus>`, `server info`.
+
+## Announcements
+`/anunt` (admins): a box opens, write the title (optional) and the message. The bot posts it in the **anunturi** channel as a western parchment sheet signed with your name, with a hidden `||@everyone||` (grey bar that still pings). `/anunt ping:false` posts without the ping. Needs the Mention Everyone permission for the bot in that channel.
 
 ## Welcome
 When someone joins, the bot posts in the welcome channel an embed with an **animated banner** (sunset, embers, glowing avatar ring, gold shimmer) with their name and member number, plus buttons for the razie and session notifications. During a join flood it falls back to text only.
 
-## Sessions
-In the sessions channel press **Planifica sesiune**: what you play + when (`azi 21:00`, `maine 20:30`, `sambata 22:00`, `28.10 21:00`) + optional details. The bot posts one message with **Vin / Poate / Nu vin** (press again to take it back) and pings the opt-in @Sesiuni role. 30 minutes before it pings everyone who said Vin or Poate. The host or an admin can cancel it. The message is deleted 3 hours after the start. Times show in everyone's own time zone.
+## Events (formerly Sessions)
+In the evenimente channel press **Planifica eveniment**: what you play + when (`azi 21:00`, `maine 20:30`, `sambata 22:00`, `28.10 21:00`) + optional details. The bot posts one message with **Vin / Poate / Nu vin** (press again to take it back) and posts a western parchment sheet with a hidden `||@everyone||` (grey bar that still pings); the @Evenimente role stays for reminders (an old @Sesiuni role is renamed automatically). 30 minutes before it pings everyone who said Vin or Poate. The host or an admin can cancel it. The message is deleted 3 hours after the start. Times show in everyone's own time zone.
 
 ## Admin log
 Everything goes to the private adminlog: joins (account age, invite used), leaves, kicks, bans/unbans, nickname/role/timeout changes (with who did it), deleted/edited messages (with content), bulk deletes (attached as a text file), channel/role/server/emoji/sticker changes, invites, threads, webhooks, voice join/leave/move/mute/stream, AutoMod hits, and what the bot itself does (razie, sessions, welcome, setup). Messages sent before the bot started can't show their old content.

@@ -1,6 +1,6 @@
 // Admin text commands for the server features (the bot has no slash commands):
 //   server setup            create/reuse the welcome, sessions and adminlog channels
-//   server aici <welcome|sesiuni|log>   use THIS channel for that feature
+//   server aici <welcome|evenimente|anunturi|log>   use THIS channel for that feature
 //   server test             preview the welcome banner (for yourself)
 //   server tz <fus orar>    time zone for sessions, e.g. Europe/Bucharest
 //   server info             show the current settings
@@ -31,52 +31,9 @@ async function ack(message, ok, text) {
 const findText = (guild, key) => guild.channels.cache.find((c) => c.type === ChannelType.GuildText && nameKey(c.name) === key);
 
 async function setup(message, client) {
-  const guild = message.guild;
-  await guild.channels.fetch();
-  const me = client.user.id;
-  const botAllow = [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.AttachFiles, P.ReadMessageHistory, P.ManageMessages];
-  const made = [];
-
-  let welcomeCh = findText(guild, 'welcome');
-  if (!welcomeCh) {
-    welcomeCh = await guild.channels.create({
-      name: `👋・${smallCaps('welcome')}`, type: ChannelType.GuildText,
-      permissionOverwrites: [{ id: guild.id, deny: [P.SendMessages] }, { id: me, allow: botAllow }],
-    });
-    made.push('welcome');
-  }
-
-  let sessionsCh = findText(guild, 'sesiuni');
-  if (!sessionsCh) {
-    sessionsCh = await guild.channels.create({
-      name: `📅・${smallCaps('sesiuni')}`, type: ChannelType.GuildText, parent: welcomeCh.parentId ?? undefined,
-      permissionOverwrites: [{ id: guild.id, deny: [P.SendMessages] }, { id: me, allow: botAllow }],
-    });
-    made.push('sesiuni');
-  }
-
-  // adminlog is always private: nobody but admins (and the bot) can see it
-  let logCh = findText(guild, 'adminlog');
-  const logOverwrites = [{ id: guild.id, deny: [P.ViewChannel] }, { id: me, allow: botAllow }];
-  if (!logCh) {
-    logCh = await guild.channels.create({ name: `🔒・${smallCaps('adminlog')}`, type: ChannelType.GuildText, permissionOverwrites: logOverwrites });
-    made.push('adminlog');
-  } else {
-    await logCh.permissionOverwrites.set(logOverwrites).catch(() => {});
-  }
-
-  store.setConfig(guild.id, { welcomeId: welcomeCh.id, sessionsId: sessionsCh.id, logId: logCh.id });
-
-  // fresh planner panel in the sessions channel
-  const old = store.cfg(guild.id).sessionsPanelId;
-  if (old) await (await sessionsCh.messages.fetch(old).catch(() => null))?.delete().catch(() => {});
-  await sessions.postPanel(client, sessionsCh);
-
-  adminlog.action(client, guild.id, 'Server setup', `Welcome: ${welcomeCh}\nSesiuni: ${sessionsCh}\nAdminlog: ${logCh}`, message.author.id);
-  await message.reply({
-    content: `Gata.\nWelcome: ${welcomeCh}\nSesiuni: ${sessionsCh}\nAdminlog: ${logCh} (privat)${made.length ? `\nCreate acum: ${made.join(', ')}` : '\nAm folosit canalele existente.'}`,
-    allowedMentions: { parse: [], repliedUser: false },
-  }).catch(() => {});
+  const text = await require('./setup').setupAll({ guild: message.guild, client, userId: message.author.id });
+  adminlog.action(client, message.guild.id, 'Server setup', text.slice(0, 1500), message.author.id);
+  await message.reply({ content: `Gata.\n${text}`.slice(0, 1990), allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
 }
 
 async function handleServerMessage(message, client) {
@@ -89,8 +46,8 @@ async function handleServerMessage(message, client) {
   if (sub === 'setup') return setup(message, client);
 
   if (sub === 'aici') {
-    const key = { welcome: 'welcomeId', sesiuni: 'sessionsId', log: 'logId', adminlog: 'logId' }[arg];
-    if (!key) return ack(message, false, 'Folosește: `server aici welcome`, `server aici sesiuni` sau `server aici log`.');
+    const key = { welcome: 'welcomeId', sesiuni: 'sessionsId', evenimente: 'sessionsId', anunturi: 'announceId', anunt: 'announceId', log: 'logId', adminlog: 'logId' }[arg];
+    if (!key) return ack(message, false, 'Folosește: `server aici welcome`, `evenimente`, `anunturi` sau `log`.');
     store.setConfig(guildId, { [key]: message.channel.id });
     if (key === 'sessionsId') await sessions.postPanel(client, message.channel);
     await ack(message, true);
@@ -118,7 +75,7 @@ async function handleServerMessage(message, client) {
     const c = store.cfg(guildId);
     const ch = (id) => (id ? `<#${id}>` : 'nesetat');
     return message.reply({
-      content: `Welcome: ${ch(c.welcomeId)}\nSesiuni: ${ch(c.sessionsId)}\nAdminlog: ${ch(c.logId)}\nFus orar sesiuni: ${c.tz || 'Europe/London (implicit)'}`,
+      content: `Welcome: ${ch(c.welcomeId)}\nEvenimente: ${ch(c.sessionsId)}\nAnunțuri: ${ch(c.announceId)}\nAdminlog: ${ch(c.logId)}\nFus orar evenimente: ${c.tz || 'Europe/London (implicit)'}`,
       allowedMentions: { parse: [], repliedUser: false },
     }).catch(() => {});
   }
