@@ -9,6 +9,7 @@ const { parseWhen, REASONS } = require('./timeparse');
 const adminlog = require('./adminlog');
 const { AttachmentBuilder } = require('discord.js');
 const { render } = require('./announce');
+const banner = require('./panelBanner');
 
 const GREEN = 0x8a5a2b, GREY = 0x95a5a6; // western brown
 const NO_PING = { parse: [] };
@@ -19,7 +20,7 @@ const log = (what) => (err) => console.error(`sessions ${what}:`, err);
 const unix = (ms) => Math.floor(ms / 1000);
 const btn = (id, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
 const row = (...c) => new ActionRowBuilder().addComponents(...c);
-const tzOf = (guildId) => store.cfg(guildId).tz || 'Europe/London';
+const tzOf = (guildId) => store.cfg(guildId).tz || 'Europe/Bucharest';
 
 const timers = new Map(); // sessionId -> { remind, cleanup }
 
@@ -83,6 +84,7 @@ function panelPayload() {
   const embed = new EmbedBuilder()
     .setColor(GREEN)
     .setTitle('Evenimente')
+    .setImage(banner.URL)
     .setDescription('Apasă **Planifică eveniment**, scrie ce faceți și când (ex: `azi 21:00`, `mâine 20:30`, `sâmbătă 22:00`, `28.10 21:00`). Apare o foaie western cu @everyone ascuns, iar fiecare spune dacă vine.');
   return {
     embeds: [embed],
@@ -92,7 +94,7 @@ function panelPayload() {
 }
 
 async function postPanel(client, channel) {
-  const msg = await channel.send(panelPayload());
+  const msg = await channel.send(banner.withBanner(panelPayload()));
   await msg.pin().catch(() => {});
   store.setConfig(channel.guild.id, { sessionsPanelId: msg.id });
   return msg;

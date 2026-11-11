@@ -1,6 +1,6 @@
 // /setup <feature>: one admin command per feature (hidden from non-admins, re-checked here).
 //   /setup tot         everything below, in one go
-//   /setup welcome | evenimente | anunturi | log | razii | crafting   [canal]
+//   /setup welcome | evenimente | anunturi | log | razii | crafting | puncte   [canal]
 //   /setup fus <zona>  time zone for events      /setup info   what is set up and what is missing
 // Without `canal` the bot reuses the channel it already knows (or one with the right name) and only
 // creates a new one if there is none. With `canal` it uses exactly that channel.
@@ -8,6 +8,7 @@ const { SlashCommandBuilder, PermissionFlagsBits: P, ChannelType } = require('di
 const store = require('./store');
 const adminlog = require('./adminlog');
 const { validTz } = require('./timeparse');
+const banner = require('./panelBanner');
 
 const FEATURES = [
   { id: 'welcome', label: 'Welcome', desc: 'Canalul cu bannerul animat pentru membri noi' },
@@ -16,6 +17,7 @@ const FEATURES = [
   { id: 'log', label: 'Adminlog', desc: 'Log privat, doar pentru admini' },
   { id: 'razii', label: 'Razii', desc: 'Panoul de timere pentru razii' },
   { id: 'crafting', label: 'Crafting', desc: 'Panoul cu catalog și calculator' },
+  { id: 'puncte', label: 'Puncte', desc: 'Canalul cu clasamentul săptămânal al benzii' },
 ];
 
 const command = (() => {
@@ -76,7 +78,7 @@ const run = {
     if (old) await (await ch.messages.fetch(old).catch(() => null))?.delete().catch(() => {});
     await sessions.postPanel(ctx.client, ch);
     await sessions.ensureRole(ctx.guild);
-    return `**Evenimente**: ${ch}${made ? ' (creat)' : ''}, panoul e postat. Fusul orar: \`${store.cfg(ctx.guild.id).tz || 'Europe/London'}\` (schimbi cu \`/setup fus\`).`;
+    return `**Evenimente**: ${ch}${made ? ' (creat)' : ''}, panoul e postat. Fusul orar: \`${store.cfg(ctx.guild.id).tz || 'Europe/Bucharest'}\` (schimbi cu \`/setup fus\`).`;
   },
   async anunturi(ctx) {
     const { ch, made } = await getChannel(ctx, { key: 'announceId', names: ['anunturi', 'anunt'], emoji: '📢', readonly: true, picked: ctx.picked });
@@ -86,7 +88,9 @@ const run = {
   },
   async log(ctx) {
     const { ch, made } = await getChannel(ctx, { key: 'logId', names: ['adminlog'], emoji: '🔒', priv: true, picked: ctx.picked });
-    await ch.permissionOverwrites.set([{ id: ctx.guild.id, deny: [P.ViewChannel] }, { id: ctx.client.user.id, allow: botAllow }]).catch(() => {});
+    // edit only @everyone and the bot: never replace the whole list, other roles' overrides stay as they are
+    await ch.permissionOverwrites.edit(ctx.client.user.id, { ViewChannel: true, SendMessages: true, EmbedLinks: true, AttachFiles: true, ReadMessageHistory: true }).catch(() => {});
+    await ch.permissionOverwrites.edit(ctx.guild.id, { ViewChannel: false }).catch(() => {});
     store.setConfig(ctx.guild.id, { logId: ch.id });
     return `**Adminlog**: ${ch}${made ? ' (creat)' : ''}, privat: îl văd doar adminii.`;
   },
@@ -106,10 +110,19 @@ const run = {
       const oc = await ctx.guild.channels.fetch(old.channelId).catch(() => null);
       await (await oc?.messages.fetch(old.messageId).catch(() => null))?.delete().catch(() => {});
     }
-    const msg = await ch.send(craft.panelPayload());
+    const msg = await ch.send(banner.withBanner(craft.panelPayload()));
     await msg.pin().catch(() => {});
     store.setConfig(ctx.guild.id, { craftChannelId: ch.id, craftPanel: { channelId: ch.id, messageId: msg.id } });
     return `**Crafting**: ${ch}${made ? ' (creat)' : ''}, panoul e postat. Oricine poate scrie \`/craft\` și \`/catalog\`.`;
+  },
+  async puncte(ctx) {
+    const points = require('./points');
+    const { ch, made } = await getChannel(ctx, { key: 'pointsChannelId', names: ['clasament', 'puncte'], emoji: '🏆', readonly: true, picked: ctx.picked });
+    store.setConfig(ctx.guild.id, { pointsChannelId: ch.id });
+    const d = points.G(ctx.guild.id);
+    d.cfg.channelId = ch.id;
+    points.touch(); points.flush();
+    return `**Puncte**: ${ch}${made ? ' (creat)' : ''}, aici se postează clasamentul duminică seara. Adaugi oameni cu \`/add\`, dai puncte cu \`/puncte da\`. Setări: \`/banda config\`. Liderii sunt rolurile „Lider” și „Co-Lider”.`;
   },
   async fus(ctx) {
     const tz = ctx.zona.trim();
@@ -123,13 +136,13 @@ const run = {
     const miss = need(ctx, [P.ManageChannels, P.ManageRoles, P.MentionEveryone, P.ViewAuditLog, P.ManageGuild]).map((p) => permNames[p]);
     return [
       `Welcome: ${ch(c.welcomeId)}`, `Evenimente: ${ch(c.sessionsId)}`, `Anunțuri: ${ch(c.announceId)}`, `Adminlog: ${ch(c.logId)}`,
-      `Razii: ${ch(rz.panel?.channelId)}`, `Crafting: ${ch(c.craftChannelId)}`, `Fus orar: ${c.tz || 'Europe/London (implicit)'}`,
+      `Razii: ${ch(rz.panel?.channelId)}`, `Crafting: ${ch(c.craftChannelId)}`, `Puncte: ${ch(c.pointsChannelId)}`, `Fus orar: ${c.tz || 'Europe/Bucharest (implicit)'}`,
       miss.length ? `\nLipsesc permisiuni la bot: **${miss.join(', ')}**` : '\nPermisiunile botului sunt ok.',
     ].join('\n');
   },
 };
 
-const ORDER = ['welcome', 'evenimente', 'anunturi', 'log', 'razii', 'crafting'];
+const ORDER = ['welcome', 'evenimente', 'anunturi', 'log', 'razii', 'crafting', 'puncte'];
 
 async function runFeature(feature, ctx) {
   if (feature !== 'info' && feature !== 'fus') {

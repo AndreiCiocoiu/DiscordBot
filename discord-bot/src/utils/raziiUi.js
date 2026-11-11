@@ -6,6 +6,7 @@ const {
   StringSelectMenuBuilder, ChannelSelectMenuBuilder, ChannelType,
   ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits,
 } = require('discord.js');
+const banner = require('./panelBanner');
 const core = require('./razii');
 const adminlog = require('./adminlog');
 
@@ -31,6 +32,7 @@ function panelPayload(guildId) {
         ? timers.map((t) => `**${t.zone}** · ${when(t.endsAt)} · <@${t.userId}>`).join('\n').slice(0, 3800)
         : 'Niciun timer activ.\nApasă **Pornește** sau scrie `razie <zona>`.'
     )
+    .setImage(banner.URL)
     .setFooter({ text: `Cooldown ${core.cooldownLabel()}` });
 
   const last = core.recent(guildId, 3);
@@ -84,7 +86,7 @@ async function createPanel(client, channel) {
     const om = oc ? await oc.messages.fetch(old.messageId).catch(() => null) : null;
     await om?.delete().catch(() => {});
   }
-  const msg = await channel.send(panelPayload(guildId));
+  const msg = await channel.send(banner.withBanner(panelPayload(guildId)));
   await msg.pin().catch(() => {}); // needs Manage Messages, optional
   core.setConfig(guildId, { panel: { channelId: channel.id, messageId: msg.id } });
   await core.ensureRole(channel.guild);

@@ -9,6 +9,7 @@ const welcome = require('./src/utils/welcome');
 const adminlog = require('./src/utils/adminlog');
 const craft = require('./src/utils/craft');
 const commands = require('./src/utils/commands');
+const points = require('./src/utils/points');
 
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
@@ -58,6 +59,7 @@ function wire(client, level) {
     for (const g of c.guilds.cache.values()) adminlog.action(client, g.id, 'Bot pornit', `Versiune ${require('./package.json').version}`);
     razii.restore(client);
     sessions.restore(client);
+    points.start(client);
     await syncSlashCommands(c);
   });
 

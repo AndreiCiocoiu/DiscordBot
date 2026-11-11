@@ -3,6 +3,7 @@
 //   /catalog          private catalog with arrows                everyone
 //   /setup <funcție>  configurare ușoară (welcome, evenimente, anunturi, log, razii, crafting, fus, info, tot)  admins only
 //   /anunt            parchment announcement + hidden @everyone     admins only
+//   /add /puncte /profil /clasament /banda   evidența benzii și punctele săptămânale (points.js)
 //   /panou <tip>      post a panel here (craft / razie / evenimente)   admins only (Manage Server)
 // Admin commands are hidden from everyone else by Discord AND re-checked here.
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
@@ -13,6 +14,8 @@ const store = require('./store');
 const adminlog = require('./adminlog');
 const announce = require('./announce');
 const setupCmd = require('./setup');
+const points = require('./points');
+const banner = require('./panelBanner');
 
 const catalogCommand = new SlashCommandBuilder().setName('catalog').setDescription('Catalogul de crafting pe categorii').setContexts(0);
 
@@ -25,11 +28,12 @@ const panelCommand = new SlashCommandBuilder().setName('panou').setDescription('
     { name: 'Evenimente', value: 'sesiuni' },
   ));
 
-const list = [craft.command, catalogCommand, panelCommand, announce.command, setupCmd.command];
+const list = [craft.command, catalogCommand, panelCommand, announce.command, setupCmd.command, ...points.commands];
 
 async function handleInteraction(interaction, client) {
   if (await announce.handleInteraction(interaction, client)) return true;
   if (await setupCmd.handleInteraction(interaction, client)) return true;
+  if (await points.handleInteraction(interaction, client)) return true;
   if (!interaction.isChatInputCommand?.()) return false;
 
   if (interaction.commandName === 'catalog') {
@@ -48,7 +52,7 @@ async function handleInteraction(interaction, client) {
     if (!channel) { await interaction.reply({ content: 'Nu pot scrie aici.', ephemeral: true }); return true; }
     await interaction.deferReply({ ephemeral: true });
     try {
-      if (tip === 'craft') await channel.send(craft.panelPayload());
+      if (tip === 'craft') await channel.send(banner.withBanner(craft.panelPayload()));
       else if (tip === 'razie') await raziiUi.createPanel(client, channel);
       else if (tip === 'sesiuni') {
         store.setConfig(interaction.guildId, { sessionsId: channel.id });

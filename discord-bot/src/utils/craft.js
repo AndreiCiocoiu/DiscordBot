@@ -5,6 +5,7 @@
 // Panel buttons: Catalog (weapons per category, with arrows) and Calculator (several weapons at once).
 // The answer has the same sections as the website: ORDER, MATERIALS, MADE ON THE WAY, ORE, CRAFT ORDER.
 const fs = require('fs');
+const banner = require('./panelBanner');
 const path = require('path');
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, PermissionFlagsBits,
@@ -196,7 +197,7 @@ function lookup(query, qty, who) {
 function panelPayload() {
   const embed = new EmbedBuilder().setColor(COLOR).setTitle('Crafting')
     .setDescription('**Catalog**: armele pe categorii, cu săgeți stânga/dreapta.\n**Calculator**: scrii armele și cantitățile și primești materialele, minereul de adunat și ordinea de craft.\nPoți folosi și `/craft Revolver Cattleman 2`.')
-    .setFooter({ text: `${data().weapons.length} arme` });
+    .setImage(banner.URL).setFooter({ text: `${data().weapons.length} arme` });
   return { embeds: [embed], components: [row(btn('cr:open', 'Catalog', ButtonStyle.Success), btn('cr:calc', 'Calculator'))], allowedMentions: NO_PING };
 }
 
@@ -316,7 +317,7 @@ async function handleMessage(message, client) {
 
   if (arg.toLowerCase() === 'panou') {
     if (!message.member?.permissions.has(PermissionFlagsBits.ManageGuild)) return;
-    await message.channel.send(panelPayload());
+    await message.channel.send(banner.withBanner(panelPayload()));
     adminlog.action(client, message.guild.id, 'Craft: panou postat', `În ${message.channel}`, message.author.id);
     if (!(await message.delete().then(() => true).catch(() => false))) await message.react('✅').catch(() => {});
     return;

@@ -22,6 +22,18 @@ When someone joins, the bot posts in the welcome channel an embed with an **anim
 ## Events (formerly Sessions)
 In the evenimente channel press **Planifica eveniment**: what you play + when (`azi 21:00`, `maine 20:30`, `sambata 22:00`, `28.10 21:00`) + optional details. The bot posts one message with **Vin / Poate / Nu vin** (press again to take it back) and posts a western parchment sheet with a hidden `||@everyone||` (grey bar that still pings); the @Evenimente role stays for reminders (an old @Sesiuni role is renamed automatically). 30 minutes before it pings everyone who said Vin or Poate. The host or an admin can cancel it. The message is deleted 3 hours after the start. Times show in everyone's own time zone.
 
+## Banda: ranguri și puncte (Sahara Cartel)
+Evidența membrilor (Angajat, Asociat, Membru) și puncte pe săptămână. Configurare: `/setup puncte` (canalul unde se postează clasamentul duminică), apoi setările cu `/banda config`.
+- **Cine dă puncte**: adminii și rolurile numite **Lider** / **Co-Lider** (sau rolurile alese cu `/banda config rol_lider rol_colider`).
+- `/add <rang> @nume` adaugă pe cineva; botul ține data intrării și a fiecărui rang. Dacă există roluri Discord numite Angajat / Asociat / Membru, le pune/scoate singur.
+- `/puncte da @nume <mină|task|prezență|organizat|bonus> [cantitate] [nota] [si: @a @b]` dă puncte (mai multe persoane odată cu `si`); `/puncte anuleaza <id>` șterge o intrare din săptămâna curentă. Toate se scriu în adminlog.
+- **Voice**: automat, 1 minut pe minut cât ești pe voice cu cel puțin încă o persoană, fără deafen, în afara canalului AFK. Valoare implicită 2 puncte/oră, maxim 40/săptămână.
+- Valori implicite: mină 10, task 10, prezență eveniment 5, eveniment organizat 15. Praguri pe săptămână: Membru 100, Asociat 60. Locuri: Membru 10, Asociat 4. Toate se schimbă din `/banda config`.
+- **Săptămâna**: luni 00:00 – duminică 23:59, ora Europe/Bucharest. Duminică la miezul nopții botul arhivează săptămâna, pornește de la zero și postează clasamentul. `/clasament saptamana:45` arată orice săptămână veche.
+- **Insigna**: pentru a ține Asociat/Membru ai nevoie de pragul rangului. După 2 săptămâni la rând sub prag (`toleranta`) ești retrogradat automat cu un rang (poate fi oprit cu `retrogradare:false`). Săptămâna în care ai intrat sau ai schimbat rangul și concediile (`/banda concediu @nume zile`) nu dau avertismente.
+- **Avansare**: `/banda rang @nume <rang>` cere pragul rangului țintă 2 săptămâni la rând și un loc liber (adminii pot ocoli cu `forta:true`). Clasamentul de duminică arată cine poate avansa.
+- `/profil [@nume]` arată rangul, vechimea, punctele din săptămâna asta și ultimele săptămâni; `/banda lista` arată cine e în bandă și locurile. Datele sunt în `points.json` din volumul `/app/data`.
+
 ## Admin log
 Everything goes to the private adminlog: joins (account age, invite used), leaves, kicks, bans/unbans, nickname/role/timeout changes (with who did it), deleted/edited messages (with content), bulk deletes (attached as a text file), channel/role/server/emoji/sticker changes, invites, threads, webhooks, voice join/leave/move/mute/stream, AutoMod hits, and what the bot itself does (razie, sessions, welcome, setup). Messages sent before the bot started can't show their old content.
 
