@@ -61,3 +61,17 @@ To add a weapon, copy a block in `weapons`; to change a rule (yield, ore per cra
 
 ## Env
 Only `DISCORD_TOKEN`. Optional: `RAZIE_MINUTES` (180), `RAZIE_WARN_MINUTES` (10), `DATA_DIR`.
+
+### Anunțuri de pe site
+
+În pagina Lideri, adminii au panoul „Postează un anunț": aleg canalul (orice canal în care botul are Send Messages și Attach Files), titlul, mesajul și dacă dă `@everyone`. Botul postează aceeași foaie de pergament ca `/anunt`, semnată cu numele celui logat, iar acțiunea apare în adminlog.
+
+### Crafting
+
+Țeava Metalică se calculează integral (1 Oțel fiecare), fără țeavă gratuită. Cantitatea se scrie direct în căsuță, până la 1000 de bucăți pe armă.
+
+### Carte de identitate
+
+În profilul unui om (pagina Banda), liderii pot încărca un screenshot cu buletinul din joc, ca dovadă. Poza e micșorată în browser, salvată în `ids/` din volumul `/app/data` și o văd doar liderii. Se șterge singură când omul e scos din bandă.
+
+Pagina Lideri e împărțită pe secțiuni: Puncte, Bandă, Anunț, Setări (ultimele două doar pentru admini).

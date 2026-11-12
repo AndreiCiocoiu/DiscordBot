@@ -4,7 +4,7 @@
 const RANKS = ['membru', 'asociat', 'angajat'];
 const RANK_NAME = { angajat: 'Angajat', asociat: 'Asociat', membru: 'Membru' };
 const TYPE_LABEL = { mina: 'Mină', task: 'Task', prezenta: 'Prezență eveniment', organizat: 'Eveniment organizat', voice: 'Voice', bonus: 'Bonus' };
-const S = { state: null, authed: null, craft: null, week: 'curenta', weekData: null, order: new Map(), tab: '', anim: true };
+const S = { state: null, authed: null, craft: null, week: 'curenta', weekData: null, order: new Map(), tab: '', ltab: 'puncte', anim: true };
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 
@@ -27,6 +27,33 @@ const svg = (tag, attrs, ...kids) => {
   for (const kid of kids.flat(Infinity)) if (kid != null) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
   return el;
 };
+
+// ---- icons ---------------------------------------------------------------
+
+const ICONS = {
+  trophy: 'M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3V3zm0 4H6v1c0 .7.4 1.4 1 1.7V7zm10 0v2.7c.6-.3 1-1 1-1.7V7h-1z',
+  people: 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm7.5 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 19c0-3.3 3.1-6 7-6s7 2.7 7 6v1H2v-1zm15.9 1v-1c0-1.9-.8-3.6-2-4.9l.6-.1c3 0 5.5 2.2 5.5 5v1h-4.1z',
+  tools: 'M14.5 2.5a5 5 0 0 0-4.6 7L3 16.4a2 2 0 0 0 0 2.8l1.8 1.8a2 2 0 0 0 2.8 0l6.9-6.9a5 5 0 0 0 6.7-6.2l-3 3-2.6-.5-.5-2.6 3-3a5 5 0 0 0-3.6-2.300zM5.5 17a1 1 0 1 1 0 2 1 1 0 0 1 0-2z',
+  crown: 'M3 18h18v2.500H3V18zM2.5 7l5 4L12 4.5 16.5 11l5-4-1.7 9.500H4.200L2.5 7z',
+  user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-8 8c0-3.9 3.6-7 8-7s8 3.1 8 7v1H4v-1z',
+  flag: 'M5 3h2v18H5V3zm3 1h11l-2.5 4L19 12H8V4z',
+  repeat: 'M17 2l4 4-4 4V7H8a3 3 0 0 0-3 3v1H3v-1a5 5 0 0 1 5-5h9V2zM7 22l-4-4 4-4v3h9a3 3 0 0 0 3-3v-1h2v1a5 5 0 0 1-5 5H7v3z',
+  note: 'M6 2h9l5 5v15H6V2zm8 1.800V8h4.200L14 3.800zM9 12v1.600h8V12H9zm0 4v1.600h8V16H9z',
+  check: 'M9.2 16.2 4.9 11.9 3 13.800l6.2 6.200L21 8.200l-1.9-1.900z',
+  horn: 'M3 9.500v5h3l1.8 6h2.700l-1.6-6H11l7 4V5.500l-7 4H3zm17-.800v6.600a3.8 3.8 0 0 0 0-6.600z',
+  plus: 'M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z',
+  list: 'M4 5h16v2H4V5zm0 6h16v2H4v-2zm0 6h16v2H4v-2z',
+  sliders: 'M4 6h9v2H4zM15 4h2v6h-2zM19 6h1v2h-1zM4 16h3v2H4zM9 14h2v6H9zM13 16h7v2h-7z',
+  shield: 'M12 2l8 3v6c0 5-3.4 9-8 11-4.6-2-8-6-8-11V5l8-3z',
+  hash: 'M9 3h2l-.500 5h4l.500-5h2l-.500 5H20v2h-3.700l-.400 4H19v2h-3.300l-.500 5h-2l.500-5h-4l-.500 5h-2l.500-5H4v-2h3.700l.400-4H5V8h3.300L9 3zm1.3 7-.400 4h4l.400-4h-4z',
+  text: 'M4 4h16v3h-2V6h-5v12h2v2H9v-2h2V6H6v1H4V4z',
+  cart: 'M3 4h2.600l.800 3H21l-2 8H8.200l.500 2H19v2H7.200L4.1 6H3V4zm5 17.500a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
+};
+const icon = (name, size = 20) => svg('svg', { class: 'ico', viewBox: '0 0 24 24', width: size, height: size, 'aria-hidden': 'true' }, svg('path', { d: ICONS[name], 'fill-rule': 'evenodd' }));
+const lab = (ic, text, forId) => h('label', forId ? { for: forId } : null, icon(ic, 18), text);
+// panel heading: round icon, gold title, one line under it, optional control on the right
+const title = (ic, text, sub, side) => h('div', { class: 'title' }, h('span', { class: 'title-ico' }, icon(ic, 28)),
+  h('div', { class: 'title-text' }, h('h2', { text }), sub ? h('p', { text: sub }) : null), side ? h('div', { class: 'side' }, side) : null);
 
 // ---- helpers -------------------------------------------------------------
 
@@ -116,7 +143,7 @@ async function loadCraft() {
 
 // ---- shell ---------------------------------------------------------------
 
-const TABS = [['clasament', 'Clasament'], ['banda', 'Banda'], ['crafting', 'Crafting'], ['lideri', 'Lideri']];
+const TABS = [['clasament', 'Clasament', 'trophy'], ['banda', 'Banda', 'people'], ['crafting', 'Crafting', 'tools'], ['lideri', 'Lideri', 'crown']];
 function route() { const t = location.hash.replace(/^#\/?/, '').split('/')[0]; return TABS.some(([k]) => k === t) ? t : 'clasament'; }
 
 function shell() {
@@ -129,7 +156,7 @@ function shell() {
   }
   if (nav.dataset.key !== String(m.leader)) {
     nav.dataset.key = String(m.leader);
-    nav.replaceChildren(...TABS.filter(([k]) => k !== 'lideri' || m.leader).map(([k, label], i) => h('a', { href: `#/${k}`, 'data-k': k, style: { '--i': i } }, h('span', { class: 'sign', text: label }))));
+    nav.replaceChildren(...TABS.filter(([k]) => k !== 'lideri' || m.leader).map(([k, label, ic]) => h('a', { href: `#/${k}`, 'data-k': k }, icon(ic, 22), h('span', { text: label }))));
   }
   const tab = route();
   for (const a of nav.children) { if (a.dataset.k === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
@@ -142,10 +169,10 @@ function render() {
   shell();
   if (S.authed === null) return view.replaceChildren();
   if (!S.authed) return view.replaceChildren(sheet(h('div', { class: 'login' },
-    h('h2', { text: 'Doar pentru banda' }),
+    h('h2', { text: 'Doar pentru bandă' }),
     h('p', { text: 'Intră cu contul tău de Discord. Dacă ești pe serverul Sahara Cartel, vezi clasamentul, banda și calculatorul de crafting.' }),
-    h('a', { class: 'btn', href: '/auth/login' }, 'Intră cu Discord'))));
-  if (!S.state) return view.replaceChildren(sheet(h('h2', { text: 'Nu pot încărca datele' }), h('p', { text: 'Botul nu răspunde acum. Reîncarcă pagina peste un minut.' })));
+    h('a', { class: 'btn big', href: '/auth/login' }, 'Intră cu Discord'))));
+  if (!S.state) return view.replaceChildren(sheet(title('shield', 'Nu pot încărca datele', 'Botul nu răspunde acum. Reîncarcă pagina peste un minut.')));
   const tab = route();
   document.title = `${TABS.find(([k]) => k === tab)[1]} - Sahara Cartel`;
   const pages = { clasament: pageBoard, banda: pageRoster, crafting: pageCraft, lideri: pageLeaders };
@@ -169,24 +196,40 @@ function pageBoard() {
     ? st.members.map((m) => ({ id: m.id, name: m.name, avatar: m.avatar, rank: m.rank, t: m.points })).sort((a, b) => b.t - a.t)
     : S.weekData.rows;
   const prag = cur ? st.cfg.prag : S.weekData.prag;
-  const title = cur ? `Săptămâna ${st.week.no}` : `Săptămâna ${S.weekData.no}`;
+  const title_ = cur ? `Săptămâna ${st.week.no}` : `Săptămâna ${S.weekData.no}`;
   const sub = cur ? `Se închide peste ${countdown(st.week.end)}, duminică la miezul nopții.` : `Încheiată pe ${fmtDate(S.weekData.end - 1)}.`;
   const sel = h('select', { 'aria-label': 'Alege săptămâna', onchange: async (e) => { S.week = e.target.value; S.anim = true; if (S.week === 'curenta') render(); else await loadWeek(S.week); } },
     h('option', { value: 'curenta', selected: cur }, 'Săptămâna curentă'),
     st.archive.map((w) => h('option', { value: w.no, selected: !cur && String(S.week) === String(w.no) }, `Săptămâna ${w.no} (încheiată)`)));
-  const list = rows.length ? h('ol', { class: 'board' }, rows.map((r, i) => {
-    const p = prag[r.rank] || 0, held = p && r.t >= p;
-    return h('li', { style: { '--i': i } }, h('button', { type: 'button', onclick: () => openProfile(r.id) },
-      h('span', { class: 'pos', text: i + 1 }), avatar(r),
+  const held = (r) => { const p = prag[r.rank] || 0; return p && r.t >= p; };
+
+  // the first three of the week
+  const K = [1, 0, 2];
+  const poster = (r, i) => h('div', { class: `slot s${i + 1}`, style: { '--k': K[i] } },
+    h('button', { type: 'button', class: 'card', style: { '--k': K[i] }, onclick: () => openProfile(r.id) },
+      h('span', { class: 'seal', text: i + 1 }),
+      h('span', { class: 'photo' }, avatar(r, 120)),
+      h('span', { class: 'nm', text: r.name }),
+      h('span', { class: 'rk', text: `${RANK_NAME[r.rank]}${held(r) ? ', insigna ținută' : ''}` }),
+      h('span', { class: 'reward' }, h('span', { 'data-count': r.t, 'data-i': i, text: r.t }), h('small', { text: 'puncte' }))));
+
+  const rest = rows.slice(3);
+  const ledger = h('ol', { class: 'board', start: 4 }, rest.map((r, j) => {
+    const p = prag[r.rank] || 0, ok = held(r);
+    return h('li', { style: { '--i': j } }, h('button', { type: 'button', onclick: () => openProfile(r.id) },
+      h('span', { class: 'pos', text: j + 4 }), avatar(r),
       h('span', { class: 'who' }, h('b', { text: r.name }), h('span', { text: RANK_NAME[r.rank] })),
-      h('span', { class: `meter${held ? ' ok' : ''}`, style: { '--i': i }, 'aria-label': p ? `${r.t} din ${p} puncte` : `${r.t} puncte` },
-        p ? h('span', { class: 'track', style: {} }, h('span', { class: 'fill', style: { display: 'block', width: `${Math.min(100, (100 * r.t) / p)}%` } })) : null,
-        h('span', { class: 'num', 'data-count': r.t, 'data-i': i, 'data-post': p ? ` din ${p}${held ? ', insigna ținută' : ''}` : ' puncte', text: p ? `${r.t} din ${p}${held ? ', insigna ținută' : ''}` : `${r.t} puncte` }))));
-  })) : h('p', { class: 'empty muted', text: 'Nimeni nu e în evidență încă. Un lider poate adăuga oameni din secțiunea Lideri sau cu /add pe Discord.' });
-  return sheet(
-    h('div', { class: 'head' }, h('div', null, h('h2', { text: title }), h('p', { class: 'muted', text: sub })), sel),
+      h('span', { class: `meter${ok ? ' ok' : ''}`, style: { '--i': j }, 'aria-label': p ? `${r.t} din ${p} puncte` : `${r.t} puncte` },
+        p ? h('span', { class: 'track' }, h('span', { class: 'fill', style: { display: 'block', width: `${Math.min(100, (100 * r.t) / p)}%` } })) : null,
+        h('span', { class: 'num', 'data-count': r.t, 'data-i': j + 3, 'data-post': p ? ` din ${p}${ok ? ', insigna ținută' : ''}` : ' puncte', text: p ? `${r.t} din ${p}${ok ? ', insigna ținută' : ''}` : `${r.t} puncte` }))));
+  }));
+
+  const body = rows.length
+    ? [h('div', { class: 'podium' }, rows.slice(0, 3).map(poster)), rest.length ? ledger : null]
+    : h('p', { class: 'empty muted', text: 'Nimeni nu e în evidență încă. Un lider poate adăuga oameni din secțiunea Lideri sau cu /add pe Discord.' });
+  return sheet(title('trophy', title_, sub, sel),
     h('p', { class: 'small muted', text: `Insigna de Membru se ține cu ${prag.membru} puncte pe săptămână, cea de Asociat cu ${prag.asociat}. Angajații nu au prag.` }),
-    list);
+    body);
 }
 
 // ---- roster --------------------------------------------------------------
@@ -194,8 +237,7 @@ function pageBoard() {
 function pageRoster() {
   const st = S.state;
   return sheet(
-    h('h2', { text: 'Banda' }),
-    h('p', { class: 'muted', text: `${plural(st.members.length, 'om', 'oameni')} în evidență. Apasă pe cineva ca să-i vezi profilul.` }),
+    title('people', 'Banda', `${plural(st.members.length, 'om', 'oameni')} în evidență. Apasă pe cineva ca să-i vezi profilul.`),
     RANKS.map((r) => {
       const people = st.members.filter((m) => m.rank === r).sort((a, b) => a.rankSince - b.rankSince);
       const [used, max] = st.seats[r];
@@ -248,10 +290,10 @@ function historyChart(m) {
   const W = 440, H = 150, pad = 54, bw = Math.min(40, (W - pad) / weeks.length - 8);
   const g = svg('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Puncte pe ultimele ${weeks.length} săptămâni` });
   const y = (v) => H - 22 - ((H - 40) * v) / max;
-  if (prag) { g.append(svg('line', { x1: pad - 4, x2: W, y1: y(prag), y2: y(prag), stroke: '#7a2a1e', 'stroke-dasharray': '5 4', 'stroke-width': 1.4 }), svg('text', { x: 0, y: y(prag) + 4, 'text-anchor': 'start' }, `prag ${prag}`)); }
+  if (prag) { g.append(svg('line', { x1: pad - 4, x2: W, y1: y(prag), y2: y(prag), stroke: '#d0563a', 'stroke-dasharray': '5 4', 'stroke-width': 1.4 }), svg('text', { x: 0, y: y(prag) + 4, 'text-anchor': 'start' }, `prag ${prag}`)); }
   weeks.forEach((w, i) => {
     const x = pad + i * ((W - pad) / weeks.length) + 4, held = prag && w.t >= (w.prag?.[w.rank] ?? prag);
-    const bar = svg('rect', { x, y: y(w.t), width: bw, height: Math.max(2, H - 22 - y(w.t)), fill: held ? '#d9a441' : '#c8702a', stroke: '#3a2412', 'stroke-width': 1 });
+    const bar = svg('rect', { x, y: y(w.t), width: bw, height: Math.max(2, H - 22 - y(w.t)), fill: held ? '#e2b455' : '#8f5a22', stroke: '#120a05', 'stroke-width': 1 });
     bar.style.setProperty('--i', i);
     g.append(bar,
       svg('text', { x: x + bw / 2, y: y(w.t) - 4, 'text-anchor': 'middle' }, w.t),
@@ -271,7 +313,7 @@ function openProfile(id) {
     h('div', { class: 'profile-head' }, avatar(m, 76),
       h('h2', { text: m.name }),
       h('p', { class: 'rank-line' }, badgeSvg(m.rank, 30), h('span', { text: RANK_NAME[m.rank] })),
-      h('div', { class: 'flourish', 'aria-hidden': 'true' }, h('span', { text: '\u2605' }))),
+      h('div', { class: 'flourish', 'aria-hidden': 'true' }, h('span', { text: '\u25c6' }))),
     h('dl', { class: 'facts' },
       h('dt', { text: 'În bandă' }), h('dd', { text: `${dayText(daysSince(m.since))}, din ${fmtDate(m.since)}` }),
       h('dt', { text: 'Rang' }), h('dd', { text: `${RANK_NAME[m.rank]} ${dayText(daysSince(m.rankSince))}` }),
@@ -285,11 +327,41 @@ function openProfile(id) {
   kids.push(h('h3', { text: 'Puncte săptămâna asta' }), breakdown.length ? h('ul', { class: 'breakdown' }, breakdown) : h('p', { class: 'small muted', text: 'Încă nimic.' }));
   kids.push(h('h3', { text: 'Ultimele săptămâni' }), historyChart(m));
   if (m.next) kids.push(h('h3', { text: `Avansare la ${RANK_NAME[m.next]}` }), h('p', { class: 'small', text: m.canPromote ? 'Îndeplinește condițiile și există loc liber.' : m.why }));
-  if (st.me.leader) kids.push(leaderTools(m));
+  if (st.me.leader) kids.push(idSection(m), leaderTools(m));
   d.replaceChildren(closeBtn, h('div', { class: 'drawer-inner' }, h('div', { class: 'poster' }, ...kids)));
   d.hidden = false; $('#scrim').hidden = false; d.querySelector('.drawer-inner').scrollTop = 0;
   countUp(d, 650);
   closeBtn.focus();
+}
+
+// identity card: the in-game ID as a screenshot, kept as proof. Leaders only.
+function idSection(m) {
+  const file = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp', hidden: true });
+  const pick = h('button', { class: 'btn alt small', type: 'button', onclick: () => file.click() }, m.idCard ? 'Schimbă poza' : 'Adaugă poza');
+  file.addEventListener('change', async () => {
+    const f = file.files[0];
+    if (!f) return;
+    pick.disabled = true; pick.textContent = 'Se încarcă…';
+    let blob = f;
+    try { // shrink big screenshots in the browser, so the upload is small
+      const bmp = await createImageBitmap(f), k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+      const cv = h('canvas', { width: Math.round(bmp.width * k), height: Math.round(bmp.height * k) });
+      cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+      blob = await new Promise((ok) => cv.toBlob((b) => ok(b || f), 'image/jpeg', 0.86));
+    } catch { /* send the original */ }
+    const res = await fetch(`/api/idcard?u=${m.id}`, { method: 'POST', headers: { 'Content-Type': blob.type || 'application/octet-stream' }, body: blob }).catch(() => null);
+    const data = res ? await res.json().catch(() => ({})) : {};
+    toast(data.msg || data.error || 'Nu am putut încărca poza.', !res?.ok);
+    if (res?.ok) { await refresh(); openProfile(m.id); } else { pick.disabled = false; pick.textContent = m.idCard ? 'Schimbă poza' : 'Adaugă poza'; }
+  });
+  const src = m.idCard ? `/api/idcard?u=${m.id}&t=${m.idCard.at}` : null;
+  return h('div', { class: 'idcard' },
+    h('h3', { text: 'Carte de identitate' }),
+    m.idCard
+      ? [h('a', { href: src, target: '_blank', rel: 'noopener', 'aria-label': 'Deschide poza mare' }, h('img', { src, alt: `Cartea de identitate a lui ${m.name}`, loading: 'lazy' })),
+        h('p', { class: 'small muted', text: `Adăugată pe ${fmtDate(m.idCard.at)}${m.idCard.byName ? ` de ${m.idCard.byName}` : ''}. O văd doar liderii.` })]
+      : h('p', { class: 'small muted', text: 'Nu are încă. Pune un screenshot cu buletinul din joc, ca dovadă. Îl văd doar liderii.' }),
+    h('p', null, pick, ' ', m.idCard ? h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Ștergi cartea de identitate a lui ${m.name}?`)) act('/api/idcard/remove', { userId: m.id }, () => openProfile(m.id)); } }, 'Șterge') : null, file));
 }
 
 function leaderTools(m) {
@@ -333,14 +405,14 @@ function paintResult() {
   if (!box) return;
   box.replaceChildren();
   const r = calcResult;
-  if (!r || !r.orders?.length) return box.append(h('p', { class: 'small muted', text: 'Adaugă arme din listă și apar materialele, minereul de adunat și ordinea de craft.' }));
+  if (!r || !r.orders?.length) return box.append(h('p', { class: 'small muted', text: 'Adaugă arme din listă. Cantitatea o poți scrie direct în căsuță.' }));
   const dl = (title, pairs) => pairs?.length ? [h('h3', { text: title }), h('dl', null, pairs.map(([n, q]) => [h('dt', { text: n }), h('dd', { text: q })]))] : [];
   box.append(...dl('Materiale necesare', r.materials), ...dl('Făcute pe parcurs', r.onTheWay), ...dl('Minereu de adunat', r.ore),
     h('h3', { text: 'Ordinea de craft' }), h('ol', null, r.order.map((o) => h('li', null, h('b', { text: o.title }), ` - ${o.text}`))));
 }
 
 function setQty(name, q) {
-  if (q <= 0) S.order.delete(name); else S.order.set(name, Math.min(200, q));
+  if (!(q > 0)) S.order.delete(name); else S.order.set(name, Math.min(1000, Math.floor(q)));
   const list = document.getElementById('order');
   if (list) list.replaceWith(orderList());
   runCalc();
@@ -351,7 +423,7 @@ function orderList() {
   for (const [name, q] of S.order) {
     box.append(h('div', { class: 'order-item' }, h('span', { text: name }), h('span', { class: 'qty' },
       h('button', { type: 'button', 'aria-label': `Mai puțin ${name}`, onclick: () => setQty(name, q - 1) }, '−'),
-      h('output', { text: q }),
+      h('input', { type: 'number', inputmode: 'numeric', min: 1, max: 1000, value: q, 'aria-label': `Câte ${name}`, onchange: (e) => setQty(name, Number(e.target.value) || 1), onfocus: (e) => e.target.select() }),
       h('button', { type: 'button', 'aria-label': `Mai mult ${name}`, onclick: () => setQty(name, q + 1) }, '+'))));
   }
   box.append(h('p', null, h('button', { class: 'btn alt small', type: 'button', onclick: () => { S.order.clear(); setQty('', 0); } }, 'Golește comanda')));
@@ -359,8 +431,8 @@ function orderList() {
 }
 
 function pageCraft() {
-  if (!S.craft) return sheet(h('h2', { text: 'Crafting' }), h('p', { class: 'muted', text: 'Se încarcă rețetele…' }));
-  const q = h('input', { type: 'text', id: 'c-q', placeholder: 'Caută o armă', 'aria-label': 'Caută o armă', autocomplete: 'off' });
+  if (!S.craft) return sheet(title('tools', 'Crafting', 'Se încarcă rețetele…'));
+  const q = h('input', { type: 'text', class: 'search', id: 'c-q', placeholder: 'Caută o armă', 'aria-label': 'Caută o armă', autocomplete: 'off' });
   const catalog = h('div', { id: 'catalog' });
   const paint = () => {
     const term = q.value.trim().toLowerCase();
@@ -377,15 +449,16 @@ function pageCraft() {
   };
   q.addEventListener('input', paint); paint();
   queueMicrotask(() => { paintResult(); });
-  return sheet(h('div', { class: 'craft' },
-    h('div', null, h('h2', { text: 'Crafting' }), q, catalog),
-    h('aside', null, h('h2', { text: 'Comanda ta' }), orderList(), h('div', { id: 'result', class: 'result' }))));
+  return sheet(title('tools', 'Crafting', 'Adaugă armele, scrie câte vrei din fiecare și primești materialele, minereul și ordinea de craft.'),
+    h('div', { class: 'craft' },
+      h('div', null, q, catalog),
+      h('aside', null, h('h3', { text: 'Comanda ta' }), orderList(), h('div', { id: 'result', class: 'result' }))));
 }
 
 // ---- leaders -------------------------------------------------------------
 
 function picker({ title, multi, onChange, remote }) {
-  const picked = new Map(), input = h('input', { type: 'text', placeholder: remote ? 'Caută pe server (min. 2 litere) sau lipește ID-ul' : 'Caută în bandă', autocomplete: 'off' });
+  const picked = new Map(), input = h('input', { type: 'text', class: 'search', placeholder: remote ? 'Caută pe server (min. 2 litere) sau lipește ID-ul' : 'Caută în bandă', autocomplete: 'off' });
   const chips = h('div', { class: 'chips' }), sug = h('ul', { class: 'suggest', hidden: true }), note = h('p', { class: 'small muted', hidden: true });
   const paintChips = () => {
     chips.replaceChildren(...[...picked].map(([id, name]) => h('span', { class: 'chip' }, name, h('button', { type: 'button', 'aria-label': `Scoate ${name}`, onclick: () => { picked.delete(id); paintChips(); } }, '×'))));
@@ -413,7 +486,7 @@ function picker({ title, multi, onChange, remote }) {
     }
   });
   if (!remote) input.addEventListener('focus', () => input.dispatchEvent(new Event('input')));
-  const el = h('div', null, h('label', { text: title }), chips, input, sug, note);
+  const el = h('div', null, lab('user', title), chips, input, sug, note);
   return { el, ids: () => [...picked.keys()], clear: () => { picked.clear(); paintChips(); } };
 }
 
@@ -422,8 +495,8 @@ function pageLeaders() {
   const give = picker({ title: 'Cine primește', multi: true, onChange: () => {} });
   const type = h('select', { id: 'p-type' }, st.types.map((t) => h('option', { value: t.value }, `${t.label}${t.pts != null ? ` (${t.pts} puncte)` : ''}`)));
   const qty = h('input', { type: 'number', id: 'p-qty', value: 1, min: -500, max: 500 });
-  const qtyLabel = h('label', { for: 'p-qty', text: 'De câte ori' });
-  type.addEventListener('change', () => { qtyLabel.textContent = type.value === 'bonus' ? 'Puncte (poate fi negativ)' : 'De câte ori'; });
+  const qtyText = h('span', { text: 'De câte ori' }), qtyLabel = h('label', { for: 'p-qty' }, icon('repeat', 18), qtyText);
+  type.addEventListener('change', () => { qtyText.textContent = type.value === 'bonus' ? 'Puncte (poate fi negativ)' : 'De câte ori'; });
   const note = h('input', { type: 'text', id: 'p-note', maxlength: 100, placeholder: 'Motiv, opțional' });
 
   const add = picker({ title: 'Persoana de adăugat', multi: false, remote: true, onChange: () => {} });
@@ -436,49 +509,96 @@ function pageLeaders() {
       h('td', null, h('button', { class: 'btn alt small', type: 'button', onclick: () => { if (confirm(`Anulezi #${e.id}: ${e.userName} ${e.pts > 0 ? '+' : ''}${e.pts} ${e.label}?`)) act('/api/undo', { id: e.id }); } }, 'Anulează'))))))
     : h('p', { class: 'small muted', text: 'Nu s-au dat puncte manual săptămâna asta.' });
 
-  const out = [
-    sheet(h('h2', { text: 'Dă puncte' }),
-      h('p', { class: 'muted', text: 'Voice-ul se adaugă singur. Aici dai minat, task-uri, prezențe, evenimente organizate și bonusuri.' }),
-      give.el,
-      h('div', { class: 'row' }, h('div', null, h('label', { for: 'p-type', text: 'Activitate' }), type), h('div', null, qtyLabel, qty), h('div', { class: 'grow' }, h('label', { for: 'p-note', text: 'Notă' }), note)),
-      h('p', null, h('button', { class: 'btn', type: 'button', onclick: async () => {
-        const ok = await act('/api/give', { userIds: give.ids(), type: type.value, qty: Number(qty.value), note: note.value });
-        if (ok) { give.clear(); note.value = ''; }
-      } }, 'Dă puncte'))),
-    sheet(h('h2', { text: 'Adaugă în bandă' }), add.el,
-      h('label', { for: 'a-rank', text: 'Rang' }), rank,
-      h('p', null, h('button', { class: 'btn', type: 'button', onclick: async () => {
-        const id = add.ids()[0];
-        if (!id) return toast('Alege mai întâi persoana.', true);
-        if (await act('/api/add', { userId: id, rank: rank.value })) add.clear();
-      } }, 'Adaugă în bandă'))),
-    sheet(h('h2', { text: 'Puncte date săptămâna asta' }), log),
-  ];
-  if (st.me.admin) out.push(configSheet());
-  return out;
+  const tabs = [['puncte', 'Puncte', 'trophy'], ['banda', 'Bandă', 'plus'], ...(st.me.admin ? [['anunt', 'Anunț', 'horn'], ['setari', 'Setări', 'sliders']] : [])];
+  if (!tabs.some(([k]) => k === S.ltab)) S.ltab = 'puncte';
+  const bar = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Secțiuni pentru lideri' }, tabs.map(([k, label, ic]) =>
+    h('button', { type: 'button', role: 'tab', 'aria-selected': String(S.ltab === k), onclick: () => { if (S.ltab !== k) { S.ltab = k; S.anim = true; render(); } } }, icon(ic, 18), label)));
+  const panels = {
+    puncte: () => [
+      sheet(title('trophy', 'Dă puncte', 'Voice-ul se adaugă singur. Aici dai minat, task-uri, prezențe, evenimente organizate și bonusuri.'),
+        give.el,
+        h('div', { class: 'row' }, h('div', null, lab('flag', 'Activitate', 'p-type'), type), h('div', null, qtyLabel, qty), h('div', { class: 'grow' }, lab('note', 'Notă', 'p-note'), note)),
+        h('p', { class: 'center' }, h('button', { class: 'btn big', type: 'button', onclick: async () => {
+          const ok = await act('/api/give', { userIds: give.ids(), type: type.value, qty: Number(qty.value), note: note.value });
+          if (ok) { give.clear(); note.value = ''; }
+        } }, icon('check', 22), 'Dă puncte'))),
+      sheet(title('list', 'Puncte date săptămâna asta'), h('div', { class: 'scroll' }, log))],
+    banda: () => [
+      sheet(title('plus', 'Adaugă în bandă', 'Caută omul pe server și alege rangul cu care intră. Rangul, concediul și cartea de identitate le schimbi din profilul lui, în pagina Banda.'), add.el,
+        lab('shield', 'Rang', 'a-rank'), rank,
+        h('p', { class: 'center' }, h('button', { class: 'btn', type: 'button', onclick: async () => {
+          const id = add.ids()[0];
+          if (!id) return toast('Alege mai întâi persoana.', true);
+          if (await act('/api/add', { userId: id, rank: rank.value })) add.clear();
+        } }, icon('plus', 20), 'Adaugă în bandă')))],
+    anunt: () => [announceSheet()],
+    setari: () => [configSheet()],
+  };
+  return [bar, ...panels[S.ltab]()];
+}
+
+// post an announcement (the parchment sheet from /anunt) in any channel the bot can write in
+function announceSheet() {
+  const ch = h('select', { id: 'an-ch', disabled: true }, h('option', { value: '' }, 'Se încarcă canalele…'));
+  const ttl = h('input', { type: 'text', id: 'an-title', maxlength: 40, placeholder: 'ANUNȚ' });
+  const count = h('span', { class: 'count', text: '0 din 900' });
+  const txt = h('textarea', { id: 'an-text', maxlength: 900, placeholder: 'Scrie mesajul aici', oninput: () => { count.textContent = `${txt.value.length} din 900`; } });
+  const ping = h('input', { type: 'checkbox', id: 'an-ping' });
+  api('/api/channels').then((r) => {
+    const list = r.ok ? r.data.channels : [];
+    if (!list.length) { ch.replaceChildren(h('option', { value: '' }, 'Botul nu poate scrie în niciun canal')); return; }
+    const groups = new Map();
+    for (const c of list) { if (!groups.has(c.group)) groups.set(c.group, []); groups.get(c.group).push(c); }
+    ch.replaceChildren(...[...groups].map(([g, cs]) => {
+      const opts = cs.map((c) => h('option', { value: c.id, selected: c.def }, `# ${c.name}`));
+      return g ? h('optgroup', { label: g }, opts) : opts;
+    }).flat());
+    ch.disabled = false;
+  }).catch(() => {});
+  const send = async (e) => {
+    const name = ch.selectedOptions[0]?.textContent || '';
+    if (!ch.value) return toast('Alege canalul.', true);
+    if (!txt.value.trim()) return toast('Scrie mesajul anunțului.', true);
+    if (!confirm(`Postezi anunțul în ${name}${ping.checked ? ', cu @everyone' : ''}?`)) return;
+    const btn = e.currentTarget; btn.disabled = true;
+    const r = await api('/api/announce', { channelId: ch.value, title: ttl.value, text: txt.value, ping: ping.checked }).catch(() => null);
+    btn.disabled = false;
+    if (!r) return;
+    toast(r.data.msg || r.data.error || 'Ceva nu a mers.', !r.ok);
+    if (r.ok) { txt.value = ''; ttl.value = ''; ping.checked = false; count.textContent = '0 din 900'; }
+  };
+  return sheet(title('horn', 'Postează un anunț', 'Botul îl pune în canalul ales, ca foaie de pergament semnată cu numele tău.'),
+    h('div', { class: 'row' }, h('div', null, lab('hash', 'Canal', 'an-ch'), ch), h('div', null, lab('text', 'Titlu, opțional', 'an-title'), ttl)),
+    h('label', { for: 'an-text' }, icon('note', 18), 'Mesaj', h('span', { class: 'grow' }), count), txt,
+    h('label', { class: 'checks' }, ping, 'Dă ping la @everyone'),
+    h('p', { class: 'center' }, h('button', { class: 'btn big', type: 'button', onclick: send }, icon('horn', 22), 'Postează anunțul')));
 }
 
 function configSheet() {
-  const c = S.state.cfg, fields = [
-    ['mina', 'Puncte pe o mină', c.values.mina], ['task', 'Puncte pe un task', c.values.task], ['prezenta', 'Puncte pe prezență la eveniment', c.values.prezenta],
-    ['organizat', 'Puncte pe eveniment organizat', c.values.organizat], ['voice', 'Puncte pe oră de voice', c.values.voice], ['plafon_voice', 'Maximum din voice pe săptămână', c.caps.voice || 0],
-    ['prag_membru', 'Prag Membru pe săptămână', c.prag.membru], ['prag_asociat', 'Prag Asociat pe săptămână', c.prag.asociat],
-    ['locuri_membru', 'Locuri de Membru', c.slots.membru], ['locuri_asociat', 'Locuri de Asociat', c.slots.asociat],
-    ['toleranta', 'Săptămâni sub prag până la retrogradare', c.toleranta], ['saptamani_promovare', 'Săptămâni peste prag pentru promovare', c.promoWeeks],
+  const c = S.state.cfg, groups = [
+    ['Puncte pe activitate', 'Câte puncte aduce fiecare lucru.', [['mina', 'O mină', c.values.mina], ['task', 'Un task', c.values.task], ['prezenta', 'Prezență la eveniment', c.values.prezenta], ['organizat', 'Eveniment organizat', c.values.organizat]]],
+    ['Voice', 'Se adună singur cât stai pe voice cu cineva.', [['voice', 'Puncte pe oră', c.values.voice], ['plafon_voice', 'Maximum pe săptămână', c.caps.voice || 0]]],
+    ['Insigne', 'Punctele de făcut pe săptămână și câte locuri sunt.', [['prag_membru', 'Prag Membru', c.prag.membru], ['prag_asociat', 'Prag Asociat', c.prag.asociat], ['locuri_membru', 'Locuri de Membru', c.slots.membru], ['locuri_asociat', 'Locuri de Asociat', c.slots.asociat]]],
+    ['Retrogradare și promovare', 'Câte săptămâni contează înainte să se schimbe rangul.', [['toleranta', 'Săptămâni sub prag până la retrogradare', c.toleranta], ['saptamani_promovare', 'Săptămâni peste prag pentru promovare', c.promoWeeks]]],
   ];
-  const inputs = fields.map(([k, label, v]) => ({ k, el: h('input', { type: 'number', id: `cfg-${k}`, value: v, min: 0, max: 1000 }), label }));
+  const inputs = [];
   const demote = h('input', { type: 'checkbox', id: 'cfg-demote', checked: c.autoDemote });
-  return sheet(h('h2', { text: 'Setări' }),
-    h('p', { class: 'muted', text: 'Valorile noi se aplică de acum. Punctele deja date rămân cum au fost.' }),
-    h('div', { class: 'cfg-grid' }, inputs.map(({ k, el, label }) => h('div', null, h('label', { for: `cfg-${k}`, text: label }), el))),
-    h('label', { class: 'checks' }, demote, 'Retrogradare automată după toleranță'),
-    h('p', null, h('button', { class: 'btn', type: 'button', onclick: () => act('/api/config', { ...Object.fromEntries(inputs.map(({ k, el }) => [k, el.value])), retrogradare: demote.checked }) }, 'Salvează setările')));
+  const blocks = groups.map(([name, sub, fields], gi) => h('fieldset', { class: 'group' }, h('legend', { text: name }), h('p', { class: 'small muted', text: sub }),
+    h('div', { class: 'cfg-grid' }, fields.map(([k, label, v]) => {
+      const el = h('input', { type: 'number', id: `cfg-${k}`, value: v, min: 0, max: 1000 });
+      inputs.push({ k, el });
+      return h('div', null, h('label', { for: `cfg-${k}`, text: label }), el);
+    })),
+    gi === 3 ? h('label', { class: 'checks' }, demote, 'Retrogradare automată după toleranță') : null));
+  return sheet(title('sliders', 'Setări', 'Valorile noi se aplică de acum. Punctele deja date rămân cum au fost.'),
+    h('div', { class: 'groups' }, blocks),
+    h('p', { class: 'center' }, h('button', { class: 'btn big', type: 'button', onclick: () => act('/api/config', { ...Object.fromEntries(inputs.map(({ k, el }) => [k, el.value])), retrogradare: demote.checked }) }, icon('check', 22), 'Salvează setările')));
 }
 
 // ---- go ------------------------------------------------------------------
 
 window.addEventListener('hashchange', () => { closeDrawer(); S.anim = true; render(); scrollTo(0, 0); });
-// ---- ambience: dust and embers, pointer parallax, lantern, tumbleweed ------
+// ---- ambience: dust and embers, pointer parallax, lantern ------
 
 function startDust() {
   const cv = $('#dust');
@@ -535,13 +655,6 @@ function startPointerFx() {
   })();
 }
 
-function startWeed() {
-  const w = $('#weed');
-  if (!w || REDUCED) return;
-  const go = () => { if (!document.hidden) { w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); } setTimeout(go, 50_000 + Math.random() * 70_000); };
-  setTimeout(go, 12_000);
-}
-
-startDust(); startPointerFx(); startWeed();
+startDust(); startPointerFx();
 refresh();
 setInterval(() => { if (!document.hidden && S.authed) refresh(true); }, 60_000);

@@ -8,7 +8,7 @@ const { PermissionFlagsBits } = require('discord.js');
 
 const ui = () => require('./raziiUi'); // lazy: raziiUi requires this file
 
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
+const DATA_DIR = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, '..', '..', 'data');
 const FILE = path.join(DATA_DIR, 'razii.json');
 const ASSETS = path.join(__dirname, '..', '..', 'assets');
 const DEFAULT_MINUTES = Number(process.env.RAZIE_MINUTES) || 180; // 3 hours

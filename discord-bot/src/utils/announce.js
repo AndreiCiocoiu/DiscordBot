@@ -196,4 +196,43 @@ async function handleInteraction(interaction, client) {
   return true;
 }
 
-module.exports = { command, handleInteraction, render };
+// ---- website: post from the leaders panel ---------------------------------
+
+const canPost = (ch, me) => {
+  const p = ch.permissionsFor(me);
+  return !!p && p.has(PermissionFlagsBits.ViewChannel) && p.has(PermissionFlagsBits.SendMessages) && p.has(PermissionFlagsBits.AttachFiles);
+};
+
+// text channels where the bot can post, in the server's order; the announcements channel is marked
+function channels(guild) {
+  const me = guild.members.me, def = findAnnounceChannel(guild)?.id || null;
+  if (!me) return [];
+  return [...guild.channels.cache.values()]
+    .filter((c) => (c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement) && canPost(c, me))
+    .sort((a, b) => (a.parent?.rawPosition ?? -1) - (b.parent?.rawPosition ?? -1) || a.rawPosition - b.rawPosition)
+    .map((c) => ({ id: c.id, name: c.name, group: c.parent?.name || '', def: c.id === def }));
+}
+
+async function post(client, guild, { channelId, title, text, ping, author, actorId }) {
+  title = String(title || '').trim().slice(0, MAX_TITLE).toUpperCase() || 'ANUNȚ';
+  text = String(text || '').trim().slice(0, MAX_TEXT);
+  if (!text) return { ok: false, msg: 'Scrie mesajul anunțului.' };
+  const ch = guild.channels.cache.get(String(channelId || ''));
+  if (!ch || !guild.members.me || !channels(guild).some((c) => c.id === ch.id)) return { ok: false, msg: 'Alege un canal în care botul poate scrie.' };
+  const canPing = ch.permissionsFor(guild.members.me).has(PermissionFlagsBits.MentionEveryone);
+  try {
+    const png = render({ title, text, author: String(author || '').slice(0, 28) });
+    await ch.send({
+      content: ping && canPing ? '||@everyone||' : undefined,
+      files: [new AttachmentBuilder(png, { name: 'anunt.png', description: `${title}: ${text}`.slice(0, 1000) })],
+      allowedMentions: ping && canPing ? { parse: ['everyone'] } : { parse: [] },
+    });
+    adminlog.action(client, guild.id, 'Anunț postat de pe site', `${ping && canPing ? 'Cu @everyone' : 'Fără ping'} în ${ch}\n**${title}**\n${text.slice(0, 500)}`, actorId);
+    return { ok: true, msg: `Anunțul a fost postat în #${ch.name}${ping && !canPing ? ', fără @everyone (botul nu are voie să dea ping acolo)' : ''}.` };
+  } catch (err) {
+    console.error('announce (web) error:', err);
+    return { ok: false, msg: 'Nu am putut posta. Botul are nevoie de Send Messages și Attach Files în canal.' };
+  }
+}
+
+module.exports = { command, handleInteraction, render, channels, post };

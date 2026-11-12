@@ -13,6 +13,8 @@ const crypto = require('crypto');
 const { Routes } = require('discord.js');
 const points = require('./points');
 const craft = require('./craft');
+const announce = require('./announce');
+const idcard = require('./idcard');
 
 const ROOT = path.join(__dirname, '..', '..');
 const TTL_MS = 4 * 3600_000;
@@ -21,8 +23,12 @@ const STATIC = {
   '/app.js': ['web/app.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['web/style.css', 'text/css; charset=utf-8'],
   '/img/sahara.jpg': ['assets/sahara.jpg', 'image/jpeg'],
-  '/fonts/Rye-Regular.ttf': ['assets/fonts/Rye-Regular.ttf', 'font/ttf'],
 };
+// every web font in assets/fonts is served at /fonts/<file>
+for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'fonts'))) {
+  if (/\.woff2$/.test(f)) STATIC[`/fonts/${f}`] = [`assets/fonts/${f}`, 'font/woff2'];
+  else if (/\.ttf$/.test(f) && f.startsWith('Rye')) STATIC[`/fonts/${f}`] = [`assets/fonts/${f}`, 'font/ttf'];
+}
 const CSP = "default-src 'self'; img-src 'self' https://cdn.discordapp.com data:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 const SECRET = crypto.createHash('sha256').update(`muie-web:${process.env.SESSION_SECRET || process.env.DISCORD_TOKEN || 'dev'}`).digest();
@@ -133,19 +139,41 @@ function start(initial) {
       }
       if (route === '/api/craft') return json(res, 200, craft.catalogJson());
       if (route === '/api/members') return session.leader ? json(res, 200, await memberSearch(guild, url.searchParams.get('q'))) : json(res, 403, { error: 'Doar lideri.' });
+      if (route === '/api/idcard') {
+        if (!session.leader) return json(res, 403, { error: 'Doar lideri.' });
+        const uid = String(url.searchParams.get('u') || ''), m = d.members[uid];
+        const f = m?.idCard ? idcard.read(guild.id, uid, m.idCard.ext) : null;
+        return f ? send(res, 200, f.data, { 'Content-Type': f.type, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }) : json(res, 404, { error: 'Nu are carte de identitate.' });
+      }
+      if (route === '/api/channels') return session.admin ? json(res, 200, { channels: announce.channels(guild) }) : json(res, 403, { error: 'Doar adminii.' });
       return json(res, 404, { error: 'Nu există.' });
     }
 
     if (req.method !== 'POST') return json(res, 405, { error: 'Metodă nepermisă.' });
     const origin = req.headers.origin;
     if (origin && new URL(origin).host !== req.headers.host) return json(res, 403, { error: 'Origine nepermisă.' });
+    // the identity card arrives as the raw image, not JSON
+    if (route === '/api/idcard') {
+      if (!session.leader) return json(res, 403, { error: 'Doar Liderul, Co-Liderul sau adminii.' });
+      const uid = String(url.searchParams.get('u') || ''), m = d.members[uid];
+      if (!m) return json(res, 422, { ok: false, msg: 'Persoana nu e în bandă.' });
+      const chunks = []; let n = 0;
+      try { for await (const c of req) { n += c.length; if (n > idcard.MAX) throw new Error('too big'); chunks.push(c); } }
+      catch { return json(res, 413, { ok: false, msg: 'Poza e prea mare (maximum 4 MB).' }); }
+      let r;
+      try { r = idcard.save(guild.id, uid, Buffer.concat(chunks)); } catch (err) { console.error('idcard save:', err); return json(res, 500, { ok: false, msg: 'Nu am putut salva poza.' }); }
+      if (!r.ok) return json(res, 422, r);
+      m.idCard = { ext: r.ext, at: Date.now(), by: session.id, byName: session.name };
+      points.touch(); points.flush();
+      return json(res, 200, { ok: true, msg: `Cartea de identitate a fost salvată pentru ${m.name || uid}.` });
+    }
     if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: 'JSON necesar.' });
     let b;
     try { b = await body(req); } catch { return json(res, 400, { error: 'Cerere invalidă.' }); }
 
     if (route === '/api/craft') return json(res, 200, craft.calcJson(b.items));
 
-    const needAdmin = route === '/api/config';
+    const needAdmin = route === '/api/config' || route === '/api/announce';
     if (!session.leader || (needAdmin && !session.admin)) return json(res, 403, { error: needAdmin ? 'Doar adminii.' : 'Doar Liderul, Co-Liderul sau adminii.' });
     const ctx = { client, guild, actorId: session.id, admin: session.admin, plain: true };
     let r;
@@ -159,6 +187,12 @@ function start(initial) {
       else if (route === '/api/remove') r = await points.actRemove(ctx, d, String(b.userId));
       else if (route === '/api/leave') r = await points.actLeave(ctx, d, { userId: String(b.userId), zile: b.zile });
       else if (route === '/api/config') r = points.actConfig(ctx, d, b);
+      else if (route === '/api/idcard/remove') {
+        const m = d.members[String(b.userId)];
+        if (!m?.idCard) r = { ok: false, msg: 'Nu are carte de identitate.' };
+        else { idcard.drop(guild.id, String(b.userId)); delete m.idCard; points.touch(); r = { ok: true, msg: 'Cartea de identitate a fost ștearsă.' }; }
+      }
+      else if (route === '/api/announce') r = await announce.post(client, guild, { channelId: b.channelId, title: b.title, text: b.text, ping: !!b.ping, author: session.name, actorId: session.id });
       else return json(res, 404, { error: 'Nu există.' });
     } catch (err) { console.error('web api error:', err); return json(res, 500, { error: 'Ceva nu a mers.' }); }
     points.flush();

@@ -92,7 +92,19 @@ function wire(client, level) {
 
 let site = { setClient() {} };
 
+function reportStorage() {
+  const path = require('path'), fs = require('fs');
+  const dir = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, 'data');
+  let files = [];
+  try { files = fs.readdirSync(dir); } catch { /* not created yet */ }
+  console.log(`Storage: ${dir} (${files.length} files: ${files.join(', ') || 'none'})`);
+  if (process.env.RAILWAY_ENVIRONMENT && !process.env.RAILWAY_VOLUME_MOUNT_PATH && !process.env.DATA_DIR) {
+    console.warn('WARNING: no Railway Volume attached. Data is wiped on every restart. Add a Volume mounted at /app/data.');
+  }
+}
+
 async function main() {
+  reportStorage();
   site = web.start(null);
   for (const level of LEVELS) {
     const client = build(level);

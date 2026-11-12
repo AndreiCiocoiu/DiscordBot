@@ -23,7 +23,7 @@ const { zonedToUtc, validTz } = require('./timeparse');
 
 // ---- storage (own file, atomic writes) ------------------------------------
 
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
+const DATA_DIR = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, '..', '..', 'data');
 const FILE = path.join(DATA_DIR, 'points.json');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -326,6 +326,7 @@ async function actRemove(ctx, d, userId) {
   if (!m) return res(ctx, false, 'Persoana nu e în evidență.');
   const w = who(ctx, d, userId);
   delete d.members[userId];
+  require('./idcard').drop(ctx.guild.id, userId);
   touch();
   await syncRoles(ctx.guild, userId, null);
   log(ctx.client, ctx.guild.id, 'Scos din bandă', `<@${userId}> (era ${RANK_NAME[m.rank]}, ${days(m.since)} zile)${ctx.plain ? ' (din web)' : ''}`, ctx.actorId);
@@ -412,7 +413,7 @@ function snapshot(d, viewerId) {
       why = !el.ok ? el.reason : (seatsLeft(d, next) > 0 ? '' : `Nu sunt locuri libere la ${RANK_NAME[next]}.`);
     }
     return {
-      id, name: m.name || id, avatar: m.avatar || null, rank: m.rank, since: m.since, rankSince: m.rankSince, strikes: m.strikes, leaveUntil: m.leaveUntil || 0,
+      id, name: m.name || id, avatar: m.avatar || null, rank: m.rank, since: m.since, rankSince: m.rankSince, strikes: m.strikes, leaveUntil: m.leaveUntil || 0, idCard: m.idCard ? { at: m.idCard.at, byName: m.idCard.byName || '' } : null,
       points: t.total, byType: t.byType, voiceMin: t.voiceMin || 0, next, canPromote, why, hist: weekHistory(d, id, 8),
     };
   });

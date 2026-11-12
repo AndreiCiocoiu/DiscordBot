@@ -16,7 +16,7 @@ const adminlog = require('./adminlog');
 const FILE = path.join(__dirname, '..', '..', 'assets', 'recipes.json');
 const NO_PING = { parse: [], repliedUser: false };
 const COLOR = 0xb3202a;
-const MAX_QTY = 200;
+const MAX_QTY = 1000;
 
 // ---- data ---------------------------------------------------------------
 
