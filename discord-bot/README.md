@@ -34,6 +34,17 @@ Evidența membrilor (Angajat, Asociat, Membru) și puncte pe săptămână. Conf
 - **Avansare**: `/banda rang @nume <rang>` cere pragul rangului țintă 2 săptămâni la rând și un loc liber (adminii pot ocoli cu `forta:true`). Clasamentul de duminică arată cine poate avansa.
 - `/profil [@nume]` arată rangul, vechimea, punctele din săptămâna asta și ultimele săptămâni; `/banda lista` arată cine e în bandă și locurile. Datele sunt în `points.json` din volumul `/app/data`.
 
+## Site web (clasament, banda, crafting, panou pentru lideri)
+Botul își servește singur pagina, deci nu ai nimic de pus pe GitHub. Setup, o singură dată:
+1. **Railway** -> serviciul botului -> Settings -> Networking -> **Generate Domain**. Adresa rezultată e linkul site-ului.
+2. **Discord Developer Portal** -> aplicația botului -> OAuth2: copiază **Client Secret** și la Redirects adaugă `https://<domeniul-tău>/auth/callback`.
+3. **Railway** -> Variables: adaugă `DISCORD_CLIENT_SECRET` cu secretul de la pasul 2. Botul repornește singur.
+4. Deschizi domeniul și apeși **Intră cu Discord**. Intră oricine e pe serverul benzii; panoul **Lideri** apare doar adminilor și rolurilor „Lider” / „Co-Lider”.
+- Pagini: Clasament (săptămâna curentă și cele vechi), Banda (locurile pe ranguri, profil cu istoric), Crafting (catalog + calculator), Lideri (dă puncte, adaugă în bandă, anulează intrări, setări pentru admini). Tot ce se face pe site se scrie și în adminlog, cu „(din web)”.
+- Poza din `assets/sahara.jpg` e imaginea de sus. Sesiunea de login ține 4 ore.
+- Variabile opționale: `WEB_URL` (adresa publică, dacă detectarea greșește), `WEB_GUILD_ID` (dacă botul e pe mai multe servere), `SESSION_SECRET`, `WEB_DISABLED=1` (oprește site-ul).
+- Căutarea de persoane la „Adaugă în bandă” are nevoie de **Server Members Intent**; fără el lipești ID-ul Discord al persoanei.
+
 ## Admin log
 Everything goes to the private adminlog: joins (account age, invite used), leaves, kicks, bans/unbans, nickname/role/timeout changes (with who did it), deleted/edited messages (with content), bulk deletes (attached as a text file), channel/role/server/emoji/sticker changes, invites, threads, webhooks, voice join/leave/move/mute/stream, AutoMod hits, and what the bot itself does (razie, sessions, welcome, setup). Messages sent before the bot started can't show their old content.
 

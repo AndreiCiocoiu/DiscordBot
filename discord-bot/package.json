@@ -1,7 +1,7 @@
 {
   "name": "muie-bot",
-  "version": "0.14.1",
-  "description": "Discord bot: RDR2 raid timers, events, gang ranks and weekly points, crafting, animated welcome, admin log.",
+  "version": "0.15.2",
+  "description": "Discord bot: RDR2 raid timers, events, gang ranks and weekly points, website, crafting, animated welcome, admin log.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

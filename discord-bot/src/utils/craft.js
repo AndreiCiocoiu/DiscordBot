@@ -335,4 +335,29 @@ async function handleMessage(message, client) {
   if (sent) await message.delete().catch(() => {}); // only the answer stays in the channel
 }
 
-module.exports = { command, handleInteraction, handleMessage, search, panelPayload, catalogView, calc, data };
+
+// same calculator for the website: items = [{ name, qty }] -> sections as plain data
+function calcJson(items) {
+  const merged = new Map(), missing = [];
+  for (const it of Array.isArray(items) ? items.slice(0, 30) : []) {
+    const w = resolve(String(it?.name ?? ''));
+    if (!w) { missing.push(String(it?.name ?? '').slice(0, 40)); continue; }
+    merged.set(w.name, { w, qty: clampQty((merged.get(w.name)?.qty || 0) + clampQty(it.qty)) });
+  }
+  const orders = [...merged.values()].slice(0, 10);
+  if (!orders.length) return { orders: [], missing };
+  const r = calc(orders);
+  const order = r.steps.map((s) => {
+    const out = s.p.yield > 1 ? `iese ${s.made}${s.left ? `, rămân ${s.left}` : ''} - ` : '';
+    return { title: s.p.name, text: `${s.crafts}x craft (${s.p.where}) - ${out}folosește ${s.p.from.map(([n, k]) => `${k * s.crafts} ${n}`).join(', ')}` };
+  });
+  for (const { w, qty } of orders) order.push({ title: w.name, text: `${qty}x craft - folosește ${w.ingredients.map(([n, k]) => `${k * qty} ${n}`).join(', ')}` });
+  return { orders: orders.map(({ w, qty }) => ({ name: w.name, qty })), missing, materials: r.materials, onTheWay: r.onTheWay, ore: r.ore, order };
+}
+
+function catalogJson() {
+  const { categories, weapons } = data();
+  return { categories, weapons: weapons.map((w) => ({ name: w.name, category: w.category, badge: w.badge || null, ingredients: w.ingredients })) };
+}
+
+module.exports = { command, handleInteraction, handleMessage, search, panelPayload, catalogView, calc, data, calcJson, catalogJson };

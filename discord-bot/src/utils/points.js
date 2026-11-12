@@ -236,65 +236,220 @@ const gangCmd = (() => {
 
 const commands = [addCmd, pointsCmd, profileCmd, boardCmd, gangCmd];
 
-// ---- command logic --------------------------------------------------------
+// ---- actions (shared by the Discord commands and the website) ---------------
+// ctx = { client, guild, actorId, admin, plain }. plain=true (website): names instead of <@id> mentions, no markdown.
 
 const log = (client, guildId, title, text, userId) => adminlog.action(client, guildId, title, text, userId);
+const who = (ctx, d, id) => (ctx.plain ? d.members[id]?.name || id : `<@${id}>`);
+const res = (ctx, ok, msg, extra = {}) => ({ ok, msg: ctx.plain ? String(msg).replace(/\*\*|`/g, '') : msg, ...extra });
+const userInfo = (u) => (u ? { name: u.globalName || u.displayName || u.username || null, avatar: u.displayAvatarURL?.({ size: 64, extension: 'png' }) || null } : {});
+const isId = (s) => /^\d{15,22}$/.test(String(s || ''));
 
-function addMember(d, uid, rank, now = Date.now()) {
-  d.members[uid] = { rank, since: now, rankSince: now, strikes: 0, leaveUntil: 0, history: [{ rank, at: now }] };
+function addMember(d, uid, rank, info = {}, now = Date.now()) {
+  d.members[uid] = { rank, since: now, rankSince: now, strikes: 0, leaveUntil: 0, history: [{ rank, at: now }], name: info.name || null, avatar: info.avatar || null, profAt: info.name ? now : 0 };
   touch();
 }
 
-async function doAdd(i, client, d) {
-  const rank = i.options.getString('rang', true), user = i.options.getUser('user', true);
-  if (user.bot) return i.editReply('Nu pot adăuga un bot.');
-  if (d.members[user.id]) return i.editReply(`${user} e deja în bandă ca **${RANK_NAME[d.members[user.id].rank]}**. Pentru schimbare folosește \`/banda rang\`.`);
-  if (seatsLeft(d, rank) <= 0) return i.editReply(`Nu mai sunt locuri de **${RANK_NAME[rank]}** (${seatText(d, rank)}). Alege alt rang sau mărește locurile cu \`/banda config\`.`);
-  addMember(d, user.id, rank);
+async function actAdd(ctx, d, { rank, userId, info }) {
+  if (!RANKS.includes(rank)) return res(ctx, false, 'Rang necunoscut.');
+  if (!isId(userId)) return res(ctx, false, 'ID Discord invalid.');
+  const w = who(ctx, d, userId);
+  if (d.members[userId]) return res(ctx, false, `${w} e deja în bandă ca **${RANK_NAME[d.members[userId].rank]}**. ${ctx.plain ? 'Schimbă rangul din profil.' : 'Pentru schimbare folosește `/banda rang`.'}`);
+  if (seatsLeft(d, rank) <= 0) return res(ctx, false, `Nu mai sunt locuri de **${RANK_NAME[rank]}** (${seatText(d, rank)}). Alege alt rang sau mărește locurile din setări.`);
+  addMember(d, userId, rank, info);
   ensureWeekNow(d);
-  await syncRoles(i.guild, user.id, rank);
-  log(client, i.guildId, 'Membru adăugat', `${user} -> ${RANK_NAME[rank]}`, i.user.id);
-  return i.editReply({ content: `${user} a intrat în bandă ca **${RANK_NAME[rank]}**. Locuri ${RANK_NAME[rank]}: ${seatText(d, rank)}.`, allowedMentions: NOPING });
+  await syncRoles(ctx.guild, userId, rank);
+  const wn = who(ctx, d, userId);
+  log(ctx.client, ctx.guild.id, 'Membru adăugat', `${ctx.plain ? `${wn} (${userId})` : `<@${userId}>`} -> ${RANK_NAME[rank]}${ctx.plain ? ' (din web)' : ''}`, ctx.actorId);
+  return res(ctx, true, `${wn} a intrat în bandă ca **${RANK_NAME[rank]}**. Locuri ${RANK_NAME[rank]}: ${seatText(d, rank)}.`);
 }
 
-async function doGive(i, client, d) {
+async function actGive(ctx, d, { type, qty = 1, note = '', userIds }) {
   const week = ensureWeekNow(d);
-  const type = i.options.getString('tip', true);
-  const qty = i.options.getInteger('cantitate') ?? 1;
-  const note = i.options.getString('nota') || '';
-  const ids = [...new Set([i.options.getUser('user', true).id, ...parseIds(i.options.getString('si'))])].slice(0, 25);
-  if (type !== 'bonus' && qty < 1) return i.editReply('La activități cantitatea trebuie să fie cel puțin 1. Pentru scăderi folosește **Bonus** cu un număr negativ.');
-  if (type === 'bonus' && qty === 0) return i.editReply('La Bonus spune câte puncte (poate fi negativ).');
+  if (!TYPES[type] || type === 'voice') return res(ctx, false, 'Tip de activitate necunoscut.');
+  qty = Math.trunc(Number(qty));
+  if (!Number.isFinite(qty) || Math.abs(qty) > 500) return res(ctx, false, 'Cantitate invalidă.');
+  if (type !== 'bonus' && qty < 1) return res(ctx, false, 'La activități cantitatea trebuie să fie cel puțin 1. Pentru scăderi folosește **Bonus** cu un număr negativ.');
+  if (type === 'bonus' && qty === 0) return res(ctx, false, 'La Bonus spune câte puncte (poate fi negativ).');
+  note = String(note || '').slice(0, 100);
+  const ids = [...new Set(userIds)].filter(isId).slice(0, 25);
+  if (!ids.length) return res(ctx, false, 'Alege cel puțin o persoană.');
   const each = type === 'bonus' ? qty : d.cfg.values[type] * qty;
   const lines = [];
   for (const uid of ids) {
-    if (!d.members[uid]) { lines.push(`<@${uid}>: nu e în bandă (folosește \`/add\`)`); continue; }
+    if (!d.members[uid]) { lines.push(`${ctx.plain ? uid : `<@${uid}>`}: nu e în bandă (adaugă-l întâi)`); continue; }
     const before = pointsOf(d, week, uid);
     const id = d.nextId++;
-    week.entries.push({ id, at: Date.now(), by: i.user.id, user: uid, type, qty, pts: each, note });
+    week.entries.push({ id, at: Date.now(), by: ctx.actorId, user: uid, type, qty, pts: each, note });
     const after = pointsOf(d, week, uid);
     touch();
     const capped = type !== 'bonus' && d.cfg.caps[type] > 0 && after - before < each ? ` (limita de ${d.cfg.caps[type]} pe săptămână)` : '';
-    lines.push(`<@${uid}>: **${after - before >= 0 ? '+' : ''}${after - before}**${capped}, acum ${after} (#${id})`);
-    log(client, i.guildId, 'Puncte', `<@${uid}>: ${each >= 0 ? '+' : ''}${each} ${TYPES[type]}${qty > 1 && type !== 'bonus' ? ` x${qty}` : ''}${note ? ` (${note})` : ''} · #${id}`, i.user.id);
+    lines.push(`${who(ctx, d, uid)}: **${after - before >= 0 ? '+' : ''}${after - before}**${capped}, acum ${after} (#${id})`);
+    log(ctx.client, ctx.guild.id, 'Puncte', `<@${uid}>: ${each >= 0 ? '+' : ''}${each} ${TYPES[type]}${qty > 1 && type !== 'bonus' ? ` x${qty}` : ''}${note ? ` (${note})` : ''} · #${id}${ctx.plain ? ' · web' : ''}`, ctx.actorId);
   }
-  return i.editReply({ content: `${TYPES[type]}${type === 'bonus' ? '' : ` x${qty} = ${each} puncte`}\n${lines.join('\n')}`.slice(0, 1990), allowedMentions: NOPING });
+  return res(ctx, true, `${TYPES[type]}${type === 'bonus' ? '' : ` x${qty} = ${each} puncte`}\n${lines.join('\n')}`);
 }
 
-async function doUndo(i, client, d) {
+async function actUndo(ctx, d, id) {
   const week = ensureWeekNow(d);
-  const id = i.options.getInteger('id', true);
-  const at = week.entries.findIndex((e) => e.id === id);
-  if (at < 0) return i.editReply(`Nu găsesc intrarea #${id} în săptămâna asta (anularea merge doar pe săptămâna curentă).`);
+  const at = week.entries.findIndex((e) => e.id === Number(id));
+  if (at < 0) return res(ctx, false, `Nu găsesc intrarea #${id} în săptămâna asta (anularea merge doar pe săptămâna curentă).`);
   const [e] = week.entries.splice(at, 1);
   touch();
-  log(client, i.guildId, 'Puncte anulate', `#${id}: <@${e.user}> ${e.pts >= 0 ? '+' : ''}${e.pts} ${TYPES[e.type]} (dat de <@${e.by}>)`, i.user.id);
-  return i.editReply({ content: `Anulat #${id}: <@${e.user}> ${e.pts >= 0 ? '+' : ''}${e.pts} ${TYPES[e.type]}.`, allowedMentions: NOPING });
+  log(ctx.client, ctx.guild.id, 'Puncte anulate', `#${id}: <@${e.user}> ${e.pts >= 0 ? '+' : ''}${e.pts} ${TYPES[e.type]} (dat de <@${e.by}>)`, ctx.actorId);
+  return res(ctx, true, `Anulat #${id}: ${who(ctx, d, e.user)} ${e.pts >= 0 ? '+' : ''}${e.pts} ${TYPES[e.type]}.`);
 }
+
+async function actRank(ctx, d, { userId, rank, force }) {
+  const m = d.members[userId];
+  if (!m) return res(ctx, false, 'Persoana nu e în bandă.');
+  if (!RANKS.includes(rank)) return res(ctx, false, 'Rang necunoscut.');
+  const w = who(ctx, d, userId);
+  if (m.rank === rank) return res(ctx, false, `${w} e deja ${RANK_NAME[rank]}.`);
+  if (force && !ctx.admin) return res(ctx, false, 'Opțiunea „forță” e doar pentru admini.');
+  if (seatsLeft(d, rank) <= 0) return res(ctx, false, `Nu mai sunt locuri de **${RANK_NAME[rank]}** (${seatText(d, rank)}).`);
+  const up = RANKS.indexOf(rank) > RANKS.indexOf(m.rank);
+  if (up && !force) {
+    const el = eligible(d, userId, rank);
+    if (!el.ok) return res(ctx, false, `${w} nu poate avansa la ${RANK_NAME[rank]}. ${el.reason}`);
+  }
+  const from = m.rank;
+  m.rank = rank; m.rankSince = Date.now(); m.strikes = 0; m.history.push({ rank, at: m.rankSince });
+  touch();
+  await syncRoles(ctx.guild, userId, rank);
+  log(ctx.client, ctx.guild.id, up ? 'Promovare' : 'Retrogradare', `<@${userId}>: ${RANK_NAME[from]} -> ${RANK_NAME[rank]}${force ? ' (forțat)' : ''}${ctx.plain ? ' (din web)' : ''}`, ctx.actorId);
+  return res(ctx, true, `${w}: ${RANK_NAME[from]} -> **${RANK_NAME[rank]}**.`);
+}
+
+async function actRemove(ctx, d, userId) {
+  const m = d.members[userId];
+  if (!m) return res(ctx, false, 'Persoana nu e în evidență.');
+  const w = who(ctx, d, userId);
+  delete d.members[userId];
+  touch();
+  await syncRoles(ctx.guild, userId, null);
+  log(ctx.client, ctx.guild.id, 'Scos din bandă', `<@${userId}> (era ${RANK_NAME[m.rank]}, ${days(m.since)} zile)${ctx.plain ? ' (din web)' : ''}`, ctx.actorId);
+  return res(ctx, true, `${w} a fost scos din evidență. Săptămânile vechi rămân în arhivă.`);
+}
+
+async function actLeave(ctx, d, { userId, zile }) {
+  const m = d.members[userId];
+  if (!m) return res(ctx, false, 'Persoana nu e în bandă.');
+  const n = Math.trunc(Number(zile));
+  if (!Number.isFinite(n) || n < 0 || n > 60) return res(ctx, false, 'Zilele trebuie să fie între 0 și 60.');
+  m.leaveUntil = n ? Date.now() + n * DAY : 0;
+  touch();
+  log(ctx.client, ctx.guild.id, 'Concediu', `<@${userId}>: ${n ? `${n} zile` : 'oprit'}${ctx.plain ? ' (din web)' : ''}`, ctx.actorId);
+  const w = who(ctx, d, userId);
+  return res(ctx, true, n ? `${w} e în concediu ${n} zile; săptămânile acoperite nu dau avertismente.` : `Concediul lui ${w} s-a oprit.`);
+}
+
+function configText(d) {
+  const c = d.cfg, v = c.values;
+  return [
+    `**Puncte**: mină ${v.mina} · task ${v.task} · prezență ${v.prezenta} · eveniment organizat ${v.organizat} · voice ${v.voice}/oră (maxim ${c.caps.voice || 'fără limită'}/săptămână)`,
+    `**Praguri/săptămână**: Membru ${c.prag.membru} · Asociat ${c.prag.asociat}`,
+    `**Locuri**: Membru ${seatText(d, 'membru')} · Asociat ${seatText(d, 'asociat')}`,
+    `**Toleranță**: ${c.toleranta} săptămâni sub prag, apoi ${c.autoDemote ? 'retrogradare automată' : 'doar avertisment (retrogradarea e manuală)'}`,
+    `**Promovare**: ${c.promoWeeks} săptămâni peste pragul rangului țintă + loc liber`,
+    `**Fus orar**: ${c.tz} · săptămâna se închide duminică la miezul nopții`,
+    `**Clasament duminică**: ${c.channelId ? `<#${c.channelId}>` : 'nesetat (doar în adminlog)'}`,
+    `**Lideri**: admini + roluri „Lider”/„Co-Lider”${c.leaderRoleIds.length ? ` + ${c.leaderRoleIds.map((r) => `<@&${r}>`).join(' ')}` : ''}`,
+  ].join('\n');
+}
+
+// patch keys = the /banda config option names
+const CONFIG_INTS = {
+  mina: (c, v) => { c.values.mina = v; }, task: (c, v) => { c.values.task = v; }, prezenta: (c, v) => { c.values.prezenta = v; },
+  organizat: (c, v) => { c.values.organizat = v; }, voice: (c, v) => { c.values.voice = v; }, plafon_voice: (c, v) => { c.caps.voice = v; },
+  prag_membru: (c, v) => { c.prag.membru = v; }, prag_asociat: (c, v) => { c.prag.asociat = v; },
+  locuri_membru: (c, v) => { c.slots.membru = v; }, locuri_asociat: (c, v) => { c.slots.asociat = v; },
+  toleranta: (c, v) => { c.toleranta = Math.max(1, v); }, saptamani_promovare: (c, v) => { c.promoWeeks = Math.max(1, v); },
+};
+function actConfig(ctx, d, patch) {
+  if (!ctx.admin) return res(ctx, false, 'Doar adminii pot schimba setările.');
+  const c = d.cfg, changed = [];
+  let err = '';
+  for (const [k, fn] of Object.entries(CONFIG_INTS)) {
+    if (patch[k] === undefined || patch[k] === null || patch[k] === '') continue;
+    const v = Math.trunc(Number(patch[k]));
+    if (!Number.isFinite(v) || v < 0 || v > 1000) { err += `${k}: valoare invalidă. `; continue; }
+    fn(c, v); changed.push(k);
+  }
+  if (patch.retrogradare !== undefined && patch.retrogradare !== null) { c.autoDemote = !!patch.retrogradare; changed.push('retrogradare'); }
+  if (patch.fus) { if (validTz(String(patch.fus).trim())) { c.tz = String(patch.fus).trim(); changed.push('fus'); } else err += `Fus orar invalid: ${patch.fus}. `; }
+  if (patch.canal) { c.channelId = String(patch.canal); changed.push('canal'); }
+  if (patch.rol_lider || patch.rol_colider) { c.leaderRoleIds = [patch.rol_lider, patch.rol_colider].filter(isId); changed.push('roluri'); }
+  if (changed.length) { touch(); log(ctx.client, ctx.guild.id, 'Setări puncte', `${changed.join(', ')}${ctx.plain ? ' (din web)' : ''}`, ctx.actorId); }
+  return res(ctx, !err || changed.length > 0, `${err}${changed.length ? 'Salvat. Valorile noi se aplică de acum; punctele deja date rămân cum au fost.\n\n' : ''}${configText(d)}`);
+}
+
+// ---- read models ----------------------------------------------------------
 
 function weekHistory(d, uid, n = 6) {
   return d.archive.slice(-n).reverse().map((w) => ({ no: w.no, t: w.totals[uid]?.t ?? null, rank: w.ranks[uid] || null, prag: w.prag }));
 }
+
+const NEXT = { angajat: 'asociat', asociat: 'membru', membru: null };
+
+async function refreshProfiles(client, d) {
+  const stale = Object.entries(d.members).filter(([, m]) => !m.name || Date.now() - (m.profAt || 0) > 6 * 3600_000).slice(0, 30);
+  await Promise.all(stale.map(async ([uid, m]) => {
+    const u = await client.users.fetch(uid).catch(() => null);
+    if (u) { Object.assign(m, userInfo(u), { profAt: Date.now() }); touch(); } else m.profAt = Date.now() - 5.5 * 3600_000; // retry in ~30 min
+  }));
+}
+
+function snapshot(d, viewerId) {
+  const week = ensureWeekNow(d), totals = totalsOf(d, week);
+  const members = Object.entries(d.members).map(([id, m]) => {
+    const t = totals[id] || { total: 0, byType: {} };
+    const next = NEXT[m.rank];
+    let canPromote = false, why = '';
+    if (next) {
+      const el = eligible(d, id, next);
+      canPromote = el.ok && seatsLeft(d, next) > 0;
+      why = !el.ok ? el.reason : (seatsLeft(d, next) > 0 ? '' : `Nu sunt locuri libere la ${RANK_NAME[next]}.`);
+    }
+    return {
+      id, name: m.name || id, avatar: m.avatar || null, rank: m.rank, since: m.since, rankSince: m.rankSince, strikes: m.strikes, leaveUntil: m.leaveUntil || 0,
+      points: t.total, byType: t.byType, voiceMin: t.voiceMin || 0, next, canPromote, why, hist: weekHistory(d, id, 8),
+    };
+  });
+  return {
+    now: Date.now(), viewerId,
+    week: { no: week.no, year: week.year, start: week.start, end: week.end },
+    cfg: { values: d.cfg.values, caps: d.cfg.caps, slots: d.cfg.slots, prag: d.cfg.prag, toleranta: d.cfg.toleranta, promoWeeks: d.cfg.promoWeeks, autoDemote: d.cfg.autoDemote, tz: d.cfg.tz, channelId: d.cfg.channelId },
+    seats: { asociat: [countRank(d, 'asociat'), d.cfg.slots.asociat], membru: [countRank(d, 'membru'), d.cfg.slots.membru], angajat: [countRank(d, 'angajat'), null] },
+    members,
+    archive: d.archive.map((w) => ({ no: w.no, year: w.year, start: w.start, end: w.end })).reverse(),
+    entries: week.entries.slice(-40).reverse().map((e) => ({ id: e.id, at: e.at, by: d.members[e.by]?.name || e.by, user: e.user, userName: d.members[e.user]?.name || e.user, type: e.type, label: TYPES[e.type], pts: e.pts, qty: e.qty, note: e.note })),
+    types: Object.entries(TYPES).filter(([k]) => k !== 'voice').map(([value, label]) => ({ value, label, pts: value === 'bonus' ? null : d.cfg.values[value] })),
+  };
+}
+
+function weekView(d, no) {
+  const w = [...d.archive].reverse().find((x) => x.no === Number(no));
+  if (!w) return null;
+  const rows = Object.entries(w.ranks).map(([id, rank]) => ({ id, name: d.members[id]?.name || id, avatar: d.members[id]?.avatar || null, rank, t: w.totals[id]?.t ?? 0, b: w.totals[id]?.b || {} })).sort((a, b) => b.t - a.t);
+  return { no: w.no, year: w.year, start: w.start, end: w.end, prag: w.prag, rows };
+}
+
+// who is a leader / admin, from the role ids Discord gave us at login
+async function rolesInfo(guild, d, userId, roleIds) {
+  if (!guild.roles.cache.size) await guild.roles.fetch().catch(() => {});
+  const admin = guild.ownerId === userId || roleIds.some((id) => {
+    const p = guild.roles.cache.get(id)?.permissions;
+    return p?.has(PermissionFlagsBits.Administrator) || p?.has(PermissionFlagsBits.ManageGuild);
+  });
+  const leader = admin || roleIds.some((id) => d.cfg.leaderRoleIds.includes(id) || LEADER_RE.test(cleanName(guild.roles.cache.get(id)?.name)));
+  return { admin, leader };
+}
+
+// ---- Discord commands -----------------------------------------------------
+
+const mkCtx = (i, client) => ({ client, guild: i.guild, actorId: i.user.id, admin: isAdmin(i), plain: false });
+const reply = (i, r) => i.editReply({ content: r.msg.slice(0, 1990), allowedMentions: NOPING });
 
 function profileEmbed(d, guild, uid, user) {
   const m = d.members[uid], week = ensureWeekNow(d);
@@ -320,7 +475,7 @@ function profileEmbed(d, guild, uid, user) {
   if (m.strikes) notes.push(`${m.strikes}/${d.cfg.toleranta} săptămâni sub prag`);
   if (m.leaveUntil > Date.now()) notes.push(`concediu până <t:${unix(m.leaveUntil)}:D>`);
   if (notes.length) e.addFields({ name: 'Atenție', value: notes.join('\n') });
-  const next = m.rank === 'angajat' ? 'asociat' : m.rank === 'asociat' ? 'membru' : null;
+  const next = NEXT[m.rank];
   if (next) {
     const el = eligible(d, uid, next);
     e.setFooter({ text: el.ok ? `Poate avansa la ${RANK_NAME[next]}${seatsLeft(d, next) ? '' : ' (nu sunt locuri libere)'}` : `Avansare: ${el.reason}` });
@@ -370,81 +525,6 @@ async function doList(i, d) {
   return i.editReply({ embeds: [e], allowedMentions: NOPING });
 }
 
-async function doRank(i, client, d) {
-  const user = i.options.getUser('user', true), rank = i.options.getString('rang', true);
-  const force = !!i.options.getBoolean('forta');
-  const m = d.members[user.id];
-  if (!m) return i.editReply(`${user} nu e în bandă. Folosește \`/add\`.`);
-  if (m.rank === rank) return i.editReply(`${user} e deja ${RANK_NAME[rank]}.`);
-  if (force && !isAdmin(i)) return i.editReply('Opțiunea „forță” e doar pentru admini.');
-  if (seatsLeft(d, rank) <= 0) return i.editReply(`Nu mai sunt locuri de **${RANK_NAME[rank]}** (${seatText(d, rank)}).`);
-  const up = RANKS.indexOf(rank) > RANKS.indexOf(m.rank);
-  if (up && !force) {
-    const el = eligible(d, user.id, rank);
-    if (!el.ok) return i.editReply(`${user} nu poate avansa la ${RANK_NAME[rank]}. ${el.reason}`);
-  }
-  const from = m.rank;
-  m.rank = rank; m.rankSince = Date.now(); m.strikes = 0; m.history.push({ rank, at: m.rankSince });
-  touch();
-  await syncRoles(i.guild, user.id, rank);
-  log(client, i.guildId, up ? 'Promovare' : 'Retrogradare', `${user}: ${RANK_NAME[from]} -> ${RANK_NAME[rank]}${force ? ' (forțat)' : ''}`, i.user.id);
-  return i.editReply({ content: `${user}: ${RANK_NAME[from]} -> **${RANK_NAME[rank]}**.`, allowedMentions: NOPING });
-}
-
-async function doRemove(i, client, d) {
-  const user = i.options.getUser('user', true);
-  const m = d.members[user.id];
-  if (!m) return i.editReply(`${user} nu e în evidență.`);
-  delete d.members[user.id];
-  touch();
-  await syncRoles(i.guild, user.id, null);
-  log(client, i.guildId, 'Scos din bandă', `${user} (era ${RANK_NAME[m.rank]}, ${days(m.since)} zile)`, i.user.id);
-  return i.editReply({ content: `${user} a fost scos din evidență. Săptămânile vechi rămân în arhivă.`, allowedMentions: NOPING });
-}
-
-async function doLeave(i, client, d) {
-  const user = i.options.getUser('user', true), n = i.options.getInteger('zile', true);
-  const m = d.members[user.id];
-  if (!m) return i.editReply(`${user} nu e în bandă.`);
-  m.leaveUntil = n ? Date.now() + n * DAY : 0;
-  touch();
-  log(client, i.guildId, 'Concediu', `${user}: ${n ? `${n} zile` : 'oprit'}`, i.user.id);
-  return i.editReply({ content: n ? `${user} e în concediu ${n} zile; săptămânile acoperite nu dau avertismente.` : `Concediul lui ${user} s-a oprit.`, allowedMentions: NOPING });
-}
-
-function configText(d) {
-  const c = d.cfg, v = c.values;
-  return [
-    `**Puncte**: mină ${v.mina} · task ${v.task} · prezență ${v.prezenta} · eveniment organizat ${v.organizat} · voice ${v.voice}/oră (maxim ${c.caps.voice || 'fără limită'}/săptămână)`,
-    `**Praguri/săptămână**: Membru ${c.prag.membru} · Asociat ${c.prag.asociat}`,
-    `**Locuri**: Membru ${seatText(d, 'membru')} · Asociat ${seatText(d, 'asociat')}`,
-    `**Toleranță**: ${c.toleranta} săptămâni sub prag, apoi ${c.autoDemote ? 'retrogradare automată' : 'doar avertisment (retrogradarea e manuală)'}`,
-    `**Promovare**: ${c.promoWeeks} săptămâni peste pragul rangului țintă + loc liber`,
-    `**Fus orar**: ${c.tz} · săptămâna se închide duminică la miezul nopții`,
-    `**Clasament duminică**: ${c.channelId ? `<#${c.channelId}>` : 'nesetat (doar în adminlog)'}`,
-    `**Lideri**: admini + roluri „Lider”/„Co-Lider”${c.leaderRoleIds.length ? ` + ${c.leaderRoleIds.map((r) => `<@&${r}>`).join(' ')}` : ''}`,
-  ].join('\n');
-}
-
-async function doConfig(i, client, d) {
-  const o = i.options, c = d.cfg, changed = [];
-  const set = (name, fn) => { const v = o.get(name)?.value; if (v !== undefined && v !== null) { fn(v); changed.push(name); } };
-  set('mina', (v) => { c.values.mina = v; }); set('task', (v) => { c.values.task = v; });
-  set('prezenta', (v) => { c.values.prezenta = v; }); set('organizat', (v) => { c.values.organizat = v; });
-  set('voice', (v) => { c.values.voice = v; }); set('plafon_voice', (v) => { c.caps.voice = v; });
-  set('prag_membru', (v) => { c.prag.membru = v; }); set('prag_asociat', (v) => { c.prag.asociat = v; });
-  set('locuri_membru', (v) => { c.slots.membru = v; }); set('locuri_asociat', (v) => { c.slots.asociat = v; });
-  set('toleranta', (v) => { c.toleranta = Math.max(1, v); }); set('saptamani_promovare', (v) => { c.promoWeeks = Math.max(1, v); });
-  set('retrogradare', (v) => { c.autoDemote = !!v; });
-  let err = '';
-  set('fus', (v) => { if (validTz(v.trim())) c.tz = v.trim(); else err = `Fus orar invalid: ${v}. `; });
-  set('canal', (v) => { c.channelId = v; });
-  const rl = o.getRole('rol_lider'), rc = o.getRole('rol_colider');
-  if (rl || rc) { c.leaderRoleIds = [rl?.id, rc?.id].filter(Boolean); changed.push('roluri'); }
-  if (changed.length) { touch(); log(client, i.guildId, 'Setări puncte', changed.join(', '), i.user.id); }
-  return i.editReply({ content: `${err}${changed.length ? 'Salvat. Valorile noi se aplică de acum; punctele deja date rămân cum au fost.\n\n' : ''}${configText(d)}`.slice(0, 1990), allowedMentions: NOPING });
-}
-
 async function handleInteraction(i, client) {
   if (!i.isChatInputCommand?.() || !['add', 'puncte', 'profil', 'clasament', 'banda'].includes(i.commandName)) return false;
   if (!i.guildId) { await i.reply({ content: 'Doar pe server.', ephemeral: true }); return true; }
@@ -457,16 +537,29 @@ async function handleInteraction(i, client) {
     return true;
   }
   await i.deferReply({ ephemeral: true });
+  const ctx = mkCtx(i, client);
   try {
-    if (i.commandName === 'add') await doAdd(i, client, d);
-    else if (i.commandName === 'puncte') await (sub === 'da' ? doGive(i, client, d) : doUndo(i, client, d));
+    if (i.commandName === 'add') {
+      const user = i.options.getUser('user', true);
+      if (user.bot) await i.editReply('Nu pot adăuga un bot.');
+      else await reply(i, await actAdd(ctx, d, { rank: i.options.getString('rang', true), userId: user.id, info: userInfo(user) }));
+    } else if (i.commandName === 'puncte' && sub === 'da') {
+      await reply(i, await actGive(ctx, d, {
+        type: i.options.getString('tip', true), qty: i.options.getInteger('cantitate') ?? 1, note: i.options.getString('nota') || '',
+        userIds: [i.options.getUser('user', true).id, ...parseIds(i.options.getString('si'))],
+      }));
+    } else if (i.commandName === 'puncte') await reply(i, await actUndo(ctx, d, i.options.getInteger('id', true)));
     else if (i.commandName === 'profil') await doProfile(i, d);
     else if (i.commandName === 'clasament') await doBoard(i, d);
     else if (sub === 'lista') await doList(i, d);
-    else if (sub === 'rang') await doRank(i, client, d);
-    else if (sub === 'scoate') await doRemove(i, client, d);
-    else if (sub === 'concediu') await doLeave(i, client, d);
-    else await doConfig(i, client, d);
+    else if (sub === 'rang') await reply(i, await actRank(ctx, d, { userId: i.options.getUser('user', true).id, rank: i.options.getString('rang', true), force: !!i.options.getBoolean('forta') }));
+    else if (sub === 'scoate') await reply(i, await actRemove(ctx, d, i.options.getUser('user', true).id));
+    else if (sub === 'concediu') await reply(i, await actLeave(ctx, d, { userId: i.options.getUser('user', true).id, zile: i.options.getInteger('zile', true) }));
+    else {
+      const patch = {};
+      for (const k of [...Object.keys(CONFIG_INTS), 'retrogradare', 'fus', 'canal', 'rol_lider', 'rol_colider']) patch[k] = i.options.get(k)?.value;
+      await reply(i, actConfig(ctx, d, patch));
+    }
   } catch (err) {
     console.error('points error:', err);
     await i.editReply(`Nu a mers: ${err.message}`).catch(() => {});
@@ -574,4 +667,8 @@ function start(client) {
   tick(client).catch(() => {});
 }
 
-module.exports = { commands, handleInteraction, start, G, weekBounds, totalsOf, eligible, closeWeek, tickVoice, addMember, configText, touch, flush, _db: db };
+module.exports = {
+  commands, handleInteraction, start, G, weekBounds, totalsOf, eligible, closeWeek, tickVoice, addMember, configText, touch, flush, _db: db,
+  // used by the website (web.js)
+  actAdd, actGive, actUndo, actRank, actRemove, actLeave, actConfig, snapshot, weekView, refreshProfiles, rolesInfo, userInfo, isId, RANK_NAME, TYPES,
+};

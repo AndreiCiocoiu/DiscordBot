@@ -10,6 +10,7 @@ const adminlog = require('./src/utils/adminlog');
 const craft = require('./src/utils/craft');
 const commands = require('./src/utils/commands');
 const points = require('./src/utils/points');
+const web = require('./src/utils/web');
 
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
@@ -60,6 +61,7 @@ function wire(client, level) {
     razii.restore(client);
     sessions.restore(client);
     points.start(client);
+    site.setClient(client);
     await syncSlashCommands(c);
   });
 
@@ -88,7 +90,10 @@ function wire(client, level) {
   });
 }
 
+let site = { setClient() {} };
+
 async function main() {
+  site = web.start(null);
   for (const level of LEVELS) {
     const client = build(level);
     try {
