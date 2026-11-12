@@ -208,10 +208,12 @@ function pageBoard() {
   const poster = (r, i) => h('div', { class: `slot s${i + 1}`, style: { '--k': K[i] } },
     h('button', { type: 'button', class: 'card', style: { '--k': K[i] }, onclick: () => openProfile(r.id) },
       h('span', { class: 'seal', text: i + 1 }),
+      i === 0 ? h('span', { class: 'crown' }, icon('crown', 30)) : null,
       h('span', { class: 'photo' }, avatar(r, 120)),
       h('span', { class: 'nm', text: r.name }),
       h('span', { class: 'rk', text: `${RANK_NAME[r.rank]}${held(r) ? ', insigna ținută' : ''}` }),
-      h('span', { class: 'reward' }, h('span', { 'data-count': r.t, 'data-i': i, text: r.t }), h('small', { text: 'puncte' }))));
+      h('span', { class: 'reward' }, h('span', { 'data-count': r.t, 'data-i': i, text: r.t }), h('small', { text: 'puncte' }))),
+    h('span', { class: 'ped', 'aria-hidden': 'true', text: ['I', 'II', 'III'][i] }));
 
   const rest = rows.slice(3);
   const ledger = h('ol', { class: 'board', start: 4 }, rest.map((r, j) => {
@@ -219,7 +221,7 @@ function pageBoard() {
     return h('li', { style: { '--i': j } }, h('button', { type: 'button', onclick: () => openProfile(r.id) },
       h('span', { class: 'pos', text: j + 4 }), avatar(r),
       h('span', { class: 'who' }, h('b', { text: r.name }), h('span', { text: RANK_NAME[r.rank] })),
-      h('span', { class: `meter${ok ? ' ok' : ''}`, style: { '--i': j }, 'aria-label': p ? `${r.t} din ${p} puncte` : `${r.t} puncte` },
+      h('span', { class: `meter${ok ? ' ok' : ''}${p ? '' : ' bare'}`, style: { '--i': j }, 'aria-label': p ? `${r.t} din ${p} puncte` : `${r.t} puncte` },
         p ? h('span', { class: 'track' }, h('span', { class: 'fill', style: { display: 'block', width: `${Math.min(100, (100 * r.t) / p)}%` } })) : null,
         h('span', { class: 'num', 'data-count': r.t, 'data-i': j + 3, 'data-post': p ? ` din ${p}${ok ? ', insigna ținută' : ''}` : ' puncte', text: p ? `${r.t} din ${p}${ok ? ', insigna ținută' : ''}` : `${r.t} puncte` }))));
   }));
