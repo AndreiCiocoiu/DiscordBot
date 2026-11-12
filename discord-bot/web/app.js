@@ -162,11 +162,43 @@ function shell() {
   for (const a of nav.children) { if (a.dataset.k === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
 }
 
+// UI-only dashboard chrome; reads the same state as the existing pages.
+// No endpoints, permissions, calculations or bot behavior are changed.
+function paintChrome() {
+  // Only text, headings and existing state fields used by the visual dashboard.
+  const labels = {
+    clasament: ['CLASAMENT', 'Cei din frunte', 'SAHARA / CLASAMENT', 'Faptele vorbesc mai tare decât cuvintele.', '01'],
+    banda: ['BANDA', 'Familia Sahara', 'SAHARA / MEMBRI', 'Oamenii care poartă același nume.', '02'],
+    crafting: ['CRAFTING', 'Atelierul bandei', 'SAHARA / CRAFTING', 'Tot ce ai nevoie, într-un singur loc.', '03'],
+    lideri: ['LIDERI', 'Conducerea', 'SAHARA / LIDERI', 'Deciziile care țin familia unită.', '04'],
+  };
+  const [small, large, eyebrow, description, no] = labels[route()];
+  const section = $('#current-section'), heading = $('#content-label');
+  if (section) section.textContent = small;
+  if (heading) heading.replaceChildren(document.createTextNode(large), h('span', { class: 'gold-dot', text: '.' }));
+  if ($('#content-eyebrow')) $('#content-eyebrow').textContent = eyebrow;
+  if ($('#content-description')) $('#content-description').textContent = description;
+  if ($('#section-numeral')) $('#section-numeral').textContent = no;
+  const members = S.state?.members || [];
+  const metrics = {
+    '#metric-members': S.authed && S.state ? String(members.length).padStart(2, '0') : '—',
+    '#metric-points': S.authed && S.state ? members.reduce((n, m) => n + (Number(m.points) || 0), 0).toLocaleString('ro-RO') : '—',
+    '#metric-week': S.authed && S.state ? `#${S.state.week.no}` : '—',
+    '#metric-role': S.authed && S.state ? (S.state.me.admin ? 'ADMIN' : S.state.me.leader ? 'LIDER' : 'MEMBRU') : '—',
+  };
+  for (const [selector, value] of Object.entries(metrics)) {
+    const element = $(selector);
+    if (element && element.textContent !== value) { element.textContent = value; element.classList.remove('metric-pop'); void element.offsetWidth; element.classList.add('metric-pop'); }
+  }
+  document.body.classList.toggle('is-authed', !!(S.authed && S.state));
+}
+
 function sheet(...kids) { return h('div', { class: 'sheet-wrap' }, h('section', { class: 'sheet' }, kids)); }
 
 function render() {
   const view = $('#view');
   shell();
+  paintChrome();
   if (S.authed === null) return view.replaceChildren();
   if (!S.authed) return view.replaceChildren(sheet(h('div', { class: 'login' },
     h('h2', { text: 'Doar pentru bandă' }),

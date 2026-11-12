@@ -4,25 +4,92 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>Sahara Cartel</title>
+  <meta name="theme-color" content="#0b0807">
+  <meta name="description" content="Sahara Cartel — clasament, banda, crafting și panoul liderilor.">
+  <title>Sahara Cartel — Familia</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="hero" id="hero">
-    <div class="stage">
-      <div class="parallax"><img class="hero-back" src="/img/sahara.jpg" alt=""></div>
-      <img class="hero-art" src="/img/sahara.jpg" width="1200" height="675" alt="Sahara Cartel: trei oameni mascați în fața conacului, la apus">
-      <div class="hero-glow" aria-hidden="true"></div>
-      <canvas id="dust" aria-hidden="true"></canvas>
-      <div class="hero-fade"></div>
-      <div class="hero-curtain" aria-hidden="true"></div>
+  <div class="site-noise" aria-hidden="true"></div>
+  <div class="site-grain" aria-hidden="true"></div>
+  <div class="app-layout">
+    <aside class="sidebar" aria-label="Meniu principal">
+      <div class="side-top">
+        <a class="brand" href="#/clasament" aria-label="Sahara Cartel — Acasă">
+          <span class="brand-symbol" aria-hidden="true">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M35 7c-12 8-15 24-7 35 5 7 12 10 22 9C42 59 27 60 17 51 4 40 5 19 19 9 23 6 29 5 35 7Z" fill="currentColor"/>
+              <path d="m43 11 2.3 6.7L52 20l-6.7 2.3L43 29l-2.3-6.7L34 20l6.7-2.3L43 11Z" fill="currentColor"/>
+              <path d="M17 47c7-13 20-12 30-5M20 51c9-9 20-9 28-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="brand-copy"><strong>SAHARA</strong><em>C A R T E L</em></span>
+        </a>
+        <div class="side-rule"><span></span> EST. 2025 <span></span></div>
+        <div class="nav-label">PANOUL BANDEI <span>01 — 04</span></div>
+        <nav id="nav" class="nav" aria-label="Secțiuni"></nav>
+      </div>
+      <div class="side-bottom">
+        <a class="family-card" href="#/banda" aria-label="Descoperă membrii bandei">
+          <img src="/img/sahara.jpg" alt="" loading="lazy">
+          <span class="family-card-shade"></span>
+          <span class="family-card-overline">DIN 2025</span>
+          <strong>Familia<br>Sahara<span>✦</span></strong>
+          <span class="family-card-link">VEZI MEMBRII <b>↗</b></span>
+        </a>
+        <div class="side-signature"><span>✳</span> LOIALITATE · RESPECT · FRĂȚIE</div>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="topbar-location"><span class="topbar-diamond">✦</span><span>SAHARA CARTEL</span><span class="topbar-slash">/</span><b id="current-section">CLASAMENT</b></div>
+        <div class="topbar-actions">
+          <a href="#/banda" class="topbar-shortcut">VEZI BANDA <span aria-hidden="true">↗</span></a>
+          <span class="topbar-divider"></span>
+          <div id="me" class="me"></div>
+        </div>
+      </header>
+
+      <header class="hero" id="hero">
+        <div class="stage">
+          <div class="parallax" aria-hidden="true"><img class="hero-back" src="/img/sahara.jpg" alt=""></div>
+          <img class="hero-art" src="/img/sahara.jpg" width="1200" height="675" alt="Sahara Cartel, conacul bandei și membrii săi, în lumina apusului">
+          <div class="hero-horizon" aria-hidden="true"></div>
+          <div class="hero-glow" aria-hidden="true"></div>
+          <div class="hero-orbit" aria-hidden="true"><span></span><span></span></div>
+          <canvas id="dust" aria-hidden="true"></canvas>
+          <div class="hero-fade" aria-hidden="true"></div>
+          <div class="hero-curtain" aria-hidden="true"></div>
+          <div class="hero-engraving" aria-hidden="true"><span>✦</span></div>
+          <div class="hero-meta"><span><i class="tiny-square"></i> SAHARA CARTEL · EST. 2025</span><span>RED DEAD REDEMPTION II <span class="meta-cross">✳</span></span></div>
+          <div class="hero-corner hero-corner-left" aria-hidden="true">SC <span>✦</span> 25</div>
+          <div class="hero-corner hero-corner-right" aria-hidden="true">THE SAHARA FAMILY</div>
+        </div>
+        <div class="hero-ribbon">
+          <div class="ribbon-emblem" aria-hidden="true">✳</div>
+          <div class="ribbon-title"><span>FAMILIA SAHARA</span><h1>Un nume. <em>O legendă.</em></h1></div>
+          <div class="ribbon-end"><span>RESPECTUL SE CÂȘTIGĂ. LOIALITATEA SE DOVEDEȘTE.</span><a href="#/banda" aria-label="Descoperă banda">DESCOPERĂ BANDA <b aria-hidden="true">↗</b></a></div>
+        </div>
+      </header>
+
+      <section class="overview-stats" id="overview-stats" aria-label="Statistici generale">
+        <div class="overview-card"><span class="stat-index">01 <i></i> FAMILIA</span><span class="stat-icon" aria-hidden="true">✦</span><strong id="metric-members">—</strong><span class="stat-foot">MEMBRI ÎN BANDĂ</span></div>
+        <div class="overview-card"><span class="stat-index">02 <i></i> ACTIVITATE</span><span class="stat-icon" aria-hidden="true">✧</span><strong id="metric-points">—</strong><span class="stat-foot">PUNCTE SĂPTĂMÂNA ASTA</span></div>
+        <div class="overview-card"><span class="stat-index">03 <i></i> CLASAMENT</span><span class="stat-icon" aria-hidden="true">◈</span><strong id="metric-week">—</strong><span class="stat-foot">SĂPTĂMÂNA CURENTĂ</span></div>
+        <div class="overview-card"><span class="stat-index">04 <i></i> PROFILUL TĂU</span><span class="stat-icon" aria-hidden="true">♛</span><strong id="metric-role">—</strong><span class="stat-foot">RANG ÎN FAMILIE</span></div>
+      </section>
+
+      <div class="content-header">
+        <span class="section-numeral" id="section-numeral" aria-hidden="true">01</span>
+        <div class="content-heading"><span class="eyebrow"><span></span> <span id="content-eyebrow">SAHARA / CLASAMENT</span></span><h2 id="content-label">Cei din frunte<span class="gold-dot">.</span></h2><p id="content-description">Faptele vorbesc mai tare decât cuvintele.</p></div>
+        <div class="content-header-side" aria-hidden="true"><span class="head-line"></span><span class="content-sun">✺</span></div>
+      </div>
+      <main id="view" class="page" aria-live="polite"></main>
+      <footer class="site-footer"><div class="footer-mark">SC<span>✦</span></div><span>© SAHARA CARTEL — EST. 2025</span><span>O FAMILIE. UN NUME. O LEGENDĂ. <b>✳</b></span></footer>
     </div>
-    <h1 class="sr">Sahara Cartel</h1>
-    <div id="me" class="me"></div>
-    <nav id="nav" class="nav" aria-label="Secțiuni"></nav>
-  </header>
-  <main id="view" class="page" aria-live="polite"></main>
-  <aside id="drawer" class="drawer" hidden aria-label="Profil"></aside>
+  </div>
+  <aside id="drawer" class="drawer" hidden aria-label="Profil membru"></aside>
   <div id="scrim" class="scrim" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>
   <div id="lantern" aria-hidden="true"></div>
