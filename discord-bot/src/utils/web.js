@@ -15,6 +15,7 @@ const points = require('./points');
 const craft = require('./craft');
 const announce = require('./announce');
 const idcard = require('./idcard');
+const familyHub = require('./familyHub');
 
 const ROOT = path.join(__dirname, '..', '..');
 const TTL_MS = 4 * 3600_000;
@@ -22,6 +23,8 @@ const STATIC = {
   '/': ['web/index.html', 'text/html; charset=utf-8'],
   '/app.js': ['web/app.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['web/style.css', 'text/css; charset=utf-8'],
+  '/hub.css': ['web/hub.css', 'text/css; charset=utf-8'],
+  '/hub.js': ['web/hub.js', 'text/javascript; charset=utf-8'],
   '/img/sahara.jpg': ['assets/sahara.jpg', 'image/jpeg'],
 };
 // every web font in assets/fonts is served at /fonts/<file>
@@ -104,6 +107,15 @@ function start(initial) {
     return { ...session, ...info };
   }
 
+  // For Family Hub, verify guild membership and leader permissions against Discord
+  // on each request (not only the signed session cookie, which lives up to 4 hours).
+  async function hubSession(session, guild, d) {
+    const member = await guild.members.fetch(session.id).catch(() => null);
+    if (!member) return null;
+    const roles = await points.rolesInfo(guild, d, session.id, [...member.roles.cache.keys()]);
+    return { ...session, ...roles };
+  }
+
   // ---- API ----
   async function body(req) {
     const chunks = []; let n = 0;
@@ -138,6 +150,12 @@ function start(initial) {
         return v ? json(res, 200, v) : json(res, 404, { error: 'Săptămâna nu e în arhivă.' });
       }
       if (route === '/api/craft') return json(res, 200, craft.catalogJson());
+      if (route === '/api/hub') {
+        const fresh = await hubSession(session, guild, d);
+        if (!fresh) return json(res, 403, { error: 'Nu putem confirma că mai ești membru al serverului.' });
+        const result = familyHub.handle({ guildId: guild.id, session: fresh, leader: fresh.leader, members: d.members, request: null });
+        return json(res, result.status, result.body);
+      }
       if (route === '/api/members') return session.leader ? json(res, 200, await memberSearch(guild, url.searchParams.get('q'))) : json(res, 403, { error: 'Doar lideri.' });
       if (route === '/api/idcard') {
         if (!session.leader) return json(res, 403, { error: 'Doar lideri.' });
@@ -172,6 +190,13 @@ function start(initial) {
     try { b = await body(req); } catch { return json(res, 400, { error: 'Cerere invalidă.' }); }
 
     if (route === '/api/craft') return json(res, 200, craft.calcJson(b.items));
+    if (route === '/api/hub') {
+      const fresh = await hubSession(session, guild, d);
+      if (!fresh) return json(res, 403, { error: 'Nu putem confirma că mai ești membru al serverului.' });
+      const catalog = craft.catalogJson();
+      const result = familyHub.handle({ guildId: guild.id, session: fresh, leader: fresh.leader, members: d.members, request: b, craftNames: catalog.weapons.map((w) => w.name) });
+      return json(res, result.status, result.body);
+    }
 
     const needAdmin = route === '/api/config' || route === '/api/announce';
     if (!session.leader || (needAdmin && !session.admin)) return json(res, 403, { error: needAdmin ? 'Doar adminii.' : 'Doar Liderul, Co-Liderul sau adminii.' });

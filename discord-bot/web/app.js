@@ -4,7 +4,7 @@
 const RANKS = ['membru', 'asociat', 'angajat'];
 const RANK_NAME = { angajat: 'Angajat', asociat: 'Asociat', membru: 'Membru' };
 const TYPE_LABEL = { mina: 'Mină', task: 'Task', prezenta: 'Prezență eveniment', organizat: 'Eveniment organizat', voice: 'Voice', bonus: 'Bonus' };
-const S = { state: null, authed: null, craft: null, week: 'curenta', weekData: null, order: new Map(), tab: '', ltab: 'puncte', anim: true };
+const S = { state: null, authed: null, craft: null, week: 'curenta', weekData: null, order: new Map(), tab: '', ltab: 'puncte', anim: true, hub: null, hubLoading: false };
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 
@@ -77,6 +77,126 @@ function avatar(m, size) {
   return h('span', { class: 'avatar', 'aria-hidden': 'true' }, (m.name || '?').trim().charAt(0).toUpperCase());
 }
 
+// Browser-only helpers: no API changes, no permissions or Discord logic changed.
+const preferenceCache = new Map();
+function preferenceKey(type) {
+  return `sahara-cartel:${type}:v1:${S.state?.me?.id || 'anonymous'}`;
+}
+function readPreference(type, fallback) {
+  const key=preferenceKey(type);
+  try { const data=localStorage.getItem(key); return data ? JSON.parse(data) : (preferenceCache.get(key) ?? fallback); }
+  catch { return preferenceCache.get(key) ?? fallback; }
+}
+function writePreference(type, value) {
+  const key=preferenceKey(type);
+  preferenceCache.set(key,value);
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch { return false; }
+}
+function favoriteIds() {
+  const data=readPreference('favorites', []);
+  return new Set(Array.isArray(data) ? data.filter(x=>typeof x==='string') : []);
+}
+function toggleFavorite(id) {
+  const favorites=favoriteIds();
+  if(favorites.has(id)) favorites.delete(id); else favorites.add(id);
+  writePreference('favorites', [...favorites]);
+  if(typeof S.rosterApply==='function') S.rosterApply();
+  return favorites.has(id);
+}
+function restoreCraftDraft() {
+  if(!S.craft || !S.state) return;
+  const catalog=new Set(S.craft.weapons.map(w=>w.name));
+  const saved=readPreference('craft-draft', []);
+  if(!Array.isArray(saved)) return;
+  S.order.clear();
+  for(const item of saved.slice(0,70)) {
+    if(!Array.isArray(item) || !catalog.has(item[0])) continue;
+    const q=Number(item[1]);
+    if(Number.isInteger(q) && q>0 && q<=1000) S.order.set(item[0],q);
+  }
+}
+function saveCraftDraft() { writePreference('craft-draft',[...S.order]); }
+function downloadTextFile(filename, contents, mime='text/plain;charset=utf-8') {
+  const url=URL.createObjectURL(new Blob([contents], {type:mime}));
+  const a=h('a',{href:url,download:filename});
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+function exportBoardCsv(rows, week) {
+  const escapeCsv=v => {
+    let s=String(v??'');
+    // Prevent formula injection when opened in spreadsheet software.
+    if(/^[\s]*[=+@\-]/.test(s)) s="'"+s;
+    return '"'+s.replace(/"/g,'""')+'"';
+  };
+  const lines=[['Loc','Membru','Rang','Puncte'],...rows.map((r,i)=>[i+1,r.name,RANK_NAME[r.rank]||r.rank,Number(r.t)||0])];
+  downloadTextFile(`sahara-clasament-${String(week).replace(/[^0-9]/g,'')}.csv`, '\ufeff'+lines.map(line=>line.map(escapeCsv).join(',')).join('\r\n'),'text/csv;charset=utf-8');
+  toast('Clasamentul a fost exportat.');
+}
+function exportCraftTxt() {
+  if(!calcResult?.orders?.length) return;
+  const fmt=(title,rows)=>[title,...(rows||[]).map(([name,qty])=>`- ${name}: ${qty}`),''].join('\n');
+  const parts=['SAHARA CARTEL — COMANDĂ CRAFTING','',fmt('Arme', [...S.order].map(([name,qty])=>[name,qty])),fmt('Materiale necesare',calcResult.materials),fmt('Făcute pe parcurs',calcResult.onTheWay),fmt('Minereu de adunat',calcResult.ore),'ORDINEA DE CRAFT',...calcResult.order.map((step,i)=>`${i+1}. ${step.title}: ${step.text}`)];
+  downloadTextFile('sahara-comanda-crafting.txt',parts.join('\n'));
+  toast('Lista de crafting a fost descărcată.');
+}
+
+// Command palette opens as a compact overlay; Ctrl/Cmd+K also works from other pages.
+let commandPreviousFocus=null, commandIndex=0, commandActions=[];
+function closeCommand() {
+  const dlg=$('#command-palette');
+  if(dlg.hidden) return;
+  dlg.hidden=true;
+  document.body.classList.remove('command-open');
+  if(commandPreviousFocus?.isConnected) commandPreviousFocus.focus();
+}
+function openCommand() {
+  if(!S.authed || !S.state) return;
+  closeDrawer();
+  commandPreviousFocus=document.activeElement;
+  $('#command-palette').hidden=false;
+  document.body.classList.add('command-open');
+  const input=$('#command-input');input.value='';
+  renderCommandResults();input.focus();
+}
+function renderCommandResults() {
+  if(!S.state) return;
+  const term=$('#command-input').value.trim().toLocaleLowerCase('ro');
+  const pages=[
+    ...TABS.filter(([k])=>k!=='lideri'||S.state.me.leader).map(([route,label])=>({title:label,sub:'Secțiune',kind:'page',go:()=>{location.hash='#/'+route;closeCommand();}})),
+    ...HUB_TABS.map(([key,label])=>({title:label,sub:'Cartier / modul',kind:'page',go:()=>{location.hash='#/cartier/'+key;closeCommand();}})),
+  ];
+  const people=S.state.members.map(m=>({title:m.name,sub:RANK_NAME[m.rank]||'Membru',kind:'person',go:()=>{closeCommand();openProfile(m.id);}}));
+  const entries=[...pages,...people].filter(item=>(item.title+' '+item.sub).toLocaleLowerCase('ro').includes(term)).slice(0,12);
+  commandActions=entries;
+  commandIndex=0;
+  const list=$('#command-results');
+  list.replaceChildren(...entries.map((item,i)=>h('button',{type:'button',class:'command-hit',role:'option','aria-selected':i===0?'true':'false',onclick:item.go},
+    h('span',{class:'command-mark',text:item.kind==='page'?'◇':'♟'}),
+    h('span',{class:'command-copy'},h('strong',{text:item.title}),h('small',{text:item.sub})),
+    h('span',{class:'command-arrow',text:'↗'}))));
+  if(!entries.length) list.append(h('p',{class:'command-empty',text:'Niciun rezultat. Încearcă alt nume.'}));
+}
+function shiftCommandSelection(delta) {
+  if(!commandActions.length) return;
+  commandIndex=(commandIndex+delta+commandActions.length)%commandActions.length;
+  [...$('#command-results').querySelectorAll('.command-hit')].forEach((el,i)=>el.setAttribute('aria-selected',String(i===commandIndex)));
+  $('#command-results').querySelectorAll('.command-hit')[commandIndex]?.scrollIntoView({block:'nearest'});
+}
+$('#quick-open').addEventListener('click',openCommand);
+$('#command-backdrop').addEventListener('click',closeCommand);
+$('#command-close').addEventListener('click',closeCommand);
+$('#command-input').addEventListener('input',renderCommandResults);
+$('#command-input').addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'||e.key==='ArrowUp') {e.preventDefault();shiftCommandSelection(e.key==='ArrowDown'?1:-1);}
+  else if(e.key==='Enter') {e.preventDefault();commandActions[commandIndex]?.go();}
+});
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k') {e.preventDefault();$('#command-palette').hidden?openCommand():closeCommand();}
+  if(e.key==='Escape'&&!$('#command-palette').hidden){e.preventDefault();closeCommand();}
+});
+
 let toastTimer;
 function toast(msg, bad) {
   const t = $('#toast');
@@ -138,16 +258,17 @@ async function loadWeek(no, quiet) {
 async function loadCraft() {
   if (S.craft) return;
   const r = await api('/api/craft');
-  if (r.ok) { S.craft = r.data; render(); }
+  if (r.ok) { S.craft = r.data; restoreCraftDraft(); render(); if (S.order.size) runCalc(); }
 }
 
 // ---- shell ---------------------------------------------------------------
 
-const TABS = [['clasament', 'Clasament', 'trophy'], ['banda', 'Banda', 'people'], ['crafting', 'Crafting', 'tools'], ['lideri', 'Lideri', 'crown']];
+const TABS = [['clasament', 'Clasament', 'trophy'], ['banda', 'Banda', 'people'], ['crafting', 'Crafting', 'tools'], ['cartier', 'Cartier', 'shield'], ['lideri', 'Lideri', 'crown']];
 function route() { const t = location.hash.replace(/^#\/?/, '').split('/')[0]; return TABS.some(([k]) => k === t) ? t : 'clasament'; }
 
 function shell() {
   const me = $('#me'), nav = $('#nav');
+  $('#quick-open').hidden = !(S.authed && S.state);
   if (!S.authed || !S.state) { me.replaceChildren(); nav.replaceChildren(); me.dataset.key = nav.dataset.key = ''; return; }
   const m = S.state.me;
   if (me.dataset.key !== m.id) {
@@ -159,38 +280,45 @@ function shell() {
     nav.replaceChildren(...TABS.filter(([k]) => k !== 'lideri' || m.leader).map(([k, label, ic]) => h('a', { href: `#/${k}`, 'data-k': k }, icon(ic, 22), h('span', { text: label }))));
   }
   const tab = route();
-  for (const a of nav.children) { if (a.dataset.k === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
+  for (const a of nav.children) {
+    if (a.dataset.k === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    if (a.dataset.k === 'cartier') {
+      const unread = S.hub?.notices?.filter((n) => !n.read)?.length || 0;
+      let indicator = a.querySelector('.nav-unread');
+      if (unread && !indicator) { indicator = h('b', { class: 'nav-unread' }); a.append(indicator); }
+      if (indicator) { indicator.textContent = String(unread); indicator.hidden = !unread; }
+    }
+  }
 }
 
-// UI-only dashboard chrome; reads the same state as the existing pages.
-// No endpoints, permissions, calculations or bot behavior are changed.
-function paintChrome() {
-  // Only text, headings and existing state fields used by the visual dashboard.
-  const labels = {
-    clasament: ['CLASAMENT', 'Cei din frunte', 'SAHARA / CLASAMENT', 'Faptele vorbesc mai tare decât cuvintele.', '01'],
-    banda: ['BANDA', 'Familia Sahara', 'SAHARA / MEMBRI', 'Oamenii care poartă același nume.', '02'],
-    crafting: ['CRAFTING', 'Atelierul bandei', 'SAHARA / CRAFTING', 'Tot ce ai nevoie, într-un singur loc.', '03'],
-    lideri: ['LIDERI', 'Conducerea', 'SAHARA / LIDERI', 'Deciziile care țin familia unită.', '04'],
-  };
-  const [small, large, eyebrow, description, no] = labels[route()];
-  const section = $('#current-section'), heading = $('#content-label');
-  if (section) section.textContent = small;
-  if (heading) heading.replaceChildren(document.createTextNode(large), h('span', { class: 'gold-dot', text: '.' }));
-  if ($('#content-eyebrow')) $('#content-eyebrow').textContent = eyebrow;
-  if ($('#content-description')) $('#content-description').textContent = description;
-  if ($('#section-numeral')) $('#section-numeral').textContent = no;
-  const members = S.state?.members || [];
-  const metrics = {
-    '#metric-members': S.authed && S.state ? String(members.length).padStart(2, '0') : '—',
-    '#metric-points': S.authed && S.state ? members.reduce((n, m) => n + (Number(m.points) || 0), 0).toLocaleString('ro-RO') : '—',
-    '#metric-week': S.authed && S.state ? `#${S.state.week.no}` : '—',
-    '#metric-role': S.authed && S.state ? (S.state.me.admin ? 'ADMIN' : S.state.me.leader ? 'LIDER' : 'MEMBRU') : '—',
-  };
-  for (const [selector, value] of Object.entries(metrics)) {
-    const element = $(selector);
-    if (element && element.textContent !== value) { element.textContent = value; element.classList.remove('metric-pop'); void element.offsetWidth; element.classList.add('metric-pop'); }
-  }
-  document.body.classList.toggle('is-authed', !!(S.authed && S.state));
+
+// Website-only weekly summary. Reads the existing /api/state payload; no new endpoints.
+function paintFamilySummary() {
+  const bar = $('#family-summary');
+  if (!bar) return;
+  if (!S.authed || !S.state) { bar.hidden = true; bar.replaceChildren(); return; }
+  const st = S.state, members = st.members || [];
+  const mine = members.find((m) => m.id === st.me.id);
+  const allPoints = members.reduce((n, m) => n + (Number(m.points) || 0), 0);
+  const threshold = mine ? (Number(st.cfg.prag[mine.rank]) || 0) : 0;
+  const pts = mine ? Number(mine.points) || 0 : 0;
+  const remaining = threshold ? Math.max(0, threshold - pts) : 0;
+  const fill = threshold ? Math.min(100, Math.max(0, (pts / threshold) * 100)) : 100;
+  const stat = (label, value) => h('span', { class: 'summary-stat' }, h('small', { text: label }), h('strong', { text: value }));
+  bar.replaceChildren(
+    h('div', { class: 'summary-identity' }, h('span', { class: 'summary-calligraphy', lang: 'ar', text: 'الصحراء' }), h('span', { class: 'summary-wordmark', text: 'FAMILIA SAHARA' })),
+    h('div', { class: 'summary-stats' },
+      stat('SĂPTĂMÂNA', String(st.week.no).padStart(2, '0')),
+      stat('MEMBRI', String(members.length).padStart(2, '0')),
+      stat('PUNCTE ÎN TOTAL', allPoints.toLocaleString('ro-RO'))),
+    mine ? h('div', { class: 'summary-progress' },
+      h('span', { class: 'summary-progress-label', text: threshold ? (remaining ? `${remaining}p până la pragul tău` : 'Pragul tău este atins') : 'Rang fără prag' }),
+      h('span', { class: 'summary-progress-track', role: 'img', 'aria-label': `Progresul tău: ${Math.round(fill)}%` }, h('span', { style: { width: `${fill}%` } }))) : null,
+    h('div', { class: 'summary-actions' },
+      mine ? h('button', { type: 'button', class: 'summary-profile', onclick: () => openProfile(mine.id) }, 'Profilul meu', h('span', { 'aria-hidden': 'true', text: '↗' })) : null,
+      h('button', { type: 'button', class: 'summary-refresh', title: 'Actualizează datele', 'aria-label': 'Actualizează datele', onclick: () => refresh() }, '↻'))
+  );
+  bar.hidden = false;
 }
 
 function sheet(...kids) { return h('div', { class: 'sheet-wrap' }, h('section', { class: 'sheet' }, kids)); }
@@ -198,7 +326,7 @@ function sheet(...kids) { return h('div', { class: 'sheet-wrap' }, h('section', 
 function render() {
   const view = $('#view');
   shell();
-  paintChrome();
+  paintFamilySummary();
   if (S.authed === null) return view.replaceChildren();
   if (!S.authed) return view.replaceChildren(sheet(h('div', { class: 'login' },
     h('h2', { text: 'Doar pentru bandă' }),
@@ -207,7 +335,7 @@ function render() {
   if (!S.state) return view.replaceChildren(sheet(title('shield', 'Nu pot încărca datele', 'Botul nu răspunde acum. Reîncarcă pagina peste un minut.')));
   const tab = route();
   document.title = `${TABS.find(([k]) => k === tab)[1]} - Sahara Cartel`;
-  const pages = { clasament: pageBoard, banda: pageRoster, crafting: pageCraft, lideri: pageLeaders };
+  const pages = { clasament: pageBoard, banda: pageRoster, crafting: pageCraft, cartier: pageHub, lideri: pageLeaders };
   if (tab === 'lideri' && !S.state.me.leader) return (location.hash = '#/clasament');
   const anim = S.anim && !REDUCED;
   S.anim = false;
@@ -218,6 +346,7 @@ function render() {
   if (keepScroll && !anim) scrollTo(0, keepScroll);
   if (anim) countUp(view);
   if (tab === 'crafting') loadCraft();
+  if (tab === 'cartier' && !S.hub && !S.hubLoading) loadHub();
 }
 
 // ---- leaderboard ---------------------------------------------------------
@@ -261,28 +390,91 @@ function pageBoard() {
   const body = rows.length
     ? [h('div', { class: 'podium' }, rows.slice(0, 3).map(poster)), rest.length ? ledger : null]
     : h('p', { class: 'empty muted', text: 'Nimeni nu e în evidență încă. Un lider poate adăuga oameni din secțiunea Lideri sau cu /add pe Discord.' });
-  return sheet(title('trophy', title_, sub, sel),
+  const boardTools=h('div',{class:'board-tools'},sel,
+    st.me.leader ? h('button',{type:'button',class:'btn alt small board-export',onclick:()=>exportBoardCsv(rows, cur?st.week.no:S.weekData.no)},'↓ CSV') : null);
+  return sheet(title('trophy', title_, sub, boardTools),
     h('p', { class: 'small muted', text: `Insigna de Membru se ține cu ${prag.membru} puncte pe săptămână, cea de Asociat cu ${prag.asociat}. Angajații nu au prag.` }),
+    compareMembersPanel(rows,prag),
     body);
+}
+
+// Optional comparison uses only the rows for the selected week.
+function compareMembersPanel(rows,prag) {
+  if(rows.length<2) return null;
+  const details=h('details',{class:'compare-members'});
+  const options=()=>rows.map((r,i)=>h('option',{value:r.id,text:r.name,selected:false}));
+  const left=h('select',{'aria-label':'Primul membru'},options());
+  const right=h('select',{'aria-label':'Al doilea membru'},options());
+  left.value=rows[0].id; right.value=rows[1].id;
+  const result=h('div',{class:'compare-result'});
+  const paint=()=>{
+    const a=rows.find(r=>r.id===left.value),b=rows.find(r=>r.id===right.value);
+    if(!a||!b) return;
+    const max=Math.max(1,Number(a.t)||0,Number(b.t)||0);
+    const item=(member)=>h('div',{class:'compare-line'},
+      h('div',{class:'compare-name'},h('strong',{text:member.name}),h('span',{text:`${RANK_NAME[member.rank]||'Membru'} · ${Number(member.t)||0}p` })),
+      h('div',{class:'compare-track'},h('span',{style:{width:`${Math.max(1,100*(Number(member.t)||0)/max)}%`}})));
+    const diff=Math.abs((Number(a.t)||0)-(Number(b.t)||0));
+    result.replaceChildren(item(a),item(b),h('p',{class:'compare-diff',text: a.id===b.id?'Alege doi membri diferiți.':diff===0?'Sunt la egalitate.':`${(Number(a.t)||0)>(Number(b.t)||0)?a.name:b.name} are ${diff} puncte în plus.`}));
+  };
+  left.addEventListener('change',paint);right.addEventListener('change',paint);
+  details.append(h('summary',null,'⚖ Compară doi membri',h('span',{class:'compare-hint',text:'doar datele din clasament'})),
+    h('div',{class:'compare-inner'},h('div',{class:'compare-selects'},left,right),result));
+  paint();
+  return details;
 }
 
 // ---- roster --------------------------------------------------------------
 
 function pageRoster() {
   const st = S.state;
-  return sheet(
-    title('people', 'Banda', `${plural(st.members.length, 'om', 'oameni')} în evidență. Apasă pe cineva ca să-i vezi profilul.`),
-    RANKS.map((r) => {
-      const people = st.members.filter((m) => m.rank === r).sort((a, b) => a.rankSince - b.rankSince);
-      const [used, max] = st.seats[r];
-      return h('div', { class: 'rank-block' },
-        h('header', null, h('h3', { text: RANK_NAME[r] }),
-          max ? h('span', { class: 'seats', role: 'img', 'aria-label': `${used} din ${max} locuri ocupate` }, Array.from({ length: Math.min(max, 40) }, (_, i) => h('span', { class: `seat${i < used ? ' used' : ''}`, style: { '--i': i } }, i < used ? badgeSvg(r, 18) : null)))
-            : null,
-          h('span', { class: 'small muted', text: max ? `${used} din ${max} locuri` : plural(used, 'angajat', 'angajați') })),
-        people.length ? h('ul', { class: 'people' }, people.map((m, i) => h('li', { style: { '--i': i } }, h('button', { type: 'button', class: 'person', onclick: () => openProfile(m.id) },
-          avatar(m), h('span', { class: 'who' }, h('b', { text: m.name }), h('span', { text: `în bandă ${dayText(daysSince(m.since))}` }), m.leaveUntil > Date.now() ? h('span', { class: 'tag', text: 'concediu' }) : null))))) : h('p', { class: 'small muted', text: 'Nimeni încă.' }));
-    }));
+  const search = h('input', { id: 'roster-search', class: 'roster-search', type: 'text', placeholder: 'Caută un membru…', autocomplete: 'off', 'aria-label': 'Caută un membru' });
+  const rankFilter = h('select', { id: 'roster-rank', class: 'roster-rank', 'aria-label': 'Filtrează după rang' },
+    h('option', { value: 'all', text: 'Toate rangurile' }),
+    ...RANKS.map((r) => h('option', { value: r, text: RANK_NAME[r] })));
+  const favOnly=h('input',{type:'checkbox',id:'roster-fav-only'});
+  const matches = h('span', { class: 'roster-matches', role: 'status', text: `${st.members.length} membri` });
+  const tools = h('div', { class: 'roster-tools' },
+    h('div', { class: 'roster-inputs' }, search, rankFilter, h('label',{class:'roster-favorites',for:'roster-fav-only'},favOnly,'★ Preferate')), matches);
+  const blocks = RANKS.map((r) => {
+    const people = st.members.filter((m) => m.rank === r).sort((a, b) => a.rankSince - b.rankSince);
+    const [used, max] = st.seats[r];
+    return h('div', { class: 'rank-block', 'data-rank': r },
+      h('header', null, h('h3', { text: RANK_NAME[r] }),
+        max ? h('span', { class: 'seats', role: 'img', 'aria-label': `${used} din ${max} locuri ocupate` }, Array.from({ length: Math.min(max, 40) }, (_, i) => h('span', { class: `seat${i < used ? ' used' : ''}`, style: { '--i': i } }, i < used ? badgeSvg(r, 18) : null))) : null,
+        h('span', { class: 'small muted', text: max ? `${used} din ${max} locuri` : plural(used, 'angajat', 'angajați') })),
+      people.length
+        ? h('ul', { class: 'people' }, people.map((m, i) => h('li', { style: { '--i': i } },
+          h('button', { type: 'button', class: 'person', 'data-name': m.name.toLocaleLowerCase('ro'), 'data-id': m.id, onclick: () => openProfile(m.id) },
+            avatar(m), h('span', { class: 'who' }, h('b', { text: m.name }), h('span', { text: `în bandă ${dayText(daysSince(m.since))}` }), m.leaveUntil > Date.now() ? h('span', { class: 'tag', text: 'concediu' }) : null)))))
+        : h('p', { class: 'small muted', text: 'Nimeni încă.' }));
+  });
+  const noMatches = h('p', { class: 'roster-no-matches muted', hidden: true, text: 'Niciun membru găsit. Încearcă alt nume sau rang.' });
+  const apply = () => {
+    const term = search.value.trim().toLocaleLowerCase('ro');
+    const rank = rankFilter.value;
+    const favorites=favoriteIds();
+    let total = 0;
+    for (const block of blocks) {
+      let visible = 0;
+      for (const person of block.querySelectorAll('.person')) {
+        const show = (rank === 'all' || rank === block.dataset.rank) && person.dataset.name.includes(term) && (!favOnly.checked || favorites.has(person.dataset.id));
+        person.closest('li').hidden = !show;
+        if (show) visible++;
+      }
+      // Empty ranks remain visible only in the unfiltered view, as before.
+      block.hidden = (!!term || rank !== 'all' || favOnly.checked) ? visible === 0 : false;
+      total += visible;
+    }
+    matches.textContent = `${total} ${total === 1 ? 'membru' : 'membri'}`;
+    noMatches.hidden = total !== 0;
+  };
+  search.addEventListener('input', apply);
+  rankFilter.addEventListener('change', apply);
+  favOnly.addEventListener('change',apply);
+  S.rosterApply=apply;
+  return sheet(title('people', 'Banda', `${plural(st.members.length, 'om', 'oameni')} în evidență. Apasă pe cineva ca să-i vezi profilul.`),
+    tools, blocks, noMatches);
 }
 
 // ---- profile drawer ------------------------------------------------------
@@ -343,9 +535,15 @@ function openProfile(id) {
   const breakdown = Object.entries(m.byType).filter(([, v]) => v).map(([k, v]) => h('li', null, h('span', { text: k === 'voice' ? `Voice (${Math.floor(m.voiceMin / 60)} ore ${m.voiceMin % 60} min)` : TYPE_LABEL[k] }), h('b', { text: v })));
   const held = prag && m.points >= prag;
   const closeBtn = h('button', { class: 'close', type: 'button', 'aria-label': 'Închide', onclick: closeDrawer }, '\u00d7');
+  const favorite=h('button',{type:'button',class:'profile-favorite','aria-pressed':String(favoriteIds().has(m.id)),onclick:()=>{
+    const active=toggleFavorite(m.id);
+    favorite.setAttribute('aria-pressed',String(active));
+    favorite.textContent=active?'★ Salvat la preferate':'☆ Adaugă la preferate';
+  }},favoriteIds().has(m.id)?'★ Salvat la preferate':'☆ Adaugă la preferate');
   const kids = [
     h('div', { class: 'profile-head' }, avatar(m, 76),
       h('h2', { text: m.name }),
+      favorite,
       h('p', { class: 'rank-line' }, badgeSvg(m.rank, 30), h('span', { text: RANK_NAME[m.rank] })),
       h('div', { class: 'flourish', 'aria-hidden': 'true' }, h('span', { text: '\u25c6' }))),
     h('dl', { class: 'facts' },
@@ -442,11 +640,13 @@ function paintResult() {
   if (!r || !r.orders?.length) return box.append(h('p', { class: 'small muted', text: 'Adaugă arme din listă. Cantitatea o poți scrie direct în căsuță.' }));
   const dl = (title, pairs) => pairs?.length ? [h('h3', { text: title }), h('dl', null, pairs.map(([n, q]) => [h('dt', { text: n }), h('dd', { text: q })]))] : [];
   box.append(...dl('Materiale necesare', r.materials), ...dl('Făcute pe parcurs', r.onTheWay), ...dl('Minereu de adunat', r.ore),
-    h('h3', { text: 'Ordinea de craft' }), h('ol', null, r.order.map((o) => h('li', null, h('b', { text: o.title }), ` - ${o.text}`))));
+    h('h3', { text: 'Ordinea de craft' }), h('ol', null, r.order.map((o) => h('li', null, h('b', { text: o.title }), ` - ${o.text}`))),
+    h('button', {class:'btn alt small craft-export',type:'button',onclick:exportCraftTxt}, '↓ Descarcă lista .txt'));
 }
 
 function setQty(name, q) {
   if (!(q > 0)) S.order.delete(name); else S.order.set(name, Math.min(1000, Math.floor(q)));
+  saveCraftDraft();
   const list = document.getElementById('order');
   if (list) list.replaceWith(orderList());
   runCalc();
