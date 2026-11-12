@@ -4,7 +4,8 @@
 const RANKS = ['membru', 'asociat', 'angajat'];
 const RANK_NAME = { angajat: 'Angajat', asociat: 'Asociat', membru: 'Membru' };
 const TYPE_LABEL = { mina: 'Mină', task: 'Task', prezenta: 'Prezență eveniment', organizat: 'Eveniment organizat', voice: 'Voice', bonus: 'Bonus' };
-const S = { state: null, authed: null, craft: null, week: 'curenta', weekData: null, order: new Map(), tab: '' };
+const S = { state: null, authed: null, craft: null, week: 'curenta', weekData: null, order: new Map(), tab: '', anim: true };
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 
 function h(tag, props, ...kids) {
@@ -13,7 +14,7 @@ function h(tag, props, ...kids) {
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v;
     else if (k === 'text') el.textContent = v;
-    else if (k === 'style') Object.assign(el.style, v);
+    else if (k === 'style') { for (const [p, x] of Object.entries(v)) { if (p.startsWith('--')) el.style.setProperty(p, x); else el.style[p] = x; } }
     else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else el.setAttribute(k, v === true ? '' : v);
   }
@@ -54,6 +55,22 @@ function toast(msg, bad) {
   const t = $('#toast');
   t.textContent = msg; t.className = `toast${bad ? ' bad' : ''}`; t.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, bad ? 7000 : 4500);
+}
+
+// numbers count up from 0 (elements marked data-count, with data-pre / data-post around the number)
+function countUp(root, delay = 0) {
+  if (REDUCED) return;
+  for (const el of root.querySelectorAll('[data-count]')) {
+    const to = Number(el.dataset.count), pre = el.dataset.pre || '', post = el.dataset.post || '';
+    const t0 = performance.now() + delay + Number(el.dataset.i || 0) * 55;
+    el.textContent = `${pre}0${post}`;
+    const step = (t) => {
+      const k = Math.min(1, Math.max(0, (t - t0) / 1100)), e = 1 - (1 - k) ** 3;
+      el.textContent = `${pre}${Math.round(to * e)}${post}`;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
 }
 
 async function api(path, body) {
@@ -104,15 +121,18 @@ function route() { const t = location.hash.replace(/^#\/?/, '').split('/')[0]; r
 
 function shell() {
   const me = $('#me'), nav = $('#nav');
-  me.replaceChildren(); nav.replaceChildren();
-  if (!S.authed || !S.state) return;
+  if (!S.authed || !S.state) { me.replaceChildren(); nav.replaceChildren(); me.dataset.key = nav.dataset.key = ''; return; }
   const m = S.state.me;
-  me.append(m.avatar ? h('img', { src: m.avatar, alt: '' }) : '', h('span', { text: m.name }), h('a', { href: '/auth/logout' }, 'Ieși'));
-  const tab = route();
-  for (const [k, label] of TABS) {
-    if (k === 'lideri' && !m.leader) continue;
-    nav.append(h('a', { href: `#/${k}`, 'aria-current': tab === k ? 'page' : null }, label));
+  if (me.dataset.key !== m.id) {
+    me.dataset.key = m.id;
+    me.replaceChildren(m.avatar ? h('img', { src: m.avatar, alt: '' }) : '', h('span', { text: m.name }), h('a', { href: '/auth/logout' }, 'Ieși'));
   }
+  if (nav.dataset.key !== String(m.leader)) {
+    nav.dataset.key = String(m.leader);
+    nav.replaceChildren(...TABS.filter(([k]) => k !== 'lideri' || m.leader).map(([k, label], i) => h('a', { href: `#/${k}`, 'data-k': k, style: { '--i': i } }, h('span', { class: 'sign', text: label }))));
+  }
+  const tab = route();
+  for (const a of nav.children) { if (a.dataset.k === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
 }
 
 function sheet(...kids) { return h('div', { class: 'sheet-wrap' }, h('section', { class: 'sheet' }, kids)); }
@@ -130,10 +150,14 @@ function render() {
   document.title = `${TABS.find(([k]) => k === tab)[1]} - Sahara Cartel`;
   const pages = { clasament: pageBoard, banda: pageRoster, crafting: pageCraft, lideri: pageLeaders };
   if (tab === 'lideri' && !S.state.me.leader) return (location.hash = '#/clasament');
+  const anim = S.anim && !REDUCED;
+  S.anim = false;
   const keepScroll = S.tab === tab ? scrollY : 0;
+  view.classList.toggle('anim', anim);
   view.replaceChildren(...[].concat(pages[tab]()));
   S.tab = tab;
-  if (keepScroll) scrollTo(0, keepScroll);
+  if (keepScroll && !anim) scrollTo(0, keepScroll);
+  if (anim) countUp(view);
   if (tab === 'crafting') loadCraft();
 }
 
@@ -147,17 +171,17 @@ function pageBoard() {
   const prag = cur ? st.cfg.prag : S.weekData.prag;
   const title = cur ? `Săptămâna ${st.week.no}` : `Săptămâna ${S.weekData.no}`;
   const sub = cur ? `Se închide peste ${countdown(st.week.end)}, duminică la miezul nopții.` : `Încheiată pe ${fmtDate(S.weekData.end - 1)}.`;
-  const sel = h('select', { 'aria-label': 'Alege săptămâna', onchange: async (e) => { S.week = e.target.value; if (S.week === 'curenta') render(); else await loadWeek(S.week); } },
+  const sel = h('select', { 'aria-label': 'Alege săptămâna', onchange: async (e) => { S.week = e.target.value; S.anim = true; if (S.week === 'curenta') render(); else await loadWeek(S.week); } },
     h('option', { value: 'curenta', selected: cur }, 'Săptămâna curentă'),
     st.archive.map((w) => h('option', { value: w.no, selected: !cur && String(S.week) === String(w.no) }, `Săptămâna ${w.no} (încheiată)`)));
   const list = rows.length ? h('ol', { class: 'board' }, rows.map((r, i) => {
     const p = prag[r.rank] || 0, held = p && r.t >= p;
-    return h('li', null, h('button', { type: 'button', onclick: () => openProfile(r.id) },
+    return h('li', { style: { '--i': i } }, h('button', { type: 'button', onclick: () => openProfile(r.id) },
       h('span', { class: 'pos', text: i + 1 }), avatar(r),
       h('span', { class: 'who' }, h('b', { text: r.name }), h('span', { text: RANK_NAME[r.rank] })),
-      h('span', { class: `meter${held ? ' ok' : ''}`, 'aria-label': p ? `${r.t} din ${p} puncte` : `${r.t} puncte` },
+      h('span', { class: `meter${held ? ' ok' : ''}`, style: { '--i': i }, 'aria-label': p ? `${r.t} din ${p} puncte` : `${r.t} puncte` },
         p ? h('span', { class: 'track', style: {} }, h('span', { class: 'fill', style: { display: 'block', width: `${Math.min(100, (100 * r.t) / p)}%` } })) : null,
-        h('span', { class: 'num', text: p ? `${r.t} din ${p}${held ? ', insigna ținută' : ''}` : `${r.t} puncte` }))));
+        h('span', { class: 'num', 'data-count': r.t, 'data-i': i, 'data-post': p ? ` din ${p}${held ? ', insigna ținută' : ''}` : ' puncte', text: p ? `${r.t} din ${p}${held ? ', insigna ținută' : ''}` : `${r.t} puncte` }))));
   })) : h('p', { class: 'empty muted', text: 'Nimeni nu e în evidență încă. Un lider poate adăuga oameni din secțiunea Lideri sau cu /add pe Discord.' });
   return sheet(
     h('div', { class: 'head' }, h('div', null, h('h2', { text: title }), h('p', { class: 'muted', text: sub })), sel),
@@ -177,10 +201,10 @@ function pageRoster() {
       const [used, max] = st.seats[r];
       return h('div', { class: 'rank-block' },
         h('header', null, h('h3', { text: RANK_NAME[r] }),
-          max ? h('span', { class: 'seats', role: 'img', 'aria-label': `${used} din ${max} locuri ocupate` }, Array.from({ length: Math.min(max, 40) }, (_, i) => h('span', { class: `seat${i < used ? ' used' : ''}` })))
+          max ? h('span', { class: 'seats', role: 'img', 'aria-label': `${used} din ${max} locuri ocupate` }, Array.from({ length: Math.min(max, 40) }, (_, i) => h('span', { class: `seat${i < used ? ' used' : ''}`, style: { '--i': i } }, i < used ? badgeSvg(r, 18) : null)))
             : null,
           h('span', { class: 'small muted', text: max ? `${used} din ${max} locuri` : plural(used, 'angajat', 'angajați') })),
-        people.length ? h('ul', { class: 'people' }, people.map((m) => h('li', null, h('button', { type: 'button', class: 'person', onclick: () => openProfile(m.id) },
+        people.length ? h('ul', { class: 'people' }, people.map((m, i) => h('li', { style: { '--i': i } }, h('button', { type: 'button', class: 'person', onclick: () => openProfile(m.id) },
           avatar(m), h('span', { class: 'who' }, h('b', { text: m.name }), h('span', { text: `în bandă ${dayText(daysSince(m.since))}` }), m.leaveUntil > Date.now() ? h('span', { class: 'tag', text: 'concediu' }) : null))))) : h('p', { class: 'small muted', text: 'Nimeni încă.' }));
     }));
 }
@@ -192,13 +216,15 @@ $('#scrim').addEventListener('click', closeDrawer);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
 // the rank as a badge: brass sheriff star (Membru), copper shield (Asociat), plain iron plate (Angajat)
+let badgeN = 0;
 function badgeSvg(rank, size) {
+  const gid = `bg-${rank}-${++badgeN}`;
   const g = svg('svg', { class: 'badge', viewBox: '0 0 40 40', width: size, height: size, 'aria-hidden': 'true' });
-  const defs = svg('defs', null, svg('linearGradient', { id: `bg-${rank}`, x1: 0, y1: 0, x2: 1, y2: 1 },
+  const defs = svg('defs', null, svg('linearGradient', { id: gid, x1: 0, y1: 0, x2: 1, y2: 1 },
     svg('stop', { offset: '0', 'stop-color': rank === 'membru' ? '#f0cd7a' : rank === 'asociat' ? '#d98a4a' : '#9a9184' }),
     svg('stop', { offset: '1', 'stop-color': rank === 'membru' ? '#a8761f' : rank === 'asociat' ? '#8d4a1c' : '#5f574c' })));
   g.append(defs);
-  const fill = `url(#bg-${rank})`, stroke = '#3a2412';
+  const fill = `url(#${gid})`, stroke = '#3a2412';
   if (rank === 'membru') {
     const pts = [], balls = [];
     for (let i = 0; i < 12; i++) {
@@ -225,7 +251,9 @@ function historyChart(m) {
   if (prag) { g.append(svg('line', { x1: pad - 4, x2: W, y1: y(prag), y2: y(prag), stroke: '#7a2a1e', 'stroke-dasharray': '5 4', 'stroke-width': 1.4 }), svg('text', { x: 0, y: y(prag) + 4, 'text-anchor': 'start' }, `prag ${prag}`)); }
   weeks.forEach((w, i) => {
     const x = pad + i * ((W - pad) / weeks.length) + 4, held = prag && w.t >= (w.prag?.[w.rank] ?? prag);
-    g.append(svg('rect', { x, y: y(w.t), width: bw, height: Math.max(2, H - 22 - y(w.t)), fill: held ? '#d9a441' : '#c8702a', stroke: '#3a2412', 'stroke-width': 1 }),
+    const bar = svg('rect', { x, y: y(w.t), width: bw, height: Math.max(2, H - 22 - y(w.t)), fill: held ? '#d9a441' : '#c8702a', stroke: '#3a2412', 'stroke-width': 1 });
+    bar.style.setProperty('--i', i);
+    g.append(bar,
       svg('text', { x: x + bw / 2, y: y(w.t) - 4, 'text-anchor': 'middle' }, w.t),
       svg('text', { x: x + bw / 2, y: H - 6, 'text-anchor': 'middle' }, `S${w.no}`));
   });
@@ -247,7 +275,7 @@ function openProfile(id) {
     h('dl', { class: 'facts' },
       h('dt', { text: 'În bandă' }), h('dd', { text: `${dayText(daysSince(m.since))}, din ${fmtDate(m.since)}` }),
       h('dt', { text: 'Rang' }), h('dd', { text: `${RANK_NAME[m.rank]} ${dayText(daysSince(m.rankSince))}` }),
-      h('dt', { text: 'Săptămâna asta' }), h('dd', { text: prag ? `${m.points} din ${prag} puncte` : `${m.points} puncte` })),
+      h('dt', { text: 'Săptămâna asta' }), h('dd', { 'data-count': m.points, 'data-post': prag ? ` din ${prag} puncte` : ' puncte', text: prag ? `${m.points} din ${prag} puncte` : `${m.points} puncte` })),
     prag ? h('div', { class: `meter${held ? ' ok' : ''}`, role: 'img', 'aria-label': `${m.points} din ${prag} puncte` },
       h('span', { class: 'track' }, h('span', { class: 'fill', style: { display: 'block', width: `${Math.min(100, (100 * m.points) / prag)}%` } })),
       h('span', { class: 'num', text: held ? 'Insigna ținută săptămâna asta' : `Mai sunt ${prag - m.points} puncte până la prag` })) : null,
@@ -260,6 +288,7 @@ function openProfile(id) {
   if (st.me.leader) kids.push(leaderTools(m));
   d.replaceChildren(closeBtn, h('div', { class: 'drawer-inner' }, h('div', { class: 'poster' }, ...kids)));
   d.hidden = false; $('#scrim').hidden = false; d.querySelector('.drawer-inner').scrollTop = 0;
+  countUp(d, 650);
   closeBtn.focus();
 }
 
@@ -339,7 +368,7 @@ function pageCraft() {
     for (const cat of S.craft.categories) {
       const items = S.craft.weapons.filter((w) => w.category === cat && (!term || w.name.toLowerCase().includes(term)));
       if (!items.length) continue;
-      catalog.append(h('h3', { text: cat }), ...items.map((w) => h('div', { class: 'recipe' },
+      catalog.append(h('h3', { text: cat }), ...items.map((w, i) => h('div', { class: 'recipe', style: { '--i': Math.min(i, 12) } },
         h('b', null, w.name, w.badge ? h('span', { class: 'tag', text: w.badge }) : null),
         h('span', { class: 'ing', text: w.ingredients.map(([n, k]) => `${k} ${n}`).join(', ') }),
         h('button', { class: 'btn small', type: 'button', 'aria-label': `Adaugă ${w.name}`, onclick: () => setQty(w.name, (S.order.get(w.name) || 0) + 1) }, 'Adaugă'))));
@@ -448,6 +477,71 @@ function configSheet() {
 
 // ---- go ------------------------------------------------------------------
 
-window.addEventListener('hashchange', () => { closeDrawer(); render(); scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { closeDrawer(); S.anim = true; render(); scrollTo(0, 0); });
+// ---- ambience: dust and embers, pointer parallax, lantern, tumbleweed ------
+
+function startDust() {
+  const cv = $('#dust');
+  if (!cv || REDUCED) return;
+  const ctx = cv.getContext('2d');
+  let W = 1, H = 1, running = false, last = 0;
+  const size = () => { const r = cv.getBoundingClientRect(); W = cv.width = Math.max(1, Math.round(r.width)); H = cv.height = Math.max(1, Math.round(r.height)); };
+  size(); addEventListener('resize', size);
+  const spawn = (p, init) => {
+    const ember = Math.random() < 0.55;
+    Object.assign(p, { ember, r: ember ? 1 + Math.random() * 1.8 : 2 + Math.random() * 5, ph: Math.random() * 6.28, a: ember ? 0.5 + Math.random() * 0.5 : 0.05 + Math.random() * 0.1, hue: ember ? 28 + Math.random() * 22 : 36,
+      vx: ember ? 6 + Math.random() * 14 : 18 + Math.random() * 40, vy: ember ? -(14 + Math.random() * 34) : -2 - Math.random() * 6 });
+    p.x = init ? Math.random() * W : ember ? Math.random() * W : -10;
+    p.y = init ? Math.random() * H : ember ? H + 10 : Math.random() * H;
+    return p;
+  };
+  const parts = Array.from({ length: innerWidth < 600 ? 34 : 64 }, () => spawn({}, true));
+  function frame(t) {
+    if (!running) return;
+    const dt = Math.min(0.05, (t - last) / 1000); last = t;
+    const gust = Math.sin(t / 4200) * 0.5 + Math.sin(t / 1700) * 0.3 + 0.7;
+    ctx.clearRect(0, 0, W, H); ctx.globalCompositeOperation = 'lighter';
+    for (const p of parts) {
+      p.ph += dt * (p.ember ? 5 : 1.2);
+      p.x += (p.vx * gust + Math.sin(p.ph) * (p.ember ? 14 : 4)) * dt; p.y += p.vy * dt;
+      if (p.x > W + 20 || p.y < -20) spawn(p, false);
+      const rad = p.r * (p.ember ? 3.2 : 2), fl = p.ember ? 0.6 + 0.4 * Math.sin(p.ph * 2.3) : 1;
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad);
+      g.addColorStop(0, `hsla(${p.hue},95%,${p.ember ? 65 : 75}%,${p.a * fl})`); g.addColorStop(1, 'hsla(30,90%,50%,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, 6.283); ctx.fill();
+    }
+    requestAnimationFrame(frame);
+  }
+  const setRun = (v) => { if (v && !running) { running = true; last = performance.now(); requestAnimationFrame(frame); } else if (!v) running = false; };
+  let inView = true;
+  new IntersectionObserver(([e]) => { inView = e.isIntersecting; setRun(inView && !document.hidden); }).observe($('#hero'));
+  document.addEventListener('visibilitychange', () => setRun(inView && !document.hidden));
+  setRun(true);
+}
+
+function startPointerFx() {
+  if (REDUCED || !matchMedia('(pointer: fine)').matches) return;
+  const par = document.querySelector('.parallax'), lantern = $('#lantern'), root = document.documentElement.style;
+  let tx = 0, ty = 0, cx = 0, cy = 0;
+  addEventListener('pointermove', (e) => {
+    tx = (e.clientX / innerWidth - 0.5) * -2; ty = (e.clientY / innerHeight - 0.5) * -2;
+    root.setProperty('--mx', `${e.clientX}px`); root.setProperty('--my', `${e.clientY}px`); lantern.classList.add('on');
+  }, { passive: true });
+  document.addEventListener('pointerleave', () => lantern.classList.remove('on'));
+  (function loop() {
+    cx += (tx - cx) * 0.06; cy += (ty - cy) * 0.06;
+    par.style.transform = `translate3d(${(cx * 16).toFixed(2)}px, ${(cy * 9).toFixed(2)}px, 0)`;
+    requestAnimationFrame(loop);
+  })();
+}
+
+function startWeed() {
+  const w = $('#weed');
+  if (!w || REDUCED) return;
+  const go = () => { if (!document.hidden) { w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); } setTimeout(go, 50_000 + Math.random() * 70_000); };
+  setTimeout(go, 12_000);
+}
+
+startDust(); startPointerFx(); startWeed();
 refresh();
 setInterval(() => { if (!document.hidden && S.authed) refresh(true); }, 60_000);
