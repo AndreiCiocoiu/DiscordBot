@@ -92,8 +92,8 @@ function pageHub() {
   const count = (key) => S.hub?.[key]?.length || 0;
   const unread = S.hub?.notices?.filter((n) => !n.read)?.length || 0;
   const nav = hb('div', { class:'hub-tabs', role:'navigation', 'aria-label':'Module Cartier' }, HUB_TABS.map(([key,label,symbol]) =>
-    hb('a', { href:`#/cartier/${key}`, class:`hub-tab ${current === key ? 'selected' : ''}`, 'aria-current': current === key ? 'page' : null },
-      hb('span', { class:'hub-tab-symbol', text:symbol }), hb('span', { text:label }), key === 'notices' && unread ? hb('b', { class:'hub-tab-count', text:unread }) : null)));
+    hb('a', { href:`#/cartier/${key}`, class:`hub-tab ${current === key ? 'selected' : ''}`, 'aria-current': current === key ? 'page' : null, 'data-hub-key': key },
+      hb('span', { class:'hub-tab-symbol', 'aria-hidden': 'true', text:'' }), hb('span', { class:'hub-tab-label', text:label }), key === 'notices' && unread ? hb('b', { class:'hub-tab-count', text:unread }) : null)));
   const intro = hb('div', { class:'hub-intro' },
     hb('div', null, hb('span', { class:'hub-arabic', lang:'ar', text:'مجلس الصحراء' }), hb('h2', { text:'Cartierul familiei' }),
       hb('p', { text:'Operațiuni, contracte, resurse și decizii. Totul la un loc.' })),
@@ -193,7 +193,7 @@ function hubDossiers(data) {
 }
 
 function hubTreasury(data, leader) {
-  const balances = hb('div',{class:'hub-balance-grid'},HUB_UNITS.map(([code,label])=>hb('div',{class:'hub-balance'},hb('span',{text:label}),hb('strong',{text:Number(data.balances[code]||0).toLocaleString('ro-RO')}))));
+  const balances = hb('div',{class:'hub-balance-grid'},HUB_UNITS.map(([code,label])=>hb('div',{class:'hub-balance','data-unit':code},hb('span',{text:label}),hb('strong',{text:Number(data.balances[code]||0).toLocaleString('ro-RO')}))));
   const form = leader ? hubForm('Înregistrează o tranzacție', [
     {name:'direction',label:'Tip',type:'select',options:[['in','Depunere'],['out','Retragere']]},
     {name:'unit',label:'Resursă',type:'select',options:HUB_UNITS},

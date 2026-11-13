@@ -26,6 +26,7 @@ const STATIC = {
   '/hub.css': ['web/hub.css', 'text/css; charset=utf-8'],
   '/hub.js': ['web/hub.js', 'text/javascript; charset=utf-8'],
   '/img/sahara.jpg': ['assets/sahara.jpg', 'image/jpeg'],
+  '/img/hub-icons.png': ['assets/hub-icons.png', 'image/png'],
 };
 // every web font in assets/fonts is served at /fonts/<file>
 for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'fonts'))) {
