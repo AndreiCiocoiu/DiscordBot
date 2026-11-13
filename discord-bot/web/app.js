@@ -326,12 +326,56 @@ function paintFamilySummary() {
   bar.hidden = false;
 }
 
+// Identifies the logged-in Discord account on private-page screenshots.
+// All text is added as textContent (never interpreted as HTML).
+function paintWatermark() {
+  const layer = $('#site-watermark');
+  const grid = $('#site-watermark-grid');
+  const stamp = $('#site-watermark-stamp');
+  if (!layer || !grid || !stamp) return;
+  const me = S.authed && S.state && S.state.me;
+  const id = me && String(me.id || '');
+  if (!id) {
+    layer.hidden = true;
+    stamp.hidden = true;
+    grid.replaceChildren();
+    layer.dataset.key = '';
+    return;
+  }
+  const name = String(me.name || 'Membru Sahara').trim().slice(0, 34) || 'Membru Sahara';
+  const key = `${id}:${name}`;
+  if (layer.dataset.key !== key) {
+    layer.dataset.key = key;
+    const marks = [];
+    for (let i = 0; i < 48; i++) {
+      const mark = document.createElement('span');
+      mark.className = 'site-watermark-mark';
+      const account = document.createElement('span');
+      account.textContent = `SAHARA · ${name}`;
+      const identifier = document.createElement('small');
+      identifier.textContent = `DISCORD ID ${id}`;
+      mark.append(account, identifier);
+      marks.push(mark);
+    }
+    grid.replaceChildren(...marks);
+    stamp.replaceChildren();
+    const title = document.createElement('strong');
+    title.textContent = `SAHARA · ${name}`;
+    const meta = document.createElement('small');
+    meta.textContent = `COPIE PERSONALIZATĂ · ${id}`;
+    stamp.append(title, meta);
+  }
+  layer.hidden = false;
+  stamp.hidden = false;
+}
+
 function sheet(...kids) { return h('div', { class: 'sheet-wrap' }, h('section', { class: 'sheet' }, kids)); }
 
 function render() {
   const view = $('#view');
   shell();
   paintFamilySummary();
+  paintWatermark();
   if (S.authed === null) return view.replaceChildren();
   if (!S.authed) return view.replaceChildren(sheet(h('div', { class: 'login' },
     h('h2', { text: 'Doar pentru bandă' }),

@@ -640,3 +640,46 @@ input[type=text], input[type=number], select, textarea { border-radius: 9px; bac
 .craft-export{margin:14px 0 5px;padding:10px 15px;font-size:14px}
 @media(max-width:620px){.quick-open{top:8px;left:8px;min-height:33px;padding:6px 9px;font-size:11px}.quick-open kbd{display:none}.quick-symbol{font-size:20px}.command-palette{padding:60px 10px 15px}.command-top{padding:12px 14px 4px}#command-input{margin:8px 12px;width:calc(100% - 24px);min-height:46px}.command-results{padding:0 6px 8px}.command-foot{padding:12px;font-size:10px}.compare-selects{grid-template-columns:1fr}.compare-hint{display:none}.roster-favorites{width:100%}.board-tools{width:100%;justify-content:stretch}.board-tools select{flex:1;min-width:0}}
 @media(prefers-reduced-motion:reduce){.command-panel{animation:none}.compare-track>span{transition:none}}
+
+
+/* Sahara Cartel — personalized screenshot attribution.
+   Presentation-only: a browser page cannot prevent or detect all screenshots. */
+.site-watermark {
+  position:fixed;inset:0;overflow:hidden;z-index:115;pointer-events:none;
+  user-select:none;-webkit-user-select:none;contain:layout paint;
+}
+.site-watermark-grid {
+  position:absolute;left:-18vw;top:-25vh;width:136vw;min-height:160vh;
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:148px;
+  align-items:center;justify-items:center;transform:rotate(-22deg);transform-origin:center;
+}
+.site-watermark-mark {
+  display:grid;justify-items:center;align-content:center;gap:5px;min-width:0;
+  padding:0 8px;text-align:center;white-space:nowrap;
+  color:rgba(244,198,134,.16);font:800 13px/1.25 system-ui,-apple-system,sans-serif;
+  letter-spacing:.065em;text-shadow:0 1px 1px rgba(0,0,0,.55);
+}
+.site-watermark-mark small {
+  color:rgba(245,198,140,.22);font:700 11px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:.015em;
+}
+.site-watermark-stamp {
+  position:fixed;z-index:116;right:14px;bottom:14px;pointer-events:none;user-select:none;
+  max-width:calc(100vw - 28px);padding:7px 11px;
+  border:1px solid rgba(208,151,82,.35);border-radius:5px;
+  background:rgba(16,9,6,.84);box-shadow:0 2px 18px rgba(0,0,0,.35);
+  color:#d4ad77;text-align:right;font:700 10px/1.45 system-ui,-apple-system,sans-serif;
+  letter-spacing:.04em;
+}
+.site-watermark-stamp strong{display:block;color:#f0d29d;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.site-watermark-stamp small{display:block;color:#ae895e;font:700 9px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace}
+@media(max-width:950px){
+  .site-watermark-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:155px;left:-28vw;width:156vw}
+}
+@media(max-width:600px){
+  .site-watermark-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:130px;left:-45vw;top:-30vh;width:190vw;min-height:170vh}
+  .site-watermark-mark{font-size:11px;letter-spacing:.025em}
+  .site-watermark-mark small{font-size:9px;letter-spacing:0}
+  .site-watermark-stamp{right:8px;bottom:8px;padding:5px 8px;font-size:9px}
+  .site-watermark-stamp small{font-size:8px}
+}
