@@ -16,6 +16,7 @@ const craft = require('./craft');
 const announce = require('./announce');
 const idcard = require('./idcard');
 const familyHub = require('./familyHub');
+const siteAccess = require('./siteAccess');
 
 const ROOT = path.join(__dirname, '..', '..');
 const TTL_MS = 4 * 3600_000;
@@ -25,6 +26,7 @@ const STATIC = {
   '/style.css': ['web/style.css', 'text/css; charset=utf-8'],
   '/hub.css': ['web/hub.css', 'text/css; charset=utf-8'],
   '/hub.js': ['web/hub.js', 'text/javascript; charset=utf-8'],
+  '/security.js': ['web/security.js', 'text/javascript; charset=utf-8'],
   '/img/sahara.jpg': ['assets/sahara.jpg', 'image/jpeg'],
   '/img/hub-icons.png': ['assets/hub-icons.png', 'image/png'],
 };
@@ -35,7 +37,7 @@ for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'fonts'))) {
 }
 const CSP = "default-src 'self'; img-src 'self' https://cdn.discordapp.com data:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
-const SECRET = crypto.createHash('sha256').update(`muie-web:${process.env.SESSION_SECRET || process.env.DISCORD_TOKEN || 'dev'}`).digest();
+const SECRET = crypto.createHash('sha256').update(`sahara-website:${process.env.SESSION_SECRET || process.env.DISCORD_TOKEN || 'dev'}`).digest();
 const b64 = (b) => Buffer.from(b).toString('base64url');
 const mac = (s) => crypto.createHmac('sha256', SECRET).update(s).digest('base64url');
 function sign(obj) { const p = b64(JSON.stringify(obj)); return `${p}.${mac(p)}`; }
@@ -92,7 +94,14 @@ function start(initial) {
       const d = points.G(guild.id);
       const { admin, leader } = await points.rolesInfo(guild, d, me.id, mem.roles || []);
       const avatar = me.avatar ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=64` : null;
-      const session = { id: me.id, name: mem.nick || me.global_name || me.username, avatar, roles: mem.roles || [], leader, admin, exp: Date.now() + TTL_MS };
+      const session = { id: me.id, name: mem.nick || me.global_name || me.username, avatar, exp: Date.now() + TTL_MS };
+      const request = siteAccess.register(guild.id, session);
+      if (request.created && !siteAccess.owner(guild, session.id)) {
+        const master = process.env.WEB_OWNER_IDS?.split(/[\s,;]+/).filter(Boolean)[0] || process.env.WEB_OWNER_ID || guild.ownerId;
+        if (master && master !== session.id && client) {
+          client.users.fetch(master).then((u) => u.send({ content: `🔐 **Sahara Cartel — cerere nouă de acces**\n**${session.name}** (${session.id}) a intrat cu Discord. Verifică secțiunea Securitate din website pentru a aproba sau respinge accesul.`, allowedMentions: { parse: [] } })).catch(() => {});
+        }
+      }
       send(res, 302, '', { Location: '/', 'Set-Cookie': [setCookie(req, 'sc', sign(session), TTL_MS / 1000), setCookie(req, 'st', '', 0)] });
     } catch (err) {
       console.error('web login error:', err);
@@ -100,21 +109,51 @@ function start(initial) {
     }
   }
 
-  // roles can change while a session lives: when the bot can see the member, trust the live roles
-  async function liveAuth(session, guild, d) {
-    const gm = guild.members.cache.get(session.id);
-    if (!gm) return session;
-    const info = await points.rolesInfo(guild, d, session.id, [...gm.roles.cache.keys()]);
-    return { ...session, ...info };
-  }
-
-  // For Family Hub, verify guild membership and leader permissions against Discord
-  // on each request (not only the signed session cookie, which lives up to 4 hours).
-  async function hubSession(session, guild, d) {
-    const member = await guild.members.fetch(session.id).catch(() => null);
+  // Never trust permissions in the signed cookie: read the persistent approval store
+  // and check real Discord server membership on every authenticated API request.
+  // A user blocked via the website is rejected on their very next request.
+  async function verifiedSession(session, guild, d) {
+    const member = await guild.members.fetch({ user: session.id, force: true }).catch(() => null);
     if (!member) return null;
     const roles = await points.rolesInfo(guild, d, session.id, [...member.roles.cache.keys()]);
-    return { ...session, ...roles };
+    return { ...session, ...roles, guildMember: true };
+  }
+
+  const limiter = new Map();
+  function limited(req, action, ceiling, interval = 60000) {
+    const ip = String(req.socket.remoteAddress || 'unknown');
+    const key = `${ip}/${action}`;
+    const now = Date.now();
+    const prior = limiter.get(key);
+    if (!prior || now - prior.start > interval) { limiter.set(key, { start: now, count: 1 }); return false; }
+    if (prior.count++ >= ceiling) return true;
+    if (limiter.size > 1000) for (const [k,v] of limiter) if (now - v.start > interval) limiter.delete(k);
+    return false;
+  }
+
+  // Outbox is persisted with the website notifications; DM failures do not undo website writes.
+  let dmInterval = null;
+  async function sendDms() {
+    if (!client?.isReady?.()) return;
+    const guild = pickGuild();
+    if (!guild) return;
+    const d = points.G(guild.id);
+    await familyHub.drainDm(guild.id, async (id, n) => {
+      const target = ['war','contracts','dossiers','treasury','orders','events','polls','feed','notices'].includes(n.target) ? n.target : 'notices';
+      const link = process.env.WEB_URL ? `\n${process.env.WEB_URL.replace(/\/$/,'')}/#/cartier/${target}` : '';
+      const user = await client.users.fetch(id);
+      await user.send({ content: `**SAHARA CARTEL — ${n.title}**\n${n.text}${link}`.slice(0, 1900), allowedMentions: { parse: [] } });
+    }, async (id, job) => {
+      const rec = siteAccess.record(guild.id, id);
+      if (!rec || rec.dm === false) return false;
+      const member = await guild.members.fetch({ user: id, force: true }).catch(() => null);
+      if (!member) return false;
+      // A refusal/revocation is a simple personal account-status message, never private Hub data.
+      if (job.accessNotice) return true;
+      if (!d.members[id] || !siteAccess.approved(guild, id, !!d.members[id])) return false;
+      const key = `hub.${job.target}.view`;
+      return siteAccess.can(guild, id, 'hub.notices.view', true) && (siteAccess.ALL.includes(key) ? siteAccess.can(guild, id, key, true) : true);
+    }, 8);
   }
 
   // ---- API ----
@@ -138,42 +177,70 @@ function start(initial) {
     if (!guild) return json(res, 503, { error: client ? 'Botul nu e pe server.' : 'Botul pornește, încearcă din nou în câteva secunde.' });
     const d = points.G(guild.id);
     const route = url.pathname;
-    session = await liveAuth(session, guild, d);
+    session = await verifiedSession(session, guild, d);
+    if (!session) return json(res, 403, { code: 'not_in_server', error: 'Contul nu mai este membru al serverului Discord.' });
+    const inFamily = !!d.members[session.id];
+    const access = siteAccess.state(guild, session.id, inFamily);
+    const allowed = (permission) => access.permissions[permission] === true;
+    const check = (permission) => allowed(permission) ? null : json(res, 403, { code: 'no_permission', error: 'Nu ai permisiune pentru această funcție.' });
+
+    if (req.method === 'GET' && route === '/api/access/me') return json(res, 200, access);
+    if (route === '/api/access' && req.method === 'GET') {
+      if (!access.owner) return json(res, 403, { error: 'Doar proprietarul poate administra accesul.' });
+      const list = siteAccess.list(guild);
+      return json(res, 200, { ...list, users: list.users.map((u) => ({ ...u, inFamily: !!d.members[u.id] })) });
+    }
+    if (!siteAccess.approved(guild, session.id, inFamily)) return json(res, 403, {
+      code: access.status === 'denied' ? 'access_denied' : !access.inFamily ? 'not_in_family' : 'access_pending',
+      error: access.status === 'denied' ? 'Accesul a fost refuzat sau retras.' : !access.inFamily ? 'Nu ești înregistrat în Familia Sahara.' : 'Cererea ta așteaptă aprobarea proprietarului.',
+    });
 
     if (req.method === 'GET') {
       if (route === '/api/state') {
         await points.refreshProfiles(client, d);
         points.flush();
-        return json(res, 200, { ...points.snapshot(d, session.id), guild: { name: guild.name }, me: { id: session.id, name: session.name, avatar: session.avatar, leader: session.leader, admin: session.admin } });
+        const snap = points.snapshot(d, session.id);
+        if (!(allowed('board.view') || allowed('roster.view') || allowed('hub.dossiers.view') || allowed('members.manage') || allowed('points.manage'))) snap.members = [];
+        if (!(allowed('board.view') || allowed('points.manage'))) { snap.archive = []; snap.entries = []; }
+        return json(res, 200, { ...snap, guild: { name: guild.name }, me: {
+          id: session.id, name: session.name, avatar: session.avatar,
+          leader: ['points.manage','members.manage','announcements.manage','config.manage'].some(allowed),
+          admin: allowed('announcements.manage') || allowed('config.manage'),
+          permissions: access.permissions, owner: access.owner, dm: access.dm,
+        } });
       }
       if (route === '/api/week') {
+        if (!allowed('board.view')) return check('board.view');
         const v = points.weekView(d, url.searchParams.get('no'));
         return v ? json(res, 200, v) : json(res, 404, { error: 'Săptămâna nu e în arhivă.' });
       }
-      if (route === '/api/craft') return json(res, 200, craft.catalogJson());
+      if (route === '/api/craft') return allowed('craft.use') ? json(res, 200, craft.catalogJson()) : check('craft.use');
       if (route === '/api/hub') {
-        const fresh = await hubSession(session, guild, d);
-        if (!fresh) return json(res, 403, { error: 'Nu putem confirma că mai ești membru al serverului.' });
-        const result = familyHub.handle({ guildId: guild.id, session: fresh, leader: fresh.leader, members: d.members, request: null });
+        const result = familyHub.handle({ guildId: guild.id, session, permissions: access.permissions, members: d.members, request: null });
         return json(res, result.status, result.body);
       }
-      if (route === '/api/members') return session.leader ? json(res, 200, await memberSearch(guild, url.searchParams.get('q'))) : json(res, 403, { error: 'Doar lideri.' });
+      if (route === '/api/members') return allowed('members.manage') ? json(res, 200, await memberSearch(guild, url.searchParams.get('q'))) : check('members.manage');
       if (route === '/api/idcard') {
-        if (!session.leader) return json(res, 403, { error: 'Doar lideri.' });
+        if (!allowed('idcard.manage')) return check('idcard.manage');
         const uid = String(url.searchParams.get('u') || ''), m = d.members[uid];
         const f = m?.idCard ? idcard.read(guild.id, uid, m.idCard.ext) : null;
         return f ? send(res, 200, f.data, { 'Content-Type': f.type, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }) : json(res, 404, { error: 'Nu are carte de identitate.' });
       }
-      if (route === '/api/channels') return session.admin ? json(res, 200, { channels: announce.channels(guild) }) : json(res, 403, { error: 'Doar adminii.' });
+      if (route === '/api/channels') return allowed('announcements.manage') ? json(res, 200, { channels: announce.channels(guild) }) : check('announcements.manage');
       return json(res, 404, { error: 'Nu există.' });
     }
 
     if (req.method !== 'POST') return json(res, 405, { error: 'Metodă nepermisă.' });
     const origin = req.headers.origin;
-    if (origin && new URL(origin).host !== req.headers.host) return json(res, 403, { error: 'Origine nepermisă.' });
+    let trustedOrigin = false;
+    try { if (origin) trustedOrigin = new URL(origin).origin === new URL(baseUrl(req)).origin; }
+    catch { trustedOrigin = false; }
+    // Browsers send Origin for same-origin POST; reject missing origin to prevent CSRF.
+    if (!trustedOrigin) return json(res, 403, { error: 'Origine nepermisă (protecție CSRF).' });
+    if (limited(req, 'write', 90)) return json(res, 429, { error: 'Prea multe cereri. Încearcă puțin mai târziu.' });
     // the identity card arrives as the raw image, not JSON
     if (route === '/api/idcard') {
-      if (!session.leader) return json(res, 403, { error: 'Doar Liderul, Co-Liderul sau adminii.' });
+      if (!allowed('idcard.manage')) return check('idcard.manage');
       const uid = String(url.searchParams.get('u') || ''), m = d.members[uid];
       if (!m) return json(res, 422, { ok: false, msg: 'Persoana nu e în bandă.' });
       const chunks = []; let n = 0;
@@ -190,18 +257,40 @@ function start(initial) {
     let b;
     try { b = await body(req); } catch { return json(res, 400, { error: 'Cerere invalidă.' }); }
 
-    if (route === '/api/craft') return json(res, 200, craft.calcJson(b.items));
+    if (route === '/api/craft') return allowed('craft.use') ? json(res, 200, craft.calcJson(b.items)) : check('craft.use');
+    if (route === '/api/access/dm') {
+      if (typeof b.enabled !== 'boolean') return json(res, 422, { error: 'Alege activate / dezactivate.' });
+      siteAccess.setDm(guild.id, session.id, b.enabled);
+      return json(res, 200, { ok: true, dm: b.enabled });
+    }
+    if (route === '/api/access') {
+      if (!access.owner) return json(res, 403, { error: 'Doar proprietarul poate administra accesul.' });
+      try {
+        const userId = String(b.userId);
+        const before = siteAccess.record(guild.id, userId)?.status;
+        siteAccess.update(guild, session.id, userId, b.status, b.permissions);
+        if (before !== b.status && (b.status === 'approved' || b.status === 'denied')) {
+          familyHub.notifyAccess(guild.id, userId, b.status === 'approved');
+          sendDms().catch((error) => console.warn('Access DM:', error.message));
+        }
+        return json(res, 200, { ok: true, ...siteAccess.list(guild) });
+      } catch (e) { return json(res, 422, { error: e.message }); }
+    }
     if (route === '/api/hub') {
-      const fresh = await hubSession(session, guild, d);
-      if (!fresh) return json(res, 403, { error: 'Nu putem confirma că mai ești membru al serverului.' });
       const catalog = craft.catalogJson();
-      const result = familyHub.handle({ guildId: guild.id, session: fresh, leader: fresh.leader, members: d.members, request: b, craftNames: catalog.weapons.map((w) => w.name) });
+      const result = familyHub.handle({ guildId: guild.id, session, permissions: access.permissions, members: d.members, request: b, craftNames: catalog.weapons.map((w) => w.name) });
+      if (result.status === 200) sendDms().catch((err) => console.error('Hub DM delivery:', err));
       return json(res, result.status, result.body);
     }
 
-    const needAdmin = route === '/api/config' || route === '/api/announce';
-    if (!session.leader || (needAdmin && !session.admin)) return json(res, 403, { error: needAdmin ? 'Doar adminii.' : 'Doar Liderul, Co-Liderul sau adminii.' });
-    const ctx = { client, guild, actorId: session.id, admin: session.admin, plain: true };
+    const permsForRoutes = {
+      '/api/add': 'members.manage', '/api/remove': 'members.manage', '/api/rank': 'members.manage', '/api/leave': 'members.manage',
+      '/api/give': 'points.manage', '/api/undo': 'points.manage', '/api/config': 'config.manage',
+      '/api/announce': 'announcements.manage', '/api/idcard/remove': 'idcard.manage',
+    };
+    if (!permsForRoutes[route]) return json(res, 404, { error: 'Nu există.' });
+    if (!allowed(permsForRoutes[route])) return check(permsForRoutes[route]);
+    const ctx = { client, guild, actorId: session.id, admin: allowed('config.manage'), plain: true };
     let r;
     try {
       if (route === '/api/add') {
@@ -229,7 +318,7 @@ function start(initial) {
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://x');
-      if (url.pathname === '/auth/login') return login(req, res);
+      if (url.pathname === '/auth/login') return limited(req, 'login', 12) ? page(res, 429, 'Prea multe încercări', 'Încearcă mai târziu.') : login(req, res);
       if (url.pathname === '/auth/callback') return callback(req, res, url);
       if (url.pathname === '/auth/logout') return send(res, 302, '', { Location: '/', 'Set-Cookie': setCookie(req, 'sc', '', 0) });
       if (url.pathname.startsWith('/api/')) {
@@ -245,6 +334,8 @@ function start(initial) {
   });
   server.on('error', (err) => console.error('web server error:', err.message));
   server.listen(port, () => console.log(`Website listening on port ${port} (PORT env: ${process.env.PORT || 'not set'})`));
+  dmInterval = setInterval(() => sendDms().catch((e) => console.warn('DM queue:', e.message)), 18000);
+  dmInterval.unref?.();
   return { setClient(c) { client = c; } };
 }
 

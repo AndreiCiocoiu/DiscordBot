@@ -11,7 +11,7 @@ fs.mkdirSync(DIR, { recursive: true });
 const MAX_ITEMS = { war: 90, contracts: 120, treasury: 600, orders: 200, events: 120, polls: 100, feed: 160 };
 const UNITS = ['aur', 'bani', 'fier', 'lemn', 'cupru', 'carbune', 'otel', 'alte'];
 const STATUSES = { war: ['planned', 'active', 'done', 'cancelled'], orders: ['new', 'in_progress', 'ready', 'delivered', 'cancelled'] };
-const NEW = () => ({ war: [], contracts: [], treasury: [], orders: [], events: [], polls: [], feed: [], notices: {} });
+const NEW = () => ({ war: [], contracts: [], treasury: [], orders: [], events: [], polls: [], feed: [], notices: {}, dmQueue: [], sentDm: [] });
 let db;
 try { db = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (!db || typeof db !== 'object' || !db.guilds || typeof db.guilds !== 'object') throw Error('invalid'); }
 catch (err) {
@@ -22,6 +22,8 @@ function dataFor(guildId) {
   const g = db.guilds[guildId] ||= NEW();
   for (const key of Object.keys(MAX_ITEMS)) if (!Array.isArray(g[key])) g[key] = [];
   if (!g.notices || typeof g.notices !== 'object') g.notices = {};
+  if (!Array.isArray(g.dmQueue)) g.dmQueue = [];
+  if (!Array.isArray(g.sentDm)) g.sentDm = [];
   return g;
 }
 function save() { const tmp = `${FILE}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify(db)); fs.renameSync(tmp, FILE); }
@@ -38,8 +40,12 @@ function feed(g, s, kind, action, subject) { append(g, 'feed', { id: id(), at: t
 function notify(g, ids, label, description, target) {
   for (const uid of new Set(ids.filter(Boolean))) {
     const list = g.notices[uid] ||= [];
-    list.unshift({ id: id(), at: time(), title: text(label, 80), text: text(description, 220), target: text(target, 60), read: false });
+    const notice = { id: id(), at: time(), title: text(label, 80), text: text(description, 220), target: text(target, 60), read: false };
+    list.unshift(notice);
     if (list.length > 90) list.length = 90;
+    g.dmQueue ||= [];
+    g.dmQueue.push({ ...notice, userId: uid, attempts: 0, nextAt: time() });
+    if (g.dmQueue.length > 1500) g.dmQueue.splice(0, g.dmQueue.length - 1500);
   }
 }
 function notifyFamily(g, members, session, label, description, target) {
@@ -47,27 +53,47 @@ function notifyFamily(g, members, session, label, description, target) {
 }
 function owner(item, s, leader) { if (!leader && item.owner !== s.id) throw Error('Nu ai acces la acest element.'); }
 function validId(x) { return typeof x === 'string' && /^[a-f0-9-]{36}$/.test(x); }
-function hubView(g, session, leader, members) {
+function hubView(g, session, permissions, members) {
+  const allowed = (key) => permissions?.[`hub.${key}.view`] === true;
+  const manager = (key) => permissions?.[`hub.${key}.manage`] === true;
   const polls = g.polls.map(({ ballots, ...p }) => {
     const counts = p.options.map((_, i) => Object.values(ballots || {}).filter((v) => v === i).length);
     return { ...p, counts, total: counts.reduce((a, b) => a + b, 0), myVote: Object.hasOwn(ballots || {}, session.id) ? ballots[session.id] : null };
   });
-  const visibleOrders = leader ? g.orders : g.orders.filter((o) => o.owner === session.id);
+  const visibleOrders = manager('orders') ? g.orders : g.orders.filter((o) => o.owner === session.id);
   const treasury = g.treasury;
   const balances = Object.fromEntries(UNITS.map((u) => [u, treasury.filter((t) => t.unit === u).reduce((a, t) => a + t.delta, 0)]));
   const dossiers = Object.entries(members).map(([userId, m]) => ({ id: userId, name: text(m.name || userId, 80), rank: m.rank || 'angajat', since: m.since || null, rankSince: m.rankSince || null, points: m.points || 0, avatar: m.avatar || null, status: m.leaveUntil > time() ? 'concediu' : 'activ' }));
-  return { war: g.war, contracts: g.contracts, treasury, balances, orders: visibleOrders, events: g.events, polls, feed: g.feed, notices: g.notices[session.id] || [], dossiers };
+  return { war: allowed('war') ? g.war : [], contracts: allowed('contracts') ? g.contracts : [],
+    treasury: allowed('treasury') ? treasury : [], balances: allowed('treasury') ? balances : {},
+    orders: allowed('orders') ? visibleOrders : [], events: allowed('events') ? g.events : [],
+    polls: allowed('polls') ? polls : [], feed: allowed('feed') ? g.feed : [],
+    notices: allowed('notices') ? (g.notices[session.id] || []) : [], dossiers: allowed('dossiers') ? dossiers : [] };
 }
-function handle({ guildId, session, leader, members, request, craftNames }) {
+const ACTION_PERMISSIONS = {
+  'war.create': 'hub.war.manage', 'war.join': 'hub.war.view', 'war.status': 'hub.war.manage',
+  'contract.create': 'hub.contracts.manage', 'contract.claim': 'hub.contracts.view',
+  'contract.submit': 'hub.contracts.view', 'contract.review': 'hub.contracts.manage', 'contract.close': 'hub.contracts.manage',
+  'treasury.add': 'hub.treasury.manage', 'order.create': 'hub.orders.view', 'order.status': 'hub.orders.view',
+  'event.create': 'hub.events.manage', 'event.rsvp': 'hub.events.view', 'event.status': 'hub.events.manage',
+  'poll.create': 'hub.polls.manage', 'poll.vote': 'hub.polls.view', 'poll.close': 'hub.polls.manage',
+  'notice.read': 'hub.notices.view',
+};
+function handle({ guildId, session, permissions = {}, members, request, craftNames }) {
   const g = dataFor(guildId), s = session, b = request || {};
-  if (!leader && !Object.hasOwn(members, s.id)) return { status: 403, body: { error: 'Doar membrii înregistrați ai bandei pot folosi acest panou.' } };
-  if (!b.action) return { status: 200, body: hubView(g, s, leader, members) };
+  // Membership and admission are checked by web.js on EVERY API request.
+  const has = (key) => permissions[key] === true;
+  const manage = (key) => has(`hub.${key}.manage`);
+  const view = (key) => has(`hub.${key}.view`);
+  if (!b.action) return { status: 200, body: hubView(g, s, permissions, members) };
+  if (typeof b.action !== 'string' || !ACTION_PERMISSIONS[b.action]) return { status: 404, body: { error: 'Acțiune necunoscută.' } };
+  if (!has(ACTION_PERMISSIONS[b.action])) return { status: 403, body: { error: 'Nu ai această permisiune în Cartier.' } };
   const a = b.action;
   try {
     let item;
     switch (a) {
       case 'war.create': {
-        leaderOnly(leader);
+        leaderOnly(manage('war'));
         const title = need(b.title, 90), at = future(b.at, 120), location = need(b.location, 100);
         item = append(g, 'war', { id: id(), title, at, location, description: text(b.description, 480), capacity: amount(b.capacity || 12, 100), state: 'planned', owner: s.id, participants: [], createdAt: time() });
         feed(g, s, 'war', 'a planificat operațiunea', item.title);
@@ -82,13 +108,13 @@ function handle({ guildId, session, leader, members, request, craftNames }) {
         feed(g, s, 'war', 'a modificat participarea la', item.title); break;
       }
       case 'war.status': {
-        leaderOnly(leader); item = find(g.war, b.id);
+        leaderOnly(manage('war')); item = find(g.war, b.id);
         if (!STATUSES.war.includes(b.state)) throw Error('Status invalid.');
         item.state = b.state; feed(g, s, 'war', 'a actualizat operațiunea', item.title);
         notify(g, item.participants, 'Operațiune actualizată', item.title, 'war'); break;
       }
       case 'contract.create': {
-        leaderOnly(leader);
+        leaderOnly(manage('contracts'));
         item = append(g, 'contracts', { id: id(), title: need(b.title, 100), description: need(b.description, 450), reward: text(b.reward, 70) || 'Recompensă stabilită de lider', capacity: amount(b.capacity || 6, 60), due: future(b.due, 120), owner: s.id, closed: false, claims: [], at: time() });
         feed(g, s, 'contract', 'a publicat contractul', item.title);
         notifyFamily(g, members, s, 'Contract nou', item.title, 'contracts'); break;
@@ -111,7 +137,7 @@ function handle({ guildId, session, leader, members, request, craftNames }) {
         notify(g, [item.owner], 'Contract de verificat', `${s.name}: ${item.title}`, 'contracts'); break;
       }
       case 'contract.review': {
-        leaderOnly(leader); item = find(g.contracts, b.id);
+        leaderOnly(manage('contracts')); item = find(g.contracts, b.id);
         const claim = item.claims.find((x) => x.userId === b.userId);
         if (!claim || claim.state !== 'submitted') throw Error('Nu există o solicitare de verificat.');
         if (!['approved', 'rejected'].includes(b.state)) throw Error('Decizie invalidă.');
@@ -120,11 +146,11 @@ function handle({ guildId, session, leader, members, request, craftNames }) {
         notify(g, [claim.userId], b.state === 'approved' ? 'Contract aprobat' : 'Contract respins', item.title, 'contracts'); break;
       }
       case 'contract.close': {
-        leaderOnly(leader); item = find(g.contracts, b.id); item.closed = !!b.closed;
+        leaderOnly(manage('contracts')); item = find(g.contracts, b.id); item.closed = !!b.closed;
         feed(g, s, 'contract', item.closed ? 'a închis contractul' : 'a redeschis contractul', item.title); break;
       }
       case 'treasury.add': {
-        leaderOnly(leader);
+        leaderOnly(manage('treasury'));
         if (!UNITS.includes(b.unit)) throw Error('Tip de resursă invalid.');
         const n = amount(b.amount), delta = b.direction === 'out' ? -n : b.direction === 'in' ? n : NaN;
         if (!Number.isFinite(delta)) throw Error('Tip de tranzacție invalid.');
@@ -142,15 +168,15 @@ function handle({ guildId, session, leader, members, request, craftNames }) {
         notify(g, Object.keys(members).filter((uid) => uid !== s.id).slice(0, 500), 'Comandă nouă în atelier', `${s.name}: ${item.quantity}× ${name}`, 'orders'); break;
       }
       case 'order.status': {
-        item = find(g.orders, b.id); owner(item, s, leader);
+        item = find(g.orders, b.id); owner(item, s, manage('orders'));
         if (!STATUSES.orders.includes(b.state)) throw Error('Status invalid.');
-        if (!leader && !(item.state === 'new' && b.state === 'cancelled')) throw Error('Doar liderii pot schimba acest status.');
+        if (!manage('orders') && !(item.state === 'new' && b.state === 'cancelled')) throw Error('Doar liderii pot schimba acest status.');
         item.state = b.state; item.updated = time(); item.by = s.id;
         feed(g, s, 'order', 'a schimbat starea comenzii', `${item.weapon} · ${b.state}`);
         notify(g, [item.owner], 'Comandă actualizată', `${item.weapon}: ${b.state}`, 'orders'); break;
       }
       case 'event.create': {
-        leaderOnly(leader);
+        leaderOnly(manage('events'));
         item = append(g, 'events', { id: id(), title: need(b.title, 100), at: future(b.at, 120), location: text(b.location, 100) || 'Discord', description: text(b.description, 450), capacity: amount(b.capacity || 25, 200), status: 'open', owner: s.id, responses: {}, createdAt: time() });
         feed(g, s, 'event', 'a programat evenimentul', item.title);
         notifyFamily(g, members, s, 'Eveniment nou', item.title, 'events'); break;
@@ -169,13 +195,13 @@ function handle({ guildId, session, leader, members, request, craftNames }) {
         feed(g, s, 'event', 'a confirmat participarea la', item.title); break;
       }
       case 'event.status': {
-        leaderOnly(leader); item = find(g.events, b.id);
+        leaderOnly(manage('events')); item = find(g.events, b.id);
         if (!['open', 'closed', 'cancelled'].includes(b.state)) throw Error('Status invalid.');
         item.status = b.state; feed(g, s, 'event', 'a actualizat evenimentul', item.title);
         notify(g, Object.keys(item.responses || {}), 'Eveniment actualizat', item.title, 'events'); break;
       }
       case 'poll.create': {
-        leaderOnly(leader);
+        leaderOnly(manage('polls'));
         const options = Array.isArray(b.options) ? b.options.map((o) => text(o, 90)).filter(Boolean) : [];
         if (options.length < 2 || options.length > 8 || new Set(options).size !== options.length) throw Error('Ai nevoie de 2–8 opțiuni diferite.');
         item = append(g, 'polls', { id: id(), title: need(b.title, 140), options, endsAt: future(b.endsAt, 45), owner: s.id, closed: false, ballots: {}, at: time() });
@@ -191,7 +217,7 @@ function handle({ guildId, session, leader, members, request, craftNames }) {
         item.ballots[s.id] = index; feed(g, s, 'poll', 'a votat în', item.title); break;
       }
       case 'poll.close': {
-        leaderOnly(leader); item = find(g.polls, b.id); item.closed = true;
+        leaderOnly(manage('polls')); item = find(g.polls, b.id); item.closed = true;
         feed(g, s, 'poll', 'a închis votul', item.title); break;
       }
       case 'notice.read': {
@@ -203,7 +229,65 @@ function handle({ guildId, session, leader, members, request, craftNames }) {
       default: return { status: 404, body: { error: 'Acțiune necunoscută.' } };
     }
     save();
-    return { status: 200, body: { ok: true, msg: 'Salvat.', hub: hubView(g, s, leader, members) } };
+    return { status: 200, body: { ok: true, msg: 'Salvat.', hub: hubView(g, s, permissions, members) } };
   } catch (err) { return { status: 422, body: { ok: false, error: err.message || 'Date invalide.' } }; }
 }
-module.exports = { handle, dataFor, FILE };
+
+// A security decision also creates a private notification. Access refusals are sent only
+// as a Discord DM (the denied member must not gain access to private site data).
+function notifyAccess(guildId, userId, approved) {
+  const g = dataFor(guildId);
+  const uid = String(userId);
+  const title = approved ? 'Acces Sahara aprobat' : 'Acces Sahara refuzat';
+  const description = approved
+    ? 'Cererea ta de acces a fost aprobată. Panoul poate fi folosit cât timp ești înregistrat în Familia Sahara.'
+    : 'Accesul tău în panoul Sahara Cartel a fost refuzat sau revocat.';
+  if (approved) {
+    notify(g, [uid], title, description, 'notices');
+    const job = g.dmQueue.find((x) => x.userId === uid && x.title === title);
+    if (job) job.accessNotice = true;
+  }
+  else {
+    const notice = { id: id(), at: time(), title, text: description, target: 'notices', userId: uid, attempts: 0, nextAt: time(), accessNotice: true };
+    g.dmQueue.push(notice);
+    if (g.dmQueue.length > 1500) g.dmQueue.splice(0, g.dmQueue.length - 1500);
+  }
+  save();
+}
+
+// Persistent delivery queue: website notices remain the source of truth. DM failures never undo the action.
+// Limit attempts and record sent notice IDs to avoid repeat sends on normal retries and restarts.
+let draining = false;
+async function drainDm(guildId, sender, permitted, max = 8) {
+  if (draining) return { sent: 0, skipped: 0 };
+  draining = true;
+  let sent = 0, skipped = 0;
+  try {
+    const g = dataFor(guildId);
+    for (const job of [...g.dmQueue].slice(0, 120)) {
+      if (sent + skipped >= max) break;
+      if (job.nextAt > time()) continue;
+      const found = g.dmQueue.findIndex((x) => x.id === job.id);
+      if (found < 0) continue;
+      if (g.sentDm.includes(job.id) || !(await permitted(job.userId, job))) {
+        g.dmQueue.splice(found, 1); skipped++; save(); continue;
+      }
+      try {
+        await sender(job.userId, job);
+        g.sentDm.unshift(job.id);
+        if (g.sentDm.length > 2000) g.sentDm.length = 2000;
+        g.dmQueue.splice(found, 1);
+        sent++;
+      } catch (error) {
+        job.attempts = (job.attempts || 0) + 1;
+        // Discord blocks DM when user disallows private messages; do not keep retrying 403.
+        const permanent = [50007, 10013, 50013].includes(Number(error?.code));
+        if (permanent || job.attempts >= 3) { g.dmQueue.splice(found, 1); skipped++; }
+        else job.nextAt = time() + Math.min(300000, job.attempts * 60000);
+      }
+      save();
+    }
+    return { sent, skipped };
+  } finally { draining = false; }
+}
+module.exports = { handle, dataFor, drainDm, notifyAccess, FILE };

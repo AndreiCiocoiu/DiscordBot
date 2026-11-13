@@ -4,7 +4,7 @@
 const RANKS = ['membru', 'asociat', 'angajat'];
 const RANK_NAME = { angajat: 'Angajat', asociat: 'Asociat', membru: 'Membru' };
 const TYPE_LABEL = { mina: 'Mină', task: 'Task', prezenta: 'Prezență eveniment', organizat: 'Eveniment organizat', voice: 'Voice', bonus: 'Bonus' };
-const S = { state: null, authed: null, craft: null, week: 'curenta', weekData: null, order: new Map(), tab: '', ltab: 'puncte', anim: true, hub: null, hubLoading: false };
+const S = { state: null, authed: null, craft: null, week: 'curenta', weekData: null, order: new Map(), tab: '', ltab: 'puncte', anim: true, hub: null, hubLoading: false, accessDenied: null, security: null, securityLoading: false };
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 
@@ -130,7 +130,7 @@ function exportBoardCsv(rows, week) {
     if(/^[\s]*[=+@\-]/.test(s)) s="'"+s;
     return '"'+s.replace(/"/g,'""')+'"';
   };
-  const lines=[['Loc','Membru','Rang','Puncte'],...rows.map((r,i)=>[i+1,r.name,RANK_NAME[r.rank]||r.rank,Number(r.t)||0])];
+  const lines=[['Loc','Membru','Rank','Puncte'],...rows.map((r,i)=>[i+1,r.name,RANK_NAME[r.rank]||r.rank,Number(r.t)||0])];
   downloadTextFile(`sahara-clasament-${String(week).replace(/[^0-9]/g,'')}.csv`, '\ufeff'+lines.map(line=>line.map(escapeCsv).join(',')).join('\r\n'),'text/csv;charset=utf-8');
   toast('Clasamentul a fost exportat.');
 }
@@ -164,8 +164,8 @@ function renderCommandResults() {
   if(!S.state) return;
   const term=$('#command-input').value.trim().toLocaleLowerCase('ro');
   const pages=[
-    ...TABS.filter(([k])=>k!=='lideri'||S.state.me.leader).map(([route,label])=>({title:label,sub:'Secțiune',kind:'page',go:()=>{location.hash='#/'+route;closeCommand();}})),
-    ...HUB_TABS.map(([key,label])=>({title:label,sub:'Cartier / modul',kind:'page',go:()=>{location.hash='#/cartier/'+key;closeCommand();}})),
+    ...TABS.filter(([k])=>isVisibleTab(k)).map(([route,label])=>({title:label,sub:'Secțiune',kind:'page',go:()=>{location.hash='#/'+route;closeCommand();}})),
+    ...HUB_TABS.filter(([key])=>canSeeHub(key)).map(([key,label])=>({title:label,sub:'Cartier / modul',kind:'page',go:()=>{location.hash='#/cartier/'+key;closeCommand();}})),
   ];
   const people=S.state.members.map(m=>({title:m.name,sub:RANK_NAME[m.rank]||'Membru',kind:'person',go:()=>{closeCommand();openProfile(m.id);}}));
   const entries=[...pages,...people].filter(item=>(item.title+' '+item.sub).toLocaleLowerCase('ro').includes(term)).slice(0,12);
@@ -242,7 +242,12 @@ async function refresh(soft) {
   const r = await fetch('/api/state').catch(() => null);
   if (!r) return;
   if (r.status === 401) { S.authed = false; return render(); }
-  if (!r.ok) { S.authed = true; S.state = null; return render(); }
+  if (!r.ok) {
+    S.authed = true; S.state = null;
+    S.accessDenied = r.status === 403 ? await r.json().catch(()=>({error:'Acces refuzat.'})) : null;
+    return render();
+  }
+  S.accessDenied = null;
   S.state = await r.json(); S.authed = true;
   if (S.week !== 'curenta' && !S.state.archive.some((w) => String(w.no) === String(S.week))) S.week = 'curenta';
   if (S.week !== 'curenta') await loadWeek(S.week, true);
@@ -263,7 +268,7 @@ async function loadCraft() {
 
 // ---- shell ---------------------------------------------------------------
 
-const TABS = [['clasament', 'Clasament', 'trophy'], ['banda', 'Banda', 'people'], ['crafting', 'Crafting', 'tools'], ['cartier', 'Cartier', 'shield'], ['lideri', 'Lideri', 'crown']];
+const TABS = [['clasament', 'Clasament', 'trophy'], ['banda', 'Banda', 'people'], ['crafting', 'Crafting', 'tools'], ['cartier', 'Cartier', 'shield'], ['lideri', 'Lideri', 'crown'], ['security', 'Securitate', 'shield']];
 function route() { const t = location.hash.replace(/^#\/?/, '').split('/')[0]; return TABS.some(([k]) => k === t) ? t : 'clasament'; }
 
 function shell() {
@@ -275,9 +280,9 @@ function shell() {
     me.dataset.key = m.id;
     me.replaceChildren(m.avatar ? h('img', { src: m.avatar, alt: '' }) : '', h('span', { text: m.name }), h('a', { href: '/auth/logout' }, 'Ieși'));
   }
-  if (nav.dataset.key !== String(m.leader)) {
-    nav.dataset.key = String(m.leader);
-    nav.replaceChildren(...TABS.filter(([k]) => k !== 'lideri' || m.leader).map(([k, label, ic]) => h('a', { href: `#/${k}`, 'data-k': k }, icon(ic, 22), h('span', { text: label }))));
+  if (nav.dataset.key !== JSON.stringify([m.permissions,m.owner])) {
+    nav.dataset.key = JSON.stringify([m.permissions,m.owner]);
+    nav.replaceChildren(...TABS.filter(([k]) => isVisibleTab(k)).map(([k, label, ic]) => h('a', { href: `#/${k}`, 'data-k': k }, icon(ic, 22), h('span', { text: label }))));
   }
   const tab = route();
   for (const a of nav.children) {
@@ -296,7 +301,7 @@ function shell() {
 function paintFamilySummary() {
   const bar = $('#family-summary');
   if (!bar) return;
-  if (!S.authed || !S.state) { bar.hidden = true; bar.replaceChildren(); return; }
+  if (!S.authed || !S.state || !isVisibleTab('clasament')) { bar.hidden = true; bar.replaceChildren(); return; }
   const st = S.state, members = st.members || [];
   const mine = members.find((m) => m.id === st.me.id);
   const allPoints = members.reduce((n, m) => n + (Number(m.points) || 0), 0);
@@ -312,7 +317,7 @@ function paintFamilySummary() {
       stat('MEMBRI', String(members.length).padStart(2, '0')),
       stat('PUNCTE ÎN TOTAL', allPoints.toLocaleString('ro-RO'))),
     mine ? h('div', { class: 'summary-progress' },
-      h('span', { class: 'summary-progress-label', text: threshold ? (remaining ? `${remaining}p până la pragul tău` : 'Pragul tău este atins') : 'Rang fără prag' }),
+      h('span', { class: 'summary-progress-label', text: threshold ? (remaining ? `${remaining}p până la pragul tău` : 'Pragul tău este atins') : 'Rank fără prag' }),
       h('span', { class: 'summary-progress-track', role: 'img', 'aria-label': `Progresul tău: ${Math.round(fill)}%` }, h('span', { style: { width: `${fill}%` } }))) : null,
     h('div', { class: 'summary-actions' },
       mine ? h('button', { type: 'button', class: 'summary-profile', onclick: () => openProfile(mine.id) }, 'Profilul meu', h('span', { 'aria-hidden': 'true', text: '↗' })) : null,
@@ -330,13 +335,26 @@ function render() {
   if (S.authed === null) return view.replaceChildren();
   if (!S.authed) return view.replaceChildren(sheet(h('div', { class: 'login' },
     h('h2', { text: 'Doar pentru bandă' }),
-    h('p', { text: 'Intră cu contul tău de Discord. Dacă ești pe serverul Sahara Cartel, vezi clasamentul, banda și calculatorul de crafting.' }),
+    h('p', { text: 'Autentifică-te prin Discord pentru a trimite o cerere de acces. Proprietarul aprobă fiecare membru și îi alege permisiunile.' }),
     h('a', { class: 'btn big', href: '/auth/login' }, 'Intră cu Discord'))));
-  if (!S.state) return view.replaceChildren(sheet(title('shield', 'Nu pot încărca datele', 'Botul nu răspunde acum. Reîncarcă pagina peste un minut.')));
+  if (!S.state) {
+    if (S.accessDenied) return view.replaceChildren(sheet(h('div',{class:'login access-pending'},
+      h('span',{class:'access-pending-mark',text:'☪'}),
+      h('h2',{text:S.accessDenied.code==='access_denied'?'Acces refuzat':S.accessDenied.code==='not_in_family'?'Acces doar pentru Familia Sahara':'Cerere în așteptare'}),
+      h('p',{text:S.accessDenied.error || 'Proprietarul trebuie să aprobe accesul tău.'}),
+      h('p',{class:'small muted',text:'Aprobarea se face individual. Până atunci nu poți consulta datele sau folosi funcțiile private.'}),
+      h('a',{class:'btn alt',href:'/auth/logout'},'Schimbă contul Discord'),
+      h('button',{class:'btn',type:'button',onclick:()=>refresh()},'↻ Verifică aprobarea'))));
+    return view.replaceChildren(sheet(title('shield', 'Nu pot încărca datele', 'Botul nu răspunde acum. Reîncarcă pagina peste un minut.')));
+  }
   const tab = route();
+  if (!isVisibleTab(tab)) {
+    const fallback = TABS.find(([k]) => isVisibleTab(k))?.[0];
+    if (fallback) { if (location.hash !== '#/'+fallback) location.hash = '#/'+fallback; return; }
+    return view.replaceChildren(sheet(title('shield','Nicio permisiune activă','Poți folosi portalul, dar proprietarul nu ți-a permis încă niciun modul.')));
+  }
   document.title = `${TABS.find(([k]) => k === tab)[1]} - Sahara Cartel`;
-  const pages = { clasament: pageBoard, banda: pageRoster, crafting: pageCraft, cartier: pageHub, lideri: pageLeaders };
-  if (tab === 'lideri' && !S.state.me.leader) return (location.hash = '#/clasament');
+  const pages = { clasament: pageBoard, banda: pageRoster, crafting: pageCraft, cartier: pageHub, lideri: pageLeaders, security: pageSecurity };
   const anim = S.anim && !REDUCED;
   S.anim = false;
   const keepScroll = S.tab === tab ? scrollY : 0;
@@ -429,7 +447,7 @@ function compareMembersPanel(rows,prag) {
 function pageRoster() {
   const st = S.state;
   const search = h('input', { id: 'roster-search', class: 'roster-search', type: 'text', placeholder: 'Caută un membru…', autocomplete: 'off', 'aria-label': 'Caută un membru' });
-  const rankFilter = h('select', { id: 'roster-rank', class: 'roster-rank', 'aria-label': 'Filtrează după rang' },
+  const rankFilter = h('select', { id: 'roster-rank', class: 'roster-rank', 'aria-label': 'Filtrează după rank' },
     h('option', { value: 'all', text: 'Toate rangurile' }),
     ...RANKS.map((r) => h('option', { value: r, text: RANK_NAME[r] })));
   const favOnly=h('input',{type:'checkbox',id:'roster-fav-only'});
@@ -449,7 +467,7 @@ function pageRoster() {
             avatar(m), h('span', { class: 'who' }, h('b', { text: m.name }), h('span', { text: `în bandă ${dayText(daysSince(m.since))}` }), m.leaveUntil > Date.now() ? h('span', { class: 'tag', text: 'concediu' }) : null)))))
         : h('p', { class: 'small muted', text: 'Nimeni încă.' }));
   });
-  const noMatches = h('p', { class: 'roster-no-matches muted', hidden: true, text: 'Niciun membru găsit. Încearcă alt nume sau rang.' });
+  const noMatches = h('p', { class: 'roster-no-matches muted', hidden: true, text: 'Niciun membru găsit. Încearcă alt nume sau rank.' });
   const apply = () => {
     const term = search.value.trim().toLocaleLowerCase('ro');
     const rank = rankFilter.value;
@@ -548,18 +566,18 @@ function openProfile(id) {
       h('div', { class: 'flourish', 'aria-hidden': 'true' }, h('span', { text: '\u25c6' }))),
     h('dl', { class: 'facts' },
       h('dt', { text: 'În bandă' }), h('dd', { text: `${dayText(daysSince(m.since))}, din ${fmtDate(m.since)}` }),
-      h('dt', { text: 'Rang' }), h('dd', { text: `${RANK_NAME[m.rank]} ${dayText(daysSince(m.rankSince))}` }),
+      h('dt', { text: 'Rank' }), h('dd', { text: `${RANK_NAME[m.rank]} ${dayText(daysSince(m.rankSince))}` }),
       h('dt', { text: 'Săptămâna asta' }), h('dd', { 'data-count': m.points, 'data-post': prag ? ` din ${prag} puncte` : ' puncte', text: prag ? `${m.points} din ${prag} puncte` : `${m.points} puncte` })),
     prag ? h('div', { class: `meter${held ? ' ok' : ''}`, role: 'img', 'aria-label': `${m.points} din ${prag} puncte` },
       h('span', { class: 'track' }, h('span', { class: 'fill', style: { display: 'block', width: `${Math.min(100, (100 * m.points) / prag)}%` } })),
       h('span', { class: 'num', text: held ? 'Insigna ținută săptămâna asta' : `Mai sunt ${prag - m.points} puncte până la prag` })) : null,
   ];
-  if (m.strikes) kids.push(h('p', { class: 'notice-line', text: `${plural(m.strikes, 'săptămână', 'săptămâni')} sub prag din ${st.cfg.toleranta} permise. La ${st.cfg.toleranta} pierde rangul${st.cfg.autoDemote ? '' : ' (retrogradarea e manuală)'}.` }));
+  if (m.strikes) kids.push(h('p', { class: 'notice-line', text: `${plural(m.strikes, 'săptămână', 'săptămâni')} sub prag din ${st.cfg.toleranta} permise. La ${st.cfg.toleranta} pierde rank-ul${st.cfg.autoDemote ? '' : ' (retrogradarea e manuală)'}.` }));
   if (m.leaveUntil > Date.now()) kids.push(h('p', { class: 'notice-line', text: `În concediu până pe ${fmtDate(m.leaveUntil)}. Nu primește avertismente.` }));
   kids.push(h('h3', { text: 'Puncte săptămâna asta' }), breakdown.length ? h('ul', { class: 'breakdown' }, breakdown) : h('p', { class: 'small muted', text: 'Încă nimic.' }));
   kids.push(h('h3', { text: 'Ultimele săptămâni' }), historyChart(m));
   if (m.next) kids.push(h('h3', { text: `Avansare la ${RANK_NAME[m.next]}` }), h('p', { class: 'small', text: m.canPromote ? 'Îndeplinește condițiile și există loc liber.' : m.why }));
-  if (st.me.leader) kids.push(idSection(m), leaderTools(m));
+  if (canSee('idcard.manage') || canSee('members.manage')) kids.push(...[canSee('idcard.manage') ? idSection(m) : null, canSee('members.manage') ? leaderTools(m) : null].filter(Boolean));
   d.replaceChildren(closeBtn, h('div', { class: 'drawer-inner' }, h('div', { class: 'poster' }, ...kids)));
   d.hidden = false; $('#scrim').hidden = false; d.querySelector('.drawer-inner').scrollTop = 0;
   countUp(d, 650);
@@ -609,9 +627,9 @@ function leaderTools(m) {
     h('div', { class: 'row' }, h('div', null, h('label', { for: 'g-type', text: 'Activitate' }), type), h('div', null, h('label', { for: 'g-qty', text: type.value === 'bonus' ? 'Puncte' : 'De câte ori' }), qty)),
     h('label', { for: 'g-note', text: 'Notă' }), note,
     h('p', null, h('button', { class: 'btn', type: 'button', onclick: () => act('/api/give', { userIds: [m.id], type: type.value, qty: Number(qty.value), note: note.value }, () => openProfile(m.id)) }, 'Dă puncte')),
-    h('h3', { text: 'Schimbă rangul' }),
+    h('h3', { text: 'Schimbă rank-ul' }),
     h('div', { class: 'row' }, h('div', null, rank), force ? h('div', { class: 'fit' }, force) : null),
-    h('p', null, h('button', { class: 'btn alt', type: 'button', onclick: () => act('/api/rank', { userId: m.id, rank: rank.value, force: !!document.getElementById('r-force')?.checked }, () => openProfile(m.id)) }, 'Schimbă rangul')),
+    h('p', null, h('button', { class: 'btn alt', type: 'button', onclick: () => act('/api/rank', { userId: m.id, rank: rank.value, force: !!document.getElementById('r-force')?.checked }, () => openProfile(m.id)) }, 'Schimbă rank-ul')),
     h('h3', { text: 'Concediu' }),
     h('div', { class: 'row' }, h('div', null, h('label', { for: 'l-days', text: 'Zile (0 îl oprește)' }), days)),
     h('p', null, h('button', { class: 'btn alt', type: 'button', onclick: () => act('/api/leave', { userId: m.id, zile: Number(days.value) }, () => openProfile(m.id)) }, 'Setează concediul')),
@@ -743,8 +761,13 @@ function pageLeaders() {
       h('td', null, h('button', { class: 'btn alt small', type: 'button', onclick: () => { if (confirm(`Anulezi #${e.id}: ${e.userName} ${e.pts > 0 ? '+' : ''}${e.pts} ${e.label}?`)) act('/api/undo', { id: e.id }); } }, 'Anulează'))))))
     : h('p', { class: 'small muted', text: 'Nu s-au dat puncte manual săptămâna asta.' });
 
-  const tabs = [['puncte', 'Puncte', 'trophy'], ['banda', 'Bandă', 'plus'], ...(st.me.admin ? [['anunt', 'Anunț', 'horn'], ['setari', 'Setări', 'sliders']] : [])];
-  if (!tabs.some(([k]) => k === S.ltab)) S.ltab = 'puncte';
+  const tabs = [
+    ...(canSee('points.manage') ? [['puncte', 'Puncte', 'trophy']] : []),
+    ...(canSee('members.manage') ? [['banda', 'Bandă', 'plus']] : []),
+    ...(canSee('announcements.manage') ? [['anunt', 'Anunț', 'horn']] : []),
+    ...(canSee('config.manage') ? [['setari', 'Setări', 'sliders']] : []),
+  ];
+  if (!tabs.some(([k]) => k === S.ltab)) S.ltab = tabs[0]?.[0] || 'puncte';
   const bar = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Secțiuni pentru lideri' }, tabs.map(([k, label, ic]) =>
     h('button', { type: 'button', role: 'tab', 'aria-selected': String(S.ltab === k), onclick: () => { if (S.ltab !== k) { S.ltab = k; S.anim = true; render(); } } }, icon(ic, 18), label)));
   const panels = {
@@ -758,8 +781,8 @@ function pageLeaders() {
         } }, icon('check', 22), 'Dă puncte'))),
       sheet(title('list', 'Puncte date săptămâna asta'), h('div', { class: 'scroll' }, log))],
     banda: () => [
-      sheet(title('plus', 'Adaugă în bandă', 'Caută omul pe server și alege rangul cu care intră. Rangul, concediul și cartea de identitate le schimbi din profilul lui, în pagina Banda.'), add.el,
-        lab('shield', 'Rang', 'a-rank'), rank,
+      sheet(title('plus', 'Adaugă în bandă', 'Caută omul pe server și alege rank-ul cu care intră. Rank-ul, concediul și cartea de identitate le schimbi din profilul lui, în pagina Banda.'), add.el,
+        lab('shield', 'Rank', 'a-rank'), rank,
         h('p', { class: 'center' }, h('button', { class: 'btn', type: 'button', onclick: async () => {
           const id = add.ids()[0];
           if (!id) return toast('Alege mai întâi persoana.', true);
@@ -813,7 +836,7 @@ function configSheet() {
     ['Puncte pe activitate', 'Câte puncte aduce fiecare lucru.', [['mina', 'O mină', c.values.mina], ['task', 'Un task', c.values.task], ['prezenta', 'Prezență la eveniment', c.values.prezenta], ['organizat', 'Eveniment organizat', c.values.organizat]]],
     ['Voice', 'Se adună singur cât stai pe voice cu cineva.', [['voice', 'Puncte pe oră', c.values.voice], ['plafon_voice', 'Maximum pe săptămână', c.caps.voice || 0]]],
     ['Insigne', 'Punctele de făcut pe săptămână și câte locuri sunt.', [['prag_membru', 'Prag Membru', c.prag.membru], ['prag_asociat', 'Prag Asociat', c.prag.asociat], ['locuri_membru', 'Locuri de Membru', c.slots.membru], ['locuri_asociat', 'Locuri de Asociat', c.slots.asociat]]],
-    ['Retrogradare și promovare', 'Câte săptămâni contează înainte să se schimbe rangul.', [['toleranta', 'Săptămâni sub prag până la retrogradare', c.toleranta], ['saptamani_promovare', 'Săptămâni peste prag pentru promovare', c.promoWeeks]]],
+    ['Retrogradare și promovare', 'Câte săptămâni contează înainte să se schimbe rank-ul.', [['toleranta', 'Săptămâni sub prag până la retrogradare', c.toleranta], ['saptamani_promovare', 'Săptămâni peste prag pentru promovare', c.promoWeeks]]],
   ];
   const inputs = [];
   const demote = h('input', { type: 'checkbox', id: 'cfg-demote', checked: c.autoDemote });

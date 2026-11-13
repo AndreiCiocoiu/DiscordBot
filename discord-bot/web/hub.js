@@ -20,7 +20,7 @@ const HUB_STATUS = {
 };
 const HUB_UNITS = [['aur', 'Aur'], ['bani', 'Bani'], ['fier', 'Fier'], ['lemn', 'Lemn'], ['cupru', 'Cupru'], ['carbune', 'Cărbune'], ['otel', 'Oțel'], ['alte', 'Altele']];
 const hb = (tag, props, ...kids) => h(tag, props, ...kids);
-const hubTab = () => HUB_TABS.some(([key]) => key === location.hash.split('/')[2]) ? location.hash.split('/')[2] : 'war';
+const hubTab = () => HUB_TABS.some(([key]) => key === location.hash.split('/')[2] && canSeeHub(key)) ? location.hash.split('/')[2] : (HUB_TABS.find(([key]) => canSeeHub(key))?.[0] || 'notices');
 const hubName = (id) => S.state?.members?.find((u) => u.id === id)?.name || (id === S.state?.me?.id ? S.state.me.name : 'Membru');
 const hubDate = (ts) => ts ? new Intl.DateTimeFormat('ro-RO', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone: typeof tz === 'function' ? tz() : 'Europe/Bucharest' }).format(new Date(ts)) : '—';
 const hubEmpty = (msg) => hb('div', { class:'hub-empty' }, hb('span', { class:'hub-empty-symbol', text:'◇' }), hb('strong', { text:'Momentan este liniște aici.' }), hb('p', { text:msg }));
@@ -88,10 +88,10 @@ const hubList = (children) => hb('div', { class:'hub-list' }, children);
 function pageHub() {
   const current = hubTab();
   const metadata = HUB_TABS.find(([key]) => key === current);
-  const leader = !!S.state?.me?.leader;
+  const leader = !!S.state?.me?.permissions?.[`hub.${current}.manage`];
   const count = (key) => S.hub?.[key]?.length || 0;
   const unread = S.hub?.notices?.filter((n) => !n.read)?.length || 0;
-  const nav = hb('div', { class:'hub-tabs', role:'navigation', 'aria-label':'Module Cartier' }, HUB_TABS.map(([key,label,symbol]) =>
+  const nav = hb('div', { class:'hub-tabs', role:'navigation', 'aria-label':'Module Cartier' }, HUB_TABS.filter(([key])=>canSeeHub(key)).map(([key,label,symbol]) =>
     hb('a', { href:`#/cartier/${key}`, class:`hub-tab ${current === key ? 'selected' : ''}`, 'aria-current': current === key ? 'page' : null, 'data-hub-key': key },
       hb('span', { class:'hub-tab-symbol', 'aria-hidden': 'true', text:'' }), hb('span', { class:'hub-tab-label', text:label }), key === 'notices' && unread ? hb('b', { class:'hub-tab-count', text:unread }) : null)));
   const intro = hb('div', { class:'hub-intro' },
@@ -283,10 +283,11 @@ function hubFeed(data) {
 function hubNotices(data) {
   const unread=data.notices.filter((n)=>!n.read).length;
   const mark=unread?hubButton('Marchează toate ca citite',()=>hubAction({action:'notice.read',all:true})) : null;
+  const dmToggle=hubButton(S.state.me.dm ? '✉ Discord DM: ACTIVATE' : '✉ Discord DM: DEZACTIVATE',()=>toggleDirectMessages(),S.state.me.dm?'active':'');
   const list=data.notices.map((n)=>hb('button',{type:'button',class:`hub-notice ${n.read?'read':''}`,onclick:async()=>{
     if(!n.read)await hubAction({action:'notice.read',id:n.id});
     if(HUB_TABS.some(([key])=>key===n.target))location.hash=`#/cartier/${n.target}`;
   }},hb('span',{class:'hub-notice-dot',text:n.read?'○':'●'}),
     hb('span',{class:'hub-notice-copy'},hb('strong',{text:n.title}),hb('span',{text:n.text}),hb('small',{text:hubDate(n.at)})),hb('span',{class:'hub-notice-arrow',text:'↗'})));
-  return hb('div',null,mark?hb('div',{class:'hub-notices-tools'},mark):null,list.length?hubList(list):hubEmpty('Nu ai notificări noi. Vei vedea aici actualizări relevante din Cartier.'));
+  return hb('div',null,hb('div',{class:'hub-notices-tools'},dmToggle,mark),hb('p',{class:'hub-dm-explainer',text:'Dacă ai mesaje private activate în Discord, botul îți trimite acolo notificările importante. Poți dezactiva DM-urile oricând.'}),list.length?hubList(list):hubEmpty('Nu ai notificări noi. Vei vedea aici actualizări relevante din Cartier.'));
 }
