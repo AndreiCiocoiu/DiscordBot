@@ -2,53 +2,38 @@
 <html lang="ro">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#100805">
-  <meta name="description" content="Panoul Sahara Cartel — clasament, membri, crafting și administrare.">
-  <title>Sahara Cartel</title>
+  <meta name="theme-color" content="#0c0a17">
+  <meta name="description" content="Reduceri la jocuri de pe Steam și alte magazine, jocuri gratis și anunțuri, într-un singur loc.">
+  <title>{{NAME}}: reduceri la jocuri</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/unbounded-latin-900-normal.woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/hub.css">
 </head>
 <body>
-  <header class="hero" id="hero">
-    <div class="stage">
-      <div class="parallax"><img class="hero-back" src="/img/sahara.jpg" alt=""></div>
-      <img class="hero-art" src="/img/sahara.jpg" width="1200" height="675" alt="Sahara Cartel: trei oameni mascați în fața conacului, la apus">
-      <div class="hero-glow" aria-hidden="true"></div>
-      <canvas id="dust" aria-hidden="true"></canvas>
-      <div class="hero-fade"></div>
-      <div class="hero-curtain" aria-hidden="true"></div>
-    </div>
-    <h1 class="sr">Sahara Cartel</h1>
-    <div id="me" class="me"></div>
-    <button id="quick-open" class="quick-open" type="button" hidden aria-keyshortcuts="Control+k Meta+k" title="Caută peste tot (Ctrl+K)">
-      <span class="quick-symbol" aria-hidden="true">⌕</span> Caută <kbd>Ctrl K</kbd>
-    </button>
+  <div id="ambient" aria-hidden="true"><i></i><i></i></div>
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <a class="skip" href="#view">Sari la conținut</a>
+  <header class="top">
+    <a class="brand" href="#/" aria-label="{{NAME}}, prima pagină"><span class="brand-tag" aria-hidden="true">%</span><span class="brand-name">{{NAME}}</span></a>
     <nav id="nav" class="nav" aria-label="Secțiuni"></nav>
+    <div class="tools">
+      <button id="find" class="tool" type="button" aria-label="Caută un joc"></button>
+      <select id="cur" class="cur" aria-label="Moneda afișată"></select>
+      <div id="me" class="me"></div>
+    </div>
   </header>
-  <section id="family-summary" class="family-summary" aria-label="Rezumatul săptămânii" hidden></section>
-  <main id="view" class="page" aria-live="polite"></main>
-  <aside id="drawer" class="drawer" hidden aria-label="Profil"></aside>
+  <main id="view" class="page" tabindex="-1"></main>
+  <footer class="foot">
+    <p>Prețurile vin de la <a href="https://www.cheapshark.com" target="_blank" rel="noopener">CheapShark</a> și sunt în dolari; în alte monede sunt aproximative. Jocurile gratuite vin din Epic Games Store. Prețul final îl vezi în magazin.</p>
+  </footer>
+  <nav id="tabbar" class="tabbar" aria-label="Secțiuni"></nav>
+  <aside id="sheet" class="sheet" hidden aria-label="Detalii joc"></aside>
+  <div id="palette" class="palette" hidden></div>
   <div id="scrim" class="scrim" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>
-  <div id="lantern" aria-hidden="true"></div>
-  <div id="site-watermark" class="site-watermark" aria-hidden="true" hidden>
-    <div id="site-watermark-grid" class="site-watermark-grid"></div>
-  </div>
-  <div id="site-watermark-stamp" class="site-watermark-stamp" aria-hidden="true" hidden></div>
-  <div id="command-palette" class="command-palette" hidden role="dialog" aria-modal="true" aria-label="Căutare rapidă">
-    <button id="command-backdrop" class="command-backdrop" type="button" aria-label="Închide căutarea"></button>
-    <section class="command-panel" aria-labelledby="command-title">
-      <div class="command-top"><span id="command-title">Căutare rapidă</span><button id="command-close" type="button" aria-label="Închide">×</button></div>
-      <input id="command-input" type="search" placeholder="Caută membri sau secțiuni…" autocomplete="off" aria-label="Caută membri și secțiuni">
-      <div id="command-results" class="command-results" role="listbox" aria-label="Rezultate"></div>
-      <footer class="command-foot">↑ ↓ navigare <span>Enter deschide · Esc închide</span></footer>
-    </section>
-  </div>
   <noscript><p class="notice">Pagina are nevoie de JavaScript.</p></noscript>
-  <script src="/hub.js" defer></script>
-  <script src="/security.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

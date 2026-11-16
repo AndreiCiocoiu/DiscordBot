@@ -1,122 +1,32 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Events } = require('discord.js');
-const razii = require('./src/utils/razii');
-const raziiUi = require('./src/utils/raziiUi');
-const { handleMessage } = require('./src/utils/raziiText');
-const { handleServerMessage } = require('./src/utils/serverText');
-const sessions = require('./src/utils/sessions');
-const welcome = require('./src/utils/welcome');
-const adminlog = require('./src/utils/adminlog');
-const craft = require('./src/utils/craft');
-const commands = require('./src/utils/commands');
-const points = require('./src/utils/points');
-const web = require('./src/utils/web');
+const fs = require('fs');
+const { DATA_DIR } = require('./src/store');
+const web = require('./src/web');
+const botMod = require('./src/bot');
 
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 process.on('uncaughtException', (err) => console.error('Uncaught exception:', err));
 
-const G = GatewayIntentBits;
-const BASE_INTENTS = [
-  G.Guilds, G.GuildModeration, G.GuildExpressions ?? G.GuildEmojisAndStickers, G.GuildInvites, G.GuildWebhooks,
-  G.GuildVoiceStates, G.GuildMessages, G.GuildScheduledEvents, G.AutoModerationExecution,
-];
-
-// Privileged intents must be switched on in the Developer Portal. If one is
-// off, the bot starts anyway with fewer features instead of not starting.
-const LEVELS = [
-  { members: true, content: true },
-  { members: false, content: true },
-  { members: false, content: false },
-];
-
-function build(level) {
-  const intents = [...BASE_INTENTS];
-  if (level.members) intents.push(G.GuildMembers);
-  if (level.content) intents.push(G.MessageContent);
-  const client = new Client({ intents, partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User] });
-  wire(client, level);
-  return client;
-}
-
-// Slash commands: /craft and /catalog (read-only lookups), /panou (admins only). Everything else
-// left over from older versions (global or per server) is removed at every start.
-async function syncSlashCommands(c) {
-  try {
-    const global = await c.application.commands.fetch();
-    if (global.size) { await c.application.commands.set([]); console.log(`Removed ${global.size} global slash command(s).`); }
-  } catch (err) { console.error('Could not clear global slash commands:', err.message); }
-  for (const guild of c.guilds.cache.values()) await syncGuild(guild);
-}
-async function syncGuild(guild) {
-  try { await guild.commands.set(commands.list.map((c) => c.toJSON())); }
-  catch (err) { console.error(`Could not set slash commands in ${guild.name}:`, err.message); }
-}
-
-function wire(client, level) {
-  client.once(Events.ClientReady, async (c) => {
-    console.log(`Logged in as ${c.user.tag}`);
-    if (!level.members) console.warn('Server Members Intent is OFF: welcome banner and member logs are disabled. Enable it in the Developer Portal -> Bot.');
-    if (!level.content) console.warn('Message Content Intent is OFF: "razie ..." / "server ..." text commands and message logs are disabled.');
-    for (const g of c.guilds.cache.values()) adminlog.action(client, g.id, 'Bot pornit', `Versiune ${require('./package.json').version}`);
-    razii.restore(client);
-    sessions.restore(client);
-    points.start(client);
-    site.setClient(client);
-    await syncSlashCommands(c);
-  });
-
-  client.on(Events.GuildCreate, (guild) => syncGuild(guild));
-  adminlog.attach(client);
-  client.on(Events.GuildMemberAdd, (member) => welcome.onMemberAdd(client, member).catch((err) => console.error('welcome error:', err)));
-
-  client.on(Events.InteractionCreate, async (interaction) => {
-    if (!(interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit() || interaction.isChatInputCommand() || interaction.isAutocomplete())) return;
-    try {
-      (await raziiUi.handleInteraction(interaction, client)) || (await sessions.handleInteraction(interaction, client)) || (await craft.handleInteraction(interaction, client)) || (await commands.handleInteraction(interaction, client));
-    } catch (err) {
-      if (err?.code === 10062 || err?.code === 40060) return; // expired / already answered
-      console.error('Interaction error:', err);
-      const payload = { content: 'Ceva nu a mers, mai încearcă o dată.', ephemeral: true };
-      if (interaction.isAutocomplete()) return;
-      if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
-      else await interaction.reply(payload).catch(() => {});
-    }
-  });
-
-  client.on(Events.MessageCreate, (message) => {
-    handleMessage(message, client).catch((err) => console.error('Text trigger error:', err));
-    craft.handleMessage(message, client).catch((err) => console.error('Craft error:', err));
-    handleServerMessage(message, client).catch((err) => console.error('Server command error:', err));
-  });
-}
-
-let site = { setClient() {} };
-
 function reportStorage() {
-  const path = require('path'), fs = require('fs');
-  const dir = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, 'data');
   let files = [];
-  try { files = fs.readdirSync(dir); } catch { /* not created yet */ }
-  console.log(`Storage: ${dir} (${files.length} files: ${files.join(', ') || 'none'})`);
+  try { files = fs.readdirSync(DATA_DIR); } catch { /* not created yet */ }
+  console.log(`Storage: ${DATA_DIR} (${files.length} files: ${files.join(', ') || 'none'})`);
   if (process.env.RAILWAY_ENVIRONMENT && !process.env.RAILWAY_VOLUME_MOUNT_PATH && !process.env.DATA_DIR) {
-    console.warn('WARNING: no Railway Volume attached. Data is wiped on every restart. Add a Volume mounted at /app/data.');
+    console.warn('WARNING: no Railway Volume attached. Announcements, wishlists and settings are wiped on every restart. Add a Volume mounted at /app/data.');
   }
 }
 
 async function main() {
   reportStorage();
-  site = web.start(null);
-  for (const level of LEVELS) {
-    const client = build(level);
-    try {
-      await client.login(process.env.DISCORD_TOKEN);
-      return;
-    } catch (err) {
-      client.destroy();
-      if (!/disallowed intents/i.test(String(err?.message)) || level === LEVELS[LEVELS.length - 1]) throw err;
-      console.warn('A privileged intent is not enabled in the Developer Portal, retrying with fewer features...');
-    }
-  }
+  const site = web.start();            // the website answers first, the bot connects after
+  const bot = botMod.start();
+  site.setBot(bot);
+  // if Discord cannot be reached (wrong token, outage), the site stays up and the bot keeps trying
+  const connect = () => bot.login().catch((err) => {
+    console.error(`Discord login failed: ${err.message}. Trying again in 60 seconds.`);
+    setTimeout(connect, 60_000);
+  });
+  await connect();
 }
 
 main().catch((err) => { console.error('Failed to start:', err); process.exit(1); });
