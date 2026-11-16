@@ -18,6 +18,26 @@ async function req(route,obj,id=ids[0]){
   const res=await fetch(base+route,opts),data=await res.json();return {status:res.status,...data};
 }
 async function test(){
+  // New Discord members should appear without clicking any opt-in control.
+  const fresh='223456789012345670';
+  const newcomer=hub.observeMember({id:fresh,username:'Newcomer',displayAvatarURL:()=>null,bot:false});
+  assert(newcomer?.tracking && newcomer?.public, 'observed community members automatically join ranking');
+  hub.addTime(fresh,'game','Counter-Strike 2',3600000);
+  assert(hub.rankings('week').players.some(x=>x.id===fresh),'auto-tracked player must be listed');
+  const excluded=hub.updateProfile({id:fresh,name:'Newcomer'},{tracking:false});
+  assert(excluded.ok && !hub.user(fresh).tracking, 'member opt-out disables recording');
+  hub.addTime(fresh,'game','Counter-Strike 2',3600000);
+  assert(!hub.rankings('week').players.some(x=>x.id===fresh),'excluded player must not be listed');
+  assert(hub.erase(fresh).ok,'erase request should work');
+  assert(!hub.observeMember({id:fresh,username:'Newcomer'}),'erasure keeps an opt-out tombstone');
+  hub.redmHeartbeat([fresh]);
+  assert(!hub.user(fresh),'the RedM bridge cannot silently re-enable an erased member');
+  const redmUser='323456789012345670';
+  hub.redmHeartbeat([redmUser]);
+  assert(hub.user(redmUser)?.tracking,'RedM-only members should be auto-discovered');
+  hub.H.bridgeLast[redmUser]=Date.now()-61000;
+  hub.redmHeartbeat([redmUser]);
+  assert(hub.totals(hub.user(redmUser)).redm>59000,'RedM heartbeat contributes real server minutes');
   for(const id of ids)assert.equal((await req('/api/hub/profile',{tracking:true,public:true,dm:true,favorites:['Red Dead Redemption 2']},id)).ok,true);
   hub.addTime(ids[0],'game','Red Dead Redemption 2',7200000);
   assert.equal((await req('/api/hub/rankings?period=week')).players[0].ms,7200000);
@@ -46,6 +66,6 @@ async function test(){
   const leaderboard=await req('/api/hub/rankings?kind=game');assert(leaderboard.games.length>0);
   const disabled=await req('/api/hub/profile',{tracking:false,public:true});assert.equal(disabled.profile.public,false);
   const erased=await req('/api/hub/erase',{});assert.equal(erased.ok,true);
-  console.log('PASS: 26+ API and bracket assertions; privacy & Railway web boot OK');
+  console.log('PASS: API, auto activity, persistent opt-out, RedM heartbeat, bracket and Railway web boot');
 }
 test().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>site.server.close());

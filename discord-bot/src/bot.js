@@ -25,6 +25,9 @@ const commands = [
     .addStringOption(o=>o.setName('perioada').setDescription('Perioada').addChoices({name:'Săptămâna',value:'week'},{name:'Luna',value:'month'},{name:'Tot timpul',value:'all'})),
   new SlashCommandBuilder().setName('profil').setDescription('Profilul tău din GamePortal'),
   new SlashCommandBuilder().setName('evenimente').setDescription('Următoarele evenimente de gaming'),
+  new SlashCommandBuilder().setName('statistici').setDescription('Confidențialitatea statisticilor tale din GamePortal')
+    .addStringOption(o=>o.setName('actiune').setDescription('Alege dacă vrei să fii exclus sau să-ți ștergi datele').setRequired(true)
+      .addChoices({name:'Exclude-mă din clasamente',value:'exclude'}, {name:'Reactivează statisticile',value:'include'}, {name:'Șterge datele și exclude-mă',value:'delete'})),
 ];
 
 async function topDeals({ max, cut } = {}) {
@@ -54,13 +57,20 @@ async function onCommand(i) {
   const name = i.commandName;
   if (name === 'portal') return i.reply({ content: siteUrl() ? `Portalul: ${siteUrl()}` : 'Adresa portalului nu e setată încă. Deschide site-ul o dată sau adaugă variabila WEB_URL.', flags: MessageFlags.Ephemeral });
   if(name==='profil') {
+    hub.observeMember(i.user);
     const p=hub.profile(i.user.id,i.user.id);
-    const msg=p?`**${p.name}**\nGaming: **${(p.totalMs/3600000).toFixed(1)}h** • Persona Non Grata: **${(p.redmMs/3600000).toFixed(1)}h**\nAchievements: ${p.badges.length} • Streak: ${p.streak} zile\n${siteUrl()?`${siteUrl()}/#/profil`:''}`:`Intră pe ${siteUrl()||'GamePortal'} și activează tracking-ul din Profil.`;
+    const msg=p?`**${p.name}**\nGaming: **${(p.totalMs/3600000).toFixed(1)}h** • Persona Non Grata: **${(p.redmMs/3600000).toFixed(1)}h**\nAchievements: ${p.badges.length} • Streak: ${p.streak} zile\n${siteUrl()?`${siteUrl()}/#/profil`:''}`:`Statistica se acumulează automat în comunitate, după configurarea tracking-ului pe bot.`;
     return i.reply({content:msg,flags:MessageFlags.Ephemeral});
   }
   if(name==='top') {
     const p=i.options.getString('perioada')||'week',top=hub.rankings(p).players.slice(0,10);
-    return i.reply({content:`**Top Gaming · ${p}**\n${top.length?top.map((u,n)=>`${n+1}. ${u.name} — ${(u.ms/3600000).toFixed(1)}h`).join('\n'):'Nimeni nu a activat încă tracking-ul public.'}\n${siteUrl()?siteUrl()+'/#/rankings':''}`});
+    return i.reply({content:`**Top Gaming · ${p}**\n${top.length?top.map((u,n)=>`${n+1}. ${u.name} — ${(u.ms/3600000).toFixed(1)}h`).join('\n'):'Nu există ore înregistrate încă.'}\n${siteUrl()?siteUrl()+'/#/rankings':''}`});
+  }
+  if(name==='statistici') {
+    const action=i.options.getString('actiune');
+    const s={id:i.user.id,name:i.user.globalName||i.user.username,avatar:i.user.displayAvatarURL({size:64})};
+    const result=action==='delete'?hub.erase(s.id):hub.updateProfile(s,{tracking:action==='include',public:action==='include'});
+    return i.reply({content:result.msg,flags:MessageFlags.Ephemeral});
   }
   if(name==='evenimente') {
     const ev=hub.listItems('events').slice(0,5);
@@ -148,24 +158,35 @@ function start() {
     if (!Object.keys(db.seenFree).length) { try { const f = await free.epic(); for (const g of f.now) db.seenFree[`${g.id}:${g.start}`] = Date.now(); save(); } catch { /* next tick */ } }
     setTimeout(tick, 20_000); setInterval(tick, 5 * 60_000);
     setInterval(()=>{try{
-      if(process.env.ENABLE_PRESENCE_TRACKING==='1')for(const g of c.guilds.cache.values())for(const p of g.presences.cache.values())hub.presence(p.userId,p.activities.find(a=>a.type===ActivityType.Playing)?.name||'');
-      // Covers users who opted in while already connected to a voice channel.
-      const g=guild();if(g)for(const vs of g.voiceStates.cache.values())if(vs.channelId)hub.voice(vs.id,true);
+      const g=guild();
+      if(process.env.ENABLE_PRESENCE_TRACKING==='1' && g)for(const p of g.presences.cache.values()){
+        const member=p.member, u=member?.user || client.users.cache.get(p.userId);
+        if(u&&!u.bot){hub.observeMember(u);hub.presence(p.userId,p.activities.find(a=>a.type===ActivityType.Playing)?.name||'');}
+      }
+      if(g)for(const vs of g.voiceStates.cache.values())if(vs.channelId && !vs.member?.user?.bot){
+        hub.observeMember(vs.member?.user || client.users.cache.get(vs.id));hub.voice(vs.id,true);
+      }
       hub.flushActive();
     }catch(e){console.error('hub activity:',e.message)}},60_000);
   });
   client.on(Events.PresenceUpdate,(oldP,newP)=>{
-    if(!newP||process.env.ENABLE_PRESENCE_TRACKING!=='1')return;
+    if(!newP||process.env.ENABLE_PRESENCE_TRACKING!=='1'||newP.guild?.id!==guild()?.id)return;
+    const u=newP.member?.user || client.users.cache.get(newP.userId);
+    if(!u || u.bot)return;
+    hub.observeMember(u);
     hub.presence(newP.userId,newP.activities.find(a=>a.type===ActivityType.Playing)?.name||'');
   });
   client.on(Events.VoiceStateUpdate,(oldS,newS)=>{
     if(oldS.guild.id!==guild()?.id && newS.guild.id!==guild()?.id)return;
-    hub.voice(newS.id,!!newS.channelId && !newS.member?.user?.bot);
+    const u=newS.member?.user || client.users.cache.get(newS.id);
+    if(u?.bot)return;
+    if(u)hub.observeMember(u);
+    hub.voice(newS.id,!!newS.channelId);
   });
   client.on(Events.GuildCreate, (g) => g.commands.set(commands.map((x) => x.toJSON())).catch(() => {}));
   client.on(Events.InteractionCreate, async (i) => {
     if (!i.isChatInputCommand()) return;
-    try { await onCommand(i); }
+    try { if(i.guildId===guild()?.id && !i.user.bot)hub.observeMember(i.user); await onCommand(i); }
     catch (err) {
       console.error('command error:', err);
       const msg = 'Nu am putut lua prețurile acum. Mai încearcă peste un minut.';

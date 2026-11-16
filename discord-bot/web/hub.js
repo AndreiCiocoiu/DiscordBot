@@ -1,16 +1,7 @@
 'use strict';
 // Community section (uses the lightweight DOM helpers in app.js; script is loaded before app.js).
-const HUB_LINKS=[
-  ['rankings','Leaderboard','Clasamente pentru Persona Non Grata, Discord și jocurile preferate','🏆'],
-  ['analytics','Community Analytics','Statistici de gaming și activitate live','📊'],
-  ['lfg','Find Your Squad','Găsește echipă pentru jocul tău','🎮'],
-  ['evenimente','Events','Înscrieri, calendare și reminder-e','📅'],
-  ['turnee','Tournament Hub','Bracket, bye-uri și rezultate','⚔️'],
-  ['voturi','Game of the Week','Votează jocul săptămânii','🗳️'],
-  ['lansari','Release Calendar','Urmărește lansări și DLC-uri','🚀'],
-  ['recomandari','For You','Recomandări personalizate de jocuri','✨'],
-  ['profil','Player Profile','Activitate, achievements, streak și notificări','👤'],
-];
+// Deal-first layout: community features live in one unobtrusive expandable area.
+const HUB_OPEN=new Set();
 const hubHead=(title,desc)=>h('div',{class:'pagehead'},h('h1',{text:title}),h('p',{text:desc}));
 const hubSec=(title,sub,contents)=>h('section',{class:'sec'},sectionHead(title,sub),contents);
 const hrs=(ms)=>`${(Math.max(0,Number(ms)||0)/3600000).toLocaleString('ro-RO',{maximumFractionDigits:1})}h`;
@@ -29,28 +20,67 @@ function hubGraph(data,valFn,labelFn){
   const max=Math.max(1,...data.map(valFn));
   return h('div',{class:'hub-bars',role:'list'},data.map(x=>h('div',{class:'hub-bar',role:'listitem',title:`${labelFn(x)} • ${hrs(valFn(x))}`},h('div',{style:{height:`${Math.max(4,valFn(x)/max*100)}%`}}),h('small',{text:labelFn(x)}))));
 }
+function communityPreview(board,events){
+  const players=(board?.players||[]).slice(0,3),games=(board?.games||[]).slice(0,3),event=events?.items?.[0];
+  const line=(content,href)=>h('a',{class:'community-preview-line',href},content);
+  return h('section',{class:'sec community-preview'},
+    sectionHead('Și comunitatea joacă','Un mic bonus pe lângă cele mai bune reduceri.', '#/comunitate','Vezi comunitatea'),
+    h('div',{class:'community-preview-grid'},
+      h('div',{class:'community-preview-box'},h('span',{class:'community-kicker',text:'🏆 PERSONA NON GRATA'}),
+        h('h3',{text:'Top ore pe server'}),
+        players.length?players.map((u,i)=>line(h('span',null,`${i+1}. ${u.name}`,h('b',{text:hrs(u.ms)})),`#/profil?user=${u.id}`)):
+          h('p',{class:'muted small',text:'Clasamentul se completează când bridge-ul RedM primește date.'})),
+      h('div',{class:'community-preview-box'},h('span',{class:'community-kicker',text:'🎮 DISCORD'}),h('h3',{text:'Cele mai jucate'}),
+        games.length?games.map((g,i)=>h('div',{class:'community-preview-line'},h('span',{text:`${i+1}. ${g.name}`}),h('b',{text:hrs(g.ms)}))):
+          h('p',{class:'muted small',text:'Activitatea apare după activarea Presence Intent.'})),
+      h('div',{class:'community-preview-box'},h('span',{class:'community-kicker',text:'📅 COMUNITATE'}),h('h3',{text:'Următorul eveniment'}),
+        event?h('div',{class:'community-upnext'},h('b',{text:event.title}),h('small',{text:`${event.game} • ${hubDate(event.at)}`}),hubLink('comunitate','Detalii și înscrieri')):
+          h('p',{class:'muted small',text:'Evenimentele vor apărea aici. Reducerile rămân în centrul site-ului.'}))));
+}
+function communityFold(key,label,description,pages){
+  let loaded=false;
+  const area=h('div',{class:'community-fold-content'},h('p',{class:'muted small',text:'Deschide pentru detalii.'}));
+  const wrap=h('details',{class:'community-fold',open:HUB_OPEN.has(key),ontoggle:async()=>{
+    if(!wrap.open){HUB_OPEN.delete(key);return;}
+    HUB_OPEN.add(key);
+    if(loaded)return;
+    area.replaceChildren(h('p',{class:'muted',text:'Se încarcă…'}));
+    try{
+      const sections=await Promise.all(pages.map(f=>f()));
+      if(!wrap.open)return;
+      // Existing page modules stay functional but share the same community page.
+      area.replaceChildren(...sections.flatMap(x=>x.slice(1)));
+      loaded=true;
+    }catch(e){console.error(e);area.replaceChildren(empty('Nu am putut încărca modulul','Încearcă să închizi și să redeschizi secțiunea.'));}
+  }},h('summary',null,h('span',null,h('strong',{text:label}),h('small',{text:description})),h('b',{class:'community-fold-arrow',text:'+'})),area);
+  return wrap;
+}
 async function pageCommunity(){
-  const d=await hubFetch('/api/hub/rankings?period=week');
-  return [hubHead('Community Hub','Gaming, evenimente și statistici pentru comunitatea Persona Non Grata.'),
-    h('div',{class:'hub-metrics sec'},
-      [['Jucători în top',d.members],['Joacă acum',d.activeGames.length],['Pe server RedM',d.redmOnline],['Jocuri urmărite',d.games.length]].map(([name,value])=>h('div',{class:'hub-stat'},h('b',{text:value.toLocaleString('ro-RO')}),h('span',{text:name})))),
-    h('div',{class:'hub-tiles sec'},HUB_LINKS.map(([slug,title,desc,emoji])=>h('a',{class:'hub-tile',href:`#/${slug}`},h('span',{class:'hub-emoji',text:emoji}),h('strong',{text:title}),h('span',{class:'muted',text:desc}),h('span',{class:'hub-arrow',text:'Deschide ↗'})))),
-    hubSec('Playing Now','Doar membrii care au activat profilul public.',d.activeGames.length?h('div',{class:'hub-list'},d.activeGames.map(p=>h('div',{class:'hub-row'},hubPlayer(p),h('b',{text:p.game})))):empty('Încă nu apar jucători online','Tracking-ul jocurilor necesită opt-in și ENABLE_PRESENCE_TRACKING=1 pe bot.'))];
+  const [b,e]=await Promise.allSettled([hubFetch('/api/hub/rankings?period=week&kind=redm'),hubFetch('/api/hub/events')]);
+  const board=b.status==='fulfilled'?b.value:null,events=e.status==='fulfilled'?e.value:null;
+  return [hubHead('Comunitatea Persona Non Grata','GamePortal rămâne un site de reduceri. Aici găsești, într-un singur loc, clasamente și activități ale comunității.'),
+    communityPreview(board,events),
+    h('div',{class:'community-disclosures sec'},
+      communityFold('rankings','Clasamente & statistici','Top playtime, jocuri populare, activity charts și live now',[pageRankings,pageAnalytics]),
+      communityFold('teams','Joacă împreună','Caută echipă, votează și înscrie-te la turnee',[pageLfg,pagePolls,pageTournaments]),
+      communityFold('calendar','Evenimente & lansări','Evenimente viitoare, remindere, release calendar',[pageEvents,pageReleases])),
+    h('div',{class:'community-footerlinks'},hubLink('recomandari','Oferte recomandate'),hubLink('profil','Profil & notificări'),h('a',{href:'#/reduceri',class:'btn small mint'},'Înapoi la reduceri')),
+    h('p',{class:'community-notice muted small',text:'Statisticile sunt calculate din activitatea accesibilă botului Discord și, separat, din timpul raportat de serverul RedM. Colectarea nu este retroactivă. Membrii pot cere excluderea și ștergerea datelor din Profil.'})];
 }
 async function pageRankings(){
   const p=new URLSearchParams(location.hash.split('?')[1]||''),period=p.get('period')||'week',kind=p.get('kind')||'total';
   const d=await hubFetch(`/api/hub/rankings?period=${encodeURIComponent(period)}&kind=${encodeURIComponent(kind)}`);
-  const chooser=(key,options)=>h('div',{class:'chips'},options.map(([v,label])=>h('a',{class:'chip',href:`#/rankings?period=${key==='period'?v:period}&kind=${key==='kind'?v:kind}`,'aria-pressed':String((key==='period'?period:kind)===v),text:label})));
+  const chooser=(key,options)=>h('div',{class:'chips'},options.map(([v,label])=>h('a',{class:'chip',href:`#/comunitate?period=${key==='period'?v:period}&kind=${key==='kind'?v:kind}`,'aria-pressed':String((key==='period'?period:kind)===v),text:label})));
   const max=d.players[0]?.ms||1;
-  return [hubHead('Leaderboard','Clasamente după timpul de gaming înregistrat cu acordul membrilor.'),
+  return [hubHead('Leaderboard','Topul membrilor comunității, calculat din orele disponibile botului.'),
     h('div',{class:'hub-controls sec'},chooser('period',[['week','7 zile'],['month','30 zile'],['all','All-time']]),chooser('kind',[['total','Gaming'],['redm','Persona Non Grata'],['game','Jocuri Discord'],['voice','Voice']])),
-    h('section',{class:'sec hub-board'},d.players.length?d.players.map((u,i)=>h('div',{class:`hub-leader ${i<3?'hub-podium':''}`},h('span',{class:'hub-rank',text:`#${i+1}`}),hubPlayer(u,`${u.streak} zile streak`),h('div',{class:'hub-track'},h('i',{style:{width:`${Math.max(2,100*u.ms/max)}%`}})),h('b',{text:hrs(u.ms)}))):empty('Niciun jucător în clasament','Activează tracking-ul public din Profil și joacă pentru a acumula timp.')),
-    hubSec('Most Played Games','Totalul jocurilor afișate de membrii publici.',d.games.length?h('div',{class:'hub-list'},d.games.slice(0,20).map((g,i)=>h('div',{class:'hub-row'},h('b',{text:`${i+1}. ${g.name}`}),h('span',{text:hrs(g.ms)})))):empty('Nu există date','Jocurile vor apărea după activarea Presence Tracking.'))];
+    h('section',{class:'sec hub-board'},d.players.length?d.players.map((u,i)=>h('div',{class:`hub-leader ${i<3?'hub-podium':''}`},h('span',{class:'hub-rank',text:`#${i+1}`}),hubPlayer(u,`${u.streak} zile streak`),h('div',{class:'hub-track'},h('i',{style:{width:`${Math.max(2,100*u.ms/max)}%`}})),h('b',{text:hrs(u.ms)}))):empty('Niciun jucător în clasament','Orele se acumulează automat când botul primește activitate din Discord sau RedM.')),
+    hubSec('Most Played Games','Jocurile afișate în activitatea membrilor comunității.',d.games.length?h('div',{class:'hub-list'},d.games.slice(0,20).map((g,i)=>h('div',{class:'hub-row'},h('b',{text:`${i+1}. ${g.name}`}),h('span',{text:hrs(g.ms)})))):empty('Nu există date','Jocurile vor apărea după activarea Presence Tracking.'))];
 }
 async function pageAnalytics(){
   const d=await hubFetch('/api/hub/analytics?period=month');
   const days=Array.from({length:30},(_,i)=>{const x=new Date(Date.now()-(29-i)*86400000);return x.toISOString().slice(0,10)}).map(date=>d.daily.find(x=>x.date===date)||{date,ms:0});
-  return [hubHead('Community Analytics','Activitate agregată a membrilor care au ales să fie vizibili în clasament.'),
+  return [hubHead('Community Analytics','Activitatea agregată a comunității. Disponibilă după configurarea botului.'),
     h('div',{class:'hub-metrics sec'},[['Membri participanți',d.members],['Jucători online',d.activeGames.length],['Pe Persona Non Grata',d.redmOnline],['Jocuri în top',d.games.length]].map(([name,n])=>h('div',{class:'hub-stat'},h('b',{text:n}),h('span',{text:name})))),
     hubSec('Ultimele 30 de zile','Ore de gaming înregistrate pe zi (UTC).',hubGraph(days,x=>x.ms,x=>x.date.slice(5))),
     hubSec('Jocurile comunității','Ce jocuri au acumulat cele mai multe ore.',d.games.length?h('div',{class:'hub-list'},d.games.slice(0,12).map(g=>h('div',{class:'hub-row'},h('strong',{text:g.name}),h('span',{text:hrs(g.ms)})))):empty('Încă nu există jocuri','Statistica se construiește după activarea tracking-ului.')),
@@ -61,14 +91,14 @@ async function pageProfile(){
   if(!S.user && !id)return [hubHead('Player Profile','Profilul și setările tale de gaming.'),hubLogin()];
   const own=!id||id===S.user?.id;
   const d=await hubFetch(`/api/hub/profile?id=${encodeURIComponent(own?S.user.id:id)}`),p=d.profile;
-  if(!p&&!own)return [hubHead('Profil privat','Jucătorul nu și-a activat profilul public.'),hubLink('rankings','Înapoi la clasament')];
+  if(!p&&!own)return [hubHead('Profil privat','Jucătorul nu are un profil public sau a ales să nu apară în clasament.'),hubLink('rankings','Înapoi la clasament')];
   const top=p?.topGames||[],badgeNodes=(p?.badges||[]).map(b=>h('span',{class:'hub-badge',title:b.description},'🏅 ',b.name));
   const res=[hubHead(own?'Profilul meu':'Player Profile','Statistici, achievements și preferințe de joc.'),
     h('section',{class:'sec hub-card'},p?h('div',{class:'hub-profilehead'},p.avatar?h('img',{src:p.avatar,alt:''}):null,h('div',null,h('h2',{text:p.name}),h('p',{class:'muted',text:p.bio||'Fără descriere.'}))):h('h2',{text:S.user.name}),
     p?.tracking?h('div',{class:'hub-metrics'},[['Gaming',hrs(p.totalMs)],['Persona Non Grata',hrs(p.redmMs)],['Voice',hrs(p.voiceMs)],['Streak',`${p.streak} zile`]].map(([l,v])=>h('div',{class:'hub-stat'},h('b',{text:v}),h('span',{text:l})))):h('p',{class:'muted',text:'Tracking-ul este oprit.'}))];
   if(top.length){
     const entries=top.map(([name,ms])=>h('div',{class:'hub-row'},h('strong',{text:name}),h('span',{text:hrs(ms)})));
-    res.push(hubSec('Top Games','Timpul jucat de când ai activat tracking-ul.',h('div',{class:'hub-list'},entries)));
+    res.push(hubSec('Top Games','Timpul contabilizat de când botul a început colectarea.',h('div',{class:'hub-list'},entries)));
   }
   res.push(hubSec('Achievements',`Insigne obținute: ${badgeNodes.length}`,h('div',{class:'hub-badges'},
     badgeNodes.length?badgeNodes:h('span',{class:'muted',text:'Începe să joci și să participi la evenimente pentru a debloca insigne.'}))));
@@ -76,14 +106,15 @@ async function pageProfile(){
   if(own){
     const desc=hubTextarea('Despre mine');desc.el.value=p?.bio||'';
     const f=hubFormField('Jocuri preferate (separate prin virgulă)',(p?.favorites||[]).join(', '));
-    const tracking=h('input',{type:'checkbox',checked:!!p?.tracking}),pub=h('input',{type:'checkbox',checked:!!p?.public}),dm=h('input',{type:'checkbox',checked:!!p?.dm});
-    res.push(h('section',{class:'sec hub-card'},h('h2',{text:'Privacy & Notifications'}),
-      h('p',{class:'muted',text:'Datele nu sunt colectate retroactiv. Tracking-ul este voluntar. Poți opri participarea sau șterge datele oricând.'}),
-      h('label',{class:'check'},tracking,'Înregistrează activitatea mea de gaming / voice / RedM'),
-      h('label',{class:'check'},pub,'Afișează-mă în clasamente și în profilurile publice'),
+    // Collection is automatic for observed members; there is no per-member consent popup.
+    // A simple opt-out remains available and is persistent after deleting the profile.
+    const excluded=h('input',{type:'checkbox',checked:!p?.tracking}),dm=h('input',{type:'checkbox',checked:!!p?.dm});
+    res.push(h('section',{class:'sec hub-card'},h('h2',{text:'Profil & notificări'}),
+      h('p',{class:'muted',text:'Statisticile de gaming și RedM se colectează automat pentru membrii comunității după configurarea botului. Nu sunt retroactive. Poți solicita excluderea și ștergerea în orice moment.'}),
+      h('label',{class:'check'},excluded,'Nu mă include în tracking și în clasamente'),
       h('label',{class:'check'},dm,'Trimite-mi notificări private prin botul Discord'),
-      desc.wrap,f.wrap,h('div',{class:'actions'},hubBtn('Salvează profilul',()=>hubAct('/api/hub/profile',{tracking:tracking.checked,public:pub.checked,dm:dm.checked,bio:desc.el.value,favorites:f.el.value.split(',').map(x=>x.trim())}),'mint'),
-      hubBtn('Șterge toate datele Hub',()=>{if(confirm('Ștergi datele tale de gaming, notificările și participarea la clasamente?'))hubAct('/api/hub/erase',{});},'danger'))));
+      desc.wrap,f.wrap,h('div',{class:'actions'},hubBtn('Salvează profilul',()=>hubAct('/api/hub/profile',{tracking:!excluded.checked,public:!excluded.checked,dm:dm.checked,bio:desc.el.value,favorites:f.el.value.split(',').map(x=>x.trim())}),'mint'),
+      hubBtn('Șterge datele mele',()=>{if(confirm('Ștergi datele tale de gaming, notificările și participarea la clasamente? Tracking-ul va rămâne oprit.'))hubAct('/api/hub/erase',{});},'danger'))));
     const notices=(await hubFetch('/api/hub/me')).inbox||[];
     res.push(hubSec('Notification Inbox',`${notices.filter(x=>!x.read).length} necitite`,h('div',{class:'hub-list'},
       notices.length?notices.map(n=>h('div',{class:`hub-row ${n.read?'':'hub-unread'}`},h('div',null,h('strong',{text:n.text}),h('div',{class:'muted small',text:ago(n.at)})),n.link?h('a',{class:'btn small ghost',href:n.link.startsWith('/#/')?n.link.slice(1):n.link,target:n.link.startsWith('/')?'_self':'_blank',rel:'noopener'},'Deschide'):null)):empty('Nu ai notificări','Aici apar invitațiile LFG și reminder-ele de eveniment.'),

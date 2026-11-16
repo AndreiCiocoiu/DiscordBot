@@ -232,6 +232,25 @@ async function pageHome() {
   out.push(row('Cele mai mari reduceri', 'Jocuri cu recenzii bune, la cel mai mare procent.', d.hot, '#/reduceri'),
     row('Sub 5 dolari și foarte bune', 'Peste 85% recenzii pozitive pe Steam.', d.cheap, '#/reduceri'),
     row('Tocmai au apărut', 'Reduceri pornite în ultimele ore.', d.fresh, '#/reduceri'));
+  // Deal content is the main product. Recommendation cards remain actual deals,
+  // while community rankings are only a small, lower-priority section at the bottom.
+  const recommendedGrid=h('div',{class:'grid'});
+  const recommended=h('section',{class:'sec',hidden:true},sectionHead('Reduceri pentru tine','Selecție bazată pe jocurile favorite și ofertele populare.','#/recomandari','Vezi toate recomandările'),recommendedGrid);
+  out.push(recommended);
+  api('/api/hub/recommendations').then(r=>{
+    if(r.ok && r.data.items?.length){
+      recommendedGrid.replaceChildren(...r.data.items.slice(0,4).map(dealCard));
+      recommended.hidden=false;
+      if(recommended.isConnected)reveal(recommended);
+    }
+  }).catch(()=>{});
+  const communitySlot=h('div',{class:'community-home-slot'});
+  out.push(communitySlot);
+  Promise.allSettled([api('/api/hub/rankings?period=week&kind=redm'),api('/api/hub/events')]).then(([b,e])=>{
+    const rank=b.status==='fulfilled'&&b.value.ok?b.value.data:null;
+    const events=e.status==='fulfilled'&&e.value.ok?e.value.data:null;
+    communitySlot.replaceChildren(communityPreview(rank,events));
+  }).catch(()=>{});
   return out;
 }
 
@@ -445,13 +464,13 @@ function openSearch() {
 }
 
 // ---- shell ----
-const TABS = [['', 'Acasă', 'home'], ['reduceri', 'Reduceri', 'tag'], ['gratis', 'Gratis', 'gift'], ['anunturi', 'Anunțuri', 'horn'], ['wishlist', 'Wishlist', 'heart'], ['comunitate', 'Hub', 'users']];
+const TABS = [['', 'Acasă', 'home'], ['reduceri', 'Reduceri', 'tag'], ['gratis', 'Gratis', 'gift'], ['anunturi', 'Anunțuri', 'horn'], ['wishlist', 'Wishlist', 'heart']];
 const PAGES = { '': pageHome, reduceri: pageDeals, gratis: pageFree, anunturi: pageNews, wishlist: pageWatch, setari: pageAdmin, ...hubPages };
 const route = () => { const r = location.hash.replace(/^#\/?/, '').split('?')[0]; return r in PAGES ? r : ''; };
 
 function shell() {
   const r = route(), freeN = S.home?.free?.now?.length || 0;
-  const links = (short) => TABS.map(([k, label, ic]) => h('a', { href: `#/${k}`, 'aria-current': (k === r || (k === 'comunitate' && r in hubPages)) ? 'page' : null }, icon(ic, short ? 22 : 18), h('span', { text: label }), !short && k === 'gratis' && freeN ? h('span', { class: 'n', text: freeN }) : null));
+  const links = (short) => TABS.map(([k, label, ic]) => h('a', { href: `#/${k}`, 'aria-current': (k === r) ? 'page' : null }, icon(ic, short ? 22 : 18), h('span', { text: label }), !short && k === 'gratis' && freeN ? h('span', { class: 'n', text: freeN }) : null));
   $('#nav').replaceChildren(...links(false)); $('#tabbar').replaceChildren(...links(true));
   const me = $('#me');
   if (S.user) {

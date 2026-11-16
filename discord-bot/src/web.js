@@ -26,7 +26,9 @@ const STATIC = {
   '/style.css': ['web/style.css', 'text/css; charset=utf-8'],
   '/favicon.svg': ['web/favicon.svg', 'image/svg+xml'],
 };
-for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'fonts'))) if (/\.woff2$/.test(f)) STATIC[`/fonts/${f}`] = [`assets/fonts/${f}`, 'font/woff2'];
+// Font files are optional: fall back to platform fonts when not present.
+const FONT_DIR=path.join(ROOT,'assets','fonts');
+if(fs.existsSync(FONT_DIR))for(const f of fs.readdirSync(FONT_DIR))if(/\.woff2$/.test(f))STATIC[`/fonts/${f}`]=[`assets/fonts/${f}`,'font/woff2'];
 // game art comes from many store CDNs, so images are allowed from any https host; scripts, styles and fonts only from here
 const CSP = "default-src 'self'; img-src 'self' https: data:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 

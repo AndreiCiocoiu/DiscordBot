@@ -1,9 +1,9 @@
-// GamePortal community hub: consent-based activity, events, LFG, rankings, polls, tournaments and alerts.
+// GamePortal deal-first companion modules: activity rankings, events, LFG and alerts.
 // Stored on the existing Railway persistent volume; no external database credential required.
 const crypto = require('crypto');
 const { db, save } = require('./store');
-const H = db.hub ||= { users: {}, events: [], lfg: [], polls: [], releases: [], tournaments: [], inbox: {}, priceHistory: {}, bridgeLast: {} };
-for (const [k,v] of Object.entries({ users:{}, events:[], lfg:[], polls:[], releases:[], tournaments:[], inbox:{}, priceHistory:{}, bridgeLast:{} })) H[k] ||= v;
+const H = db.hub ||= { users: {}, events: [], lfg: [], polls: [], releases: [], tournaments: [], inbox: {}, priceHistory: {}, bridgeLast: {}, excluded: {} };
+for (const [k,v] of Object.entries({ users:{}, events:[], lfg:[], polls:[], releases:[], tournaments:[], inbox:{}, priceHistory:{}, bridgeLast:{}, excluded:{} })) H[k] ||= v;
 const uid = () => crypto.randomUUID();
 const now = () => Date.now();
 const clean = (v,n=100) => String(v||'').trim().slice(0,n);
@@ -16,15 +16,30 @@ const MAX_DAYS=180;
 function fail(msg) { return { ok:false, msg }; }
 function ok(msg,extra={}) { return { ok:true, msg, ...extra }; }
 function user(id) { return H.users[String(id)] || null; }
+// Members who appear in the configured community are counted automatically.
+// An explicit opt-out is always respected, including after a delete request.
 function ensure(s) {
   if (!isSnowflake(s?.id)) return null;
-  const first=!H.users[s.id];
-  const u = H.users[s.id] ||= { name:clean(s.name,40)||'Jucător', avatar:s.avatar||null, tracking:false, public:false, dm:false, bio:'', favorites:[], days:{}, registered:now() };
-  u.name=clean(s.name,40)||u.name; u.avatar=s.avatar||null; if(first)save(); return u;
+  const id=String(s.id), first=!H.users[id], excluded=!!H.excluded[id];
+  const u = H.users[id] ||= { name:clean(s.name,40)||'Jucător Discord', avatar:s.avatar||null,
+    tracking:!excluded, public:!excluded, dm:false, bio:'', favorites:[], days:{}, registered:now() };
+  if(s.name)u.name=clean(s.name,40)||u.name;
+  if(s.avatar)u.avatar=s.avatar;
+  if(excluded){u.tracking=false;u.public=false;}
+  if(first)save();
+  return u;
+}
+function observeMember(obj) {
+  if (!obj || !isSnowflake(obj.id) || obj.bot || H.excluded[String(obj.id)]) return null;
+  const s={id:String(obj.id), name:obj.globalName||obj.displayName||obj.username||obj.name,
+    avatar:typeof obj.displayAvatarURL==='function'?obj.displayAvatarURL({size:64}):obj.avatar||null};
+  return ensure(s);
 }
 function updateProfile(s,p) {
+  if(!isSnowflake(s?.id)) return fail('Autentifică-te cu Discord.');
+  if(p.tracking===true)delete H.excluded[s.id];
   const u=ensure(s); if (!u) return fail('Autentifică-te cu Discord.');
-  if ('tracking' in p) { u.tracking=p.tracking===true; if (!u.tracking) { u.public=false; active.delete(s.id); redmActive.delete(s.id); } }
+  if ('tracking' in p) { u.tracking=p.tracking===true; if (!u.tracking) { H.excluded[s.id]=true; u.public=false; active.delete(s.id); redmActive.delete(s.id); delete H.bridgeLast[s.id]; } else {delete H.excluded[s.id];u.public=true;} }
   if ('public' in p) u.public=u.tracking && p.public===true;
   if ('dm' in p) u.dm=p.dm===true;
   if ('bio' in p) u.bio=clean(p.bio,200);
@@ -36,7 +51,7 @@ function updateProfile(s,p) {
 }
 function erase(id) {
   if (!user(id)) return fail('Nu există date de șters.');
-  delete H.users[id]; delete H.inbox[id]; delete H.bridgeLast[id]; active.delete(id); redmActive.delete(id);
+  delete H.users[id]; delete H.inbox[id]; delete H.bridgeLast[id]; H.excluded[id]=true; active.delete(id); redmActive.delete(id);
   for (const l of H.lfg) { l.members=l.members.filter(x=>x!==id); if(l.owner===id) l.closed=true; }
   for (const e of H.events) e.going=e.going.filter(x=>x!==id);
   for (const p of H.polls) delete p.votes[id];
@@ -50,7 +65,7 @@ function erase(id) {
       if(t.winner===id)t.winner=anon;
     }
   }
-  save(); return ok('Datele tale din Community Hub au fost șterse.');
+  save(); return ok('Datele au fost șterse și tracking-ul a fost dezactivat pentru contul tău.');
 }
 function addTime(id,type,key,ms,t=now()) {
   const u=user(id); if (!u?.tracking || ms<=0) return;
@@ -94,7 +109,9 @@ function redmHeartbeat(ids) {
   if (!Array.isArray(ids)||ids.length>512) return fail('Lista de jucători este invalidă.');
   const t=now(), currently=new Set();
   for(const id of new Set(ids.map(String))) {
-    if(!isSnowflake(id)||!user(id)?.tracking) continue;
+    if(!isSnowflake(id)||H.excluded[id]) continue;
+    if(!user(id))ensure({id});
+    if(!user(id)?.tracking)continue;
     currently.add(id); const prev=H.bridgeLast[id];
     if(prev && t>prev && t-prev<=100_000) addTime(id,'redm','',t-prev,t);
     H.bridgeLast[id]=t; redmActive.add(id);
@@ -279,5 +296,5 @@ function recommendations(id,dealsList){const u=user(id),prefs=(u?.favorites||[])
 function reminders(){const t=now();for(const e of H.events)if(!e.reminded&&e.at>t&&e.at-t<=3600000){e.reminded=true;for(const id of e.going)notify(id,`Evenimentul „${e.title}” începe în mai puțin de o oră.`,'/#/evenimente');}
   for(const r of H.releases)if(!r.reminded&&r.at>t&&r.at-t<=86400000){r.reminded=true;for(const[id,u]of Object.entries(H.users))if(u.favorites.some(x=>r.game.toLowerCase().includes(x.toLowerCase())))notify(id,`${r.kind}: ${r.game} apare în următoarele 24 de ore.`,r.link||'/#/lansari');}save();}
 function listPublicPeople(ids){return ids.map(display);}
-module.exports={H,ensure,user,updateProfile,erase,addTime,presence,voice,flushActive,redmHeartbeat,rankings,profile,totals,badges,streak,notify,inbox,markRead,sendDms,
+module.exports={H,ensure,observeMember,user,updateProfile,erase,addTime,presence,voice,flushActive,redmHeartbeat,rankings,profile,totals,badges,streak,notify,inbox,markRead,sendDms,
   listItems,createEvent,eventJoin,lfgCreate,lfgJoin,lfgClose,createPoll,vote,createRelease,remove,createTournament,tournamentJoin,tournamentStart,tournamentResult,history,sampleBest,samplePrice,recommendations,reminders,listPublicPeople,display};

@@ -1,5 +1,6 @@
 -- Optional RedM server bridge: reports currently online players by Discord identifier.
--- Consent is required: GamePortal only counts users who enable tracking from their profile.
+-- Reports player identifiers only to the configured GamePortal backend.
+-- Publish a clear privacy notice on the community server; players can request exclusion.
 local endpoint = GetConvar('gameportal_bridge_url', '')
 local secret = GetConvar('gameportal_bridge_secret', '')
 

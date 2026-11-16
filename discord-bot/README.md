@@ -51,11 +51,13 @@ Răspunsurile sunt ținute în memorie câteva minute, ca botul să nu ceară ac
 - `src/news.js`, `src/watch.js`, `src/store.js` anunțuri, wishlist, salvare (`data/portal.json`)
 - `web/` interfața
 
-## GamePortal 2.0 – Community Hub
+## GamePortal 2.1 – Funcții secundare (reducerile rămân focusul)
 
-The community section adds:
+Pe homepage, după ofertele și reducerile principale, apare doar un rezumat compact cu top playtime / jocuri / următorul eveniment. Meniul principal NU conține Hub. Funcțiile de mai jos sunt grupate în secțiuni extensibile pe o pagină secundară accesată din rezumat sau footer (`/#/comunitate`). Recomandările personalizate sunt prezentate ca **reduceri**, nu ca un produs separat.
 
-1. Leaderboards (7 days / 30 days / all-time; games, Persona Non Grata RedM, Discord voice), opt-in only.
+Funcționalități incluse:
+
+1. Leaderboards (7 days / 30 days / all-time; games, Persona Non Grata RedM, Discord voice), automatic for observed community members unless opted out.
 2. Most played games and live Discord status display (requires enabled privileged Presence Intent).
 3. Public member profiles and individually configured favorites, achievements (1/10/50/100/500 hours), streaks (10+ minutes/day).
 4. Community analytics: 30-day activity histogram, current players, popular games.
@@ -67,17 +69,18 @@ The community section adds:
 10. Personalized in-site notification inbox and optional Discord DM alerts. Users must enable DMs in Profile.
 11. Tournament hub: registration, admin starts bracket, automatic byes, admin scores winners, champion.
 12. Game recommendations using favorites, community playtime and current deals; **heuristic**, not AI-generated.
-13. Optional **real RedM server** playtime: `integrations/gameportal_bridge` reports active Discord IDs through an authenticated heartbeat. Requires access to the RedM host and an identical secret on both sides. Counts no time until a user opts in.
+13. Optional **real RedM server** playtime: `integrations/gameportal_bridge` reports active Discord IDs through an authenticated heartbeat. Requires access to the RedM host and an identical secret on both sides. Counts time from the first heartbeat for players who have not opted out.
 
-**New slash commands:** `/top [perioada]`, `/profil`, `/evenimente` plus the original commands.
+**New slash commands:** `/top [perioada]`, `/profil`, `/evenimente`, `/statistici` plus the original commands.
 
 ### Data & privacy
 
-- No playtime is recorded for players until they actively enable tracking in Profile.
-- A separate toggle controls whether activity and profile appear publicly in leaderboards.
-- Members can disable tracking, disable private DM alerts and erase their Community Hub data in Profile.
+- Playtime collection is automatic for newly observed players in the configured community; no per-user website approval prompt is required. Presence Intent and (for server-specific playtime) RedM bridge still need configuration.
+- Membership is **not legally equivalent to consent**. Operators must publish transparent information in their Discord rules / announcements and select an appropriate lawful basis for collecting and publishing named player activity.
+- Members can opt out, erase all tracked records and disable private DM alerts in Profile; `/statistici` provides the same exclusion and delete access directly on Discord. Deleted records stay excluded until the player explicitly re-enables tracking.
+- Existing users previously marked as disabled are **not automatically re-enabled**, to preserve past preferences.
 - The existing wishlist and announcements live in `portal.json`; GamePortal 2.0 community data also uses that file, requiring a **Railway Volume**. No PostgreSQL integration is included. Large communities should migrate it to PostgreSQL before reaching substantial scale.
-- 'All-time' uses the accumulated history since consent/first tracking, not hours spent before installation. Overall gaming time uses the greater of Discord gaming hours or RedM gaming hours to avoid simply double-counting the same RDR2 session; it is therefore an estimate when the two sources cover different sessions.
+- 'All-time' uses the accumulated history since installation/first tracking, not hours spent before installation. Overall gaming time uses the greater of Discord gaming hours or RedM gaming hours to avoid simply double-counting the same RDR2 session; it is therefore an estimate when the two sources cover different sessions.
 - Discord statuses reveal a **game name**, but not whether someone is playing on the Persona Non Grata server. The RedM bridge is necessary for specific server time.
 - Calendar entries are manually entered, not an automatically synchronized commercial release feed.
 - DMs can fail when a user's privacy settings prevent bot messages.
