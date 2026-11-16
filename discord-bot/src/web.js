@@ -14,6 +14,7 @@ const free = require('./free');
 const news = require('./news');
 const watch = require('./watch');
 const { rates } = require('./rates');
+const hub = require('./hub');
 
 const ROOT = path.join(__dirname, '..');
 const NAME = String(process.env.SITE_NAME || 'DROPZONE').slice(0, 24);
@@ -21,6 +22,7 @@ const TTL_MS = 7 * 86400_000;
 const STATIC = {
   '/': ['web/index.html', 'text/html; charset=utf-8'],
   '/app.js': ['web/app.js', 'text/javascript; charset=utf-8'],
+  '/hub.js': ['web/hub.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['web/style.css', 'text/css; charset=utf-8'],
   '/favicon.svg': ['web/favicon.svg', 'image/svg+xml'],
 };
@@ -92,7 +94,7 @@ function start() {
     if (!process.env.DISCORD_CLIENT_SECRET) return page(res, 503, 'Login neconfigurat', 'Adminul trebuie să adauge variabila DISCORD_CLIENT_SECRET în Railway (Discord Developer Portal, OAuth2).');
     if (!clientId()) return page(res, 503, 'Botul pornește', 'Botul încă pornește. Încearcă din nou peste câteva secunde.');
     const state = crypto.randomBytes(16).toString('hex');
-    const q = new URLSearchParams({ client_id: clientId(), response_type: 'code', scope: 'identify', redirect_uri: `${baseUrl(req)}/auth/callback`, state, prompt: 'none' });
+    const q = new URLSearchParams({ client_id: clientId(), response_type: 'code', scope: 'identify', redirect_uri: `${baseUrl(req)}/auth/callback`, state });
     send(res, 302, '', { Location: `https://discord.com/oauth2/authorize?${q}`, 'Set-Cookie': setCookie(req, 'st', state, 600) });
   }
   async function callback(req, res, url) {
@@ -107,6 +109,7 @@ function start() {
       const me = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${tok.access_token}` } }).then((r) => r.json());
       if (!me?.id) return page(res, 400, 'Login eșuat', 'Discord nu a trimis contul. Încearcă din nou.');
       const session = { id: me.id, name: String(me.global_name || me.username || 'Jucător').slice(0, 40), avatar: me.avatar ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=64` : null, exp: Date.now() + TTL_MS };
+      hub.ensure(session);
       send(res, 302, '', { Location: '/', 'Set-Cookie': [setCookie(req, 'sc', sign(session), TTL_MS / 1000), setCookie(req, 'st', '', 0)] });
     } catch (err) {
       console.error('web login error:', err);
@@ -134,10 +137,21 @@ function start() {
         const [e, z] = await Promise.allSettled([free.epic(), deals.list({ max: 0, sort: 'reviews' })]);
         return json(res, 200, { now: e.value?.now || [], soon: e.value?.soon || [], others: (z.value?.items || []).filter((d) => d.sale === 0).slice(0, 24), down: e.status !== 'fulfilled' });
       }
-      if (route === '/api/game') { const g = await deals.game(q.id); return g ? json(res, 200, g) : json(res, 404, { error: 'Nu am găsit jocul.' }); }
+      if (route === '/api/game') { const g = await deals.game(q.id); if(g) hub.samplePrice(q.id,g); return g ? json(res, 200, {...g, priceHistory:hub.history(q.id)}) : json(res, 404, { error: 'Nu am găsit jocul.' }); }
       if (route === '/api/search') { if (limited(req, 40)) return json(res, 429, { error: 'Prea multe căutări. Așteaptă un minut.' }); return json(res, 200, { games: await deals.search(q.q) }); }
       if (route === '/api/news') return json(res, 200, { news: news.list() });
       if (route === '/api/watch') return session ? json(res, 200, { list: watch.mine(session.id), max: watch.MAX }) : json(res, 401, { error: 'Intră cu Discord ca să ai wishlist.' });
+      // Community hub: public discovery, private profile, personalised recommendations and notifications.
+      if (route === '/api/hub/rankings' || route === '/api/hub/analytics') return json(res, 200, hub.rankings(['week','month','all'].includes(q.period)?q.period:'week', ['total','game','redm','voice'].includes(q.kind)?q.kind:'total'));
+      if (route === '/api/hub/profile') return json(res, 200, {profile:hub.profile(q.id || session?.id,session?.id)});
+      if (route === '/api/hub/me') return session ? json(res,200,{profile:hub.profile(session.id,session.id),inbox:hub.inbox(session.id)}) : json(res,401,{error:'Autentifică-te cu Discord.'});
+      if (route === '/api/hub/events') return json(res,200,{items:hub.listItems('events').map(e=>({...e,going:hub.listPublicPeople(e.going)}))});
+      if (route === '/api/hub/lfg') return json(res,200,{items:hub.listItems('lfg').map(e=>({...e,owner:hub.display(e.owner),members:hub.listPublicPeople(e.members)}))});
+      if (route === '/api/hub/polls') return json(res,200,{items:hub.listItems('polls').map(p=>({...p,votes:Object.values(p.votes).reduce((a,v)=>(a[v]=(a[v]||0)+1,a),{}),myVote:session?p.votes[session.id]:null}))});
+      if (route === '/api/hub/releases') return json(res,200,{items:hub.listItems('releases')});
+      if (route === '/api/hub/tournaments') return json(res,200,{items:hub.listItems('tournaments').map(t=>({...t,players:hub.listPublicPeople(t.players),bracket:t.bracket.map(m=>({...m,a:m.a?hub.display(m.a):null,b:m.b?hub.display(m.b):null,winner:m.winner?hub.display(m.winner):null})),winner:t.winner?hub.display(t.winner):null}))});
+      if (route === '/api/hub/history') return json(res,200,{points:hub.history(q.id)});
+      if (route === '/api/hub/recommendations') { const r=await deals.list({sort:'rating',size:60});return json(res,200,{items:hub.recommendations(session?.id,r.items)}); }
       if (route === '/api/channels') return (await isAdmin(session)) ? json(res, 200, { channels: bot.channels() }) : json(res, 403, { error: 'Doar adminii.' });
       return json(res, 404, { error: 'Nu există.' });
     }
@@ -147,8 +161,30 @@ function start() {
     if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: 'Trimite JSON.' });
     if (!session) return json(res, 401, { error: 'Intră cu Discord mai întâi.' });
     let b; try { b = await body(req); } catch { return json(res, 400, { error: 'Cerere invalidă.' }); }
+    if (!b || Array.isArray(b) || typeof b !== 'object') return json(res,400,{error:'Trimite un obiect JSON.'});
 
     let r;
+    if (route.startsWith('/api/hub/')) {
+      const admin = await isAdmin(session);
+      if (route === '/api/hub/profile') r=hub.updateProfile(session,b);
+      else if (route === '/api/hub/erase') r=hub.erase(session.id);
+      else if (route === '/api/hub/read') r=hub.markRead(session.id);
+      else if (route === '/api/hub/event/create') r=hub.createEvent(session,b,admin);
+      else if (route === '/api/hub/event/join') r=hub.eventJoin(session.id,b);
+      else if (route === '/api/hub/lfg/create') r=hub.lfgCreate(session,b);
+      else if (route === '/api/hub/lfg/join') r=hub.lfgJoin(session.id,b);
+      else if (route === '/api/hub/lfg/close') r=hub.lfgClose(session.id,b,admin);
+      else if (route === '/api/hub/poll/create') r=hub.createPoll(b,admin);
+      else if (route === '/api/hub/poll/vote') r=hub.vote(session.id,b);
+      else if (route === '/api/hub/release/create') r=hub.createRelease(b,admin);
+      else if (route === '/api/hub/remove') r=hub.remove(session.id,b,admin);
+      else if (route === '/api/hub/tournament/create') r=hub.createTournament(b,admin);
+      else if (route === '/api/hub/tournament/join') r=hub.tournamentJoin(session.id,b);
+      else if (route === '/api/hub/tournament/start') r=hub.tournamentStart(b,admin);
+      else if (route === '/api/hub/tournament/result') r=hub.tournamentResult(b,admin);
+      else return json(res,404,{error:'Nu există.'});
+      return json(res,r.ok?200:422,r);
+    }
     if (route === '/api/watch') r = await watch.add(session.id, b);
     else if (route === '/api/watch/remove') r = watch.remove(session.id, b.gameId);
     else {
@@ -186,6 +222,15 @@ function start() {
       if (url.pathname === '/auth/login') return login(req, res);
       if (url.pathname === '/auth/callback') return callback(req, res, url);
       if (url.pathname === '/auth/logout') return send(res, 302, '', { Location: '/', 'Set-Cookie': setCookie(req, 'sc', '', 0) });
+      // Optional trusted RedM/FiveM resource. Not a browser endpoint: bearer secret required.
+      if (url.pathname === '/api/bridge/heartbeat' && req.method === 'POST') {
+        const secret=process.env.GAME_BRIDGE_SECRET;
+        const token=String(req.headers.authorization||'').replace(/^Bearer /i,'');
+        if(!secret || token.length!==secret.length || !crypto.timingSafeEqual(Buffer.from(token),Buffer.from(secret))) return json(res,401,{error:'Unauthorized bridge.'});
+        let payload;try{payload=await body(req);}catch{return json(res,400,{error:'Invalid heartbeat.'});}
+        const result=hub.redmHeartbeat(payload.players);
+        return json(res,result.ok?200:422,result);
+      }
       if (url.pathname.startsWith('/api/')) {
         if (limited(req)) return json(res, 429, { error: 'Prea multe cereri. Așteaptă un minut.' });
         // remember the public address once, so the bot can link to the site from Discord

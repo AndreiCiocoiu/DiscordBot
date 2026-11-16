@@ -1,10 +1,11 @@
 // The Discord side: slash commands, the daily deals digest, free-game alerts, wishlist alerts, mirrored announcements.
-const { Client, GatewayIntentBits, Events, EmbedBuilder, SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } = require('discord.js');
+const { Client, GatewayIntentBits, Events, EmbedBuilder, SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, ActivityType } = require('discord.js');
 const { db, save, cfg } = require('./store');
 const deals = require('./deals');
 const free = require('./free');
 const watch = require('./watch');
 const news = require('./news');
+const hub = require('./hub');
 
 const YELLOW = 0xffd400, MINT = 0x3df2b0, CORAL = 0xff4d6d;
 const usd = (n) => `${Number(n).toFixed(2)} $`;
@@ -20,6 +21,10 @@ const commands = [
   new SlashCommandBuilder().setName('joc').setDescription('Cel mai mic preț pentru un joc, în toate magazinele')
     .addStringOption((o) => o.setName('nume').setDescription('Numele jocului').setRequired(true).setMaxLength(60)),
   new SlashCommandBuilder().setName('portal').setDescription('Linkul către portal'),
+  new SlashCommandBuilder().setName('top').setDescription('Top jucători după timpul de gaming')
+    .addStringOption(o=>o.setName('perioada').setDescription('Perioada').addChoices({name:'Săptămâna',value:'week'},{name:'Luna',value:'month'},{name:'Tot timpul',value:'all'})),
+  new SlashCommandBuilder().setName('profil').setDescription('Profilul tău din GamePortal'),
+  new SlashCommandBuilder().setName('evenimente').setDescription('Următoarele evenimente de gaming'),
 ];
 
 async function topDeals({ max, cut } = {}) {
@@ -48,6 +53,19 @@ function freeEmbed(g, soon) {
 async function onCommand(i) {
   const name = i.commandName;
   if (name === 'portal') return i.reply({ content: siteUrl() ? `Portalul: ${siteUrl()}` : 'Adresa portalului nu e setată încă. Deschide site-ul o dată sau adaugă variabila WEB_URL.', flags: MessageFlags.Ephemeral });
+  if(name==='profil') {
+    const p=hub.profile(i.user.id,i.user.id);
+    const msg=p?`**${p.name}**\nGaming: **${(p.totalMs/3600000).toFixed(1)}h** • Persona Non Grata: **${(p.redmMs/3600000).toFixed(1)}h**\nAchievements: ${p.badges.length} • Streak: ${p.streak} zile\n${siteUrl()?`${siteUrl()}/#/profil`:''}`:`Intră pe ${siteUrl()||'GamePortal'} și activează tracking-ul din Profil.`;
+    return i.reply({content:msg,flags:MessageFlags.Ephemeral});
+  }
+  if(name==='top') {
+    const p=i.options.getString('perioada')||'week',top=hub.rankings(p).players.slice(0,10);
+    return i.reply({content:`**Top Gaming · ${p}**\n${top.length?top.map((u,n)=>`${n+1}. ${u.name} — ${(u.ms/3600000).toFixed(1)}h`).join('\n'):'Nimeni nu a activat încă tracking-ul public.'}\n${siteUrl()?siteUrl()+'/#/rankings':''}`});
+  }
+  if(name==='evenimente') {
+    const ev=hub.listItems('events').slice(0,5);
+    return i.reply({content:ev.length?ev.map(e=>`• **${e.title}** (${e.game}) — <t:${Math.floor(e.at/1000)}:F>`).join('\n')+`\n${siteUrl()?siteUrl()+'/#/evenimente':''}`:'Niciun eveniment momentan.'});
+  }
   await i.deferReply();
   if (name === 'reduceri') {
     const list = await topDeals({ max: i.options.getInteger('pret_max') ?? undefined, cut: i.options.getInteger('reducere_min') ?? undefined });
@@ -72,7 +90,9 @@ async function onCommand(i) {
 }
 
 function start() {
-  const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+  const intents=[GatewayIntentBits.Guilds,GatewayIntentBits.GuildVoiceStates];
+  if(process.env.ENABLE_PRESENCE_TRACKING==='1') intents.push(GatewayIntentBits.GuildPresences);
+  const client = new Client({ intents });
   const guild = () => (process.env.WEB_GUILD_ID && client.guilds.cache.get(process.env.WEB_GUILD_ID)) || client.guilds.cache.first();
   const channel = (id) => { const ch = id && client.channels.cache.get(id); return ch?.isTextBased?.() ? ch : null; };
 
@@ -114,6 +134,8 @@ function start() {
       const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }).formatToParts(new Date()).map((p) => [p.type, p.value]));
       const day = `${parts.year}-${parts.month}-${parts.day}`;
       if (c.digest && c.dealsChannel && Number(parts.hour) % 24 >= c.hour && db.lastDigest !== day) { db.lastDigest = day; save(); await digest(false); }
+      hub.flushActive(); hub.reminders();
+      await hub.sendDms(async(id,text,link)=>{const u=await client.users.fetch(id);await u.send(`${text}${link?`\n${link.startsWith('/')?siteUrl()+link:link}`:''}`);});
       if (n++ % 6 === 0) { await freeAlerts(); await watchAlerts(); }
     } catch (err) { console.error('bot tick:', err.message); }
   }
@@ -125,6 +147,20 @@ function start() {
     // the first run only remembers which games are free now, so a restart does not re-announce them
     if (!Object.keys(db.seenFree).length) { try { const f = await free.epic(); for (const g of f.now) db.seenFree[`${g.id}:${g.start}`] = Date.now(); save(); } catch { /* next tick */ } }
     setTimeout(tick, 20_000); setInterval(tick, 5 * 60_000);
+    setInterval(()=>{try{
+      if(process.env.ENABLE_PRESENCE_TRACKING==='1')for(const g of c.guilds.cache.values())for(const p of g.presences.cache.values())hub.presence(p.userId,p.activities.find(a=>a.type===ActivityType.Playing)?.name||'');
+      // Covers users who opted in while already connected to a voice channel.
+      const g=guild();if(g)for(const vs of g.voiceStates.cache.values())if(vs.channelId)hub.voice(vs.id,true);
+      hub.flushActive();
+    }catch(e){console.error('hub activity:',e.message)}},60_000);
+  });
+  client.on(Events.PresenceUpdate,(oldP,newP)=>{
+    if(!newP||process.env.ENABLE_PRESENCE_TRACKING!=='1')return;
+    hub.presence(newP.userId,newP.activities.find(a=>a.type===ActivityType.Playing)?.name||'');
+  });
+  client.on(Events.VoiceStateUpdate,(oldS,newS)=>{
+    if(oldS.guild.id!==guild()?.id && newS.guild.id!==guild()?.id)return;
+    hub.voice(newS.id,!!newS.channelId && !newS.member?.user?.bot);
   });
   client.on(Events.GuildCreate, (g) => g.commands.set(commands.map((x) => x.toJSON())).catch(() => {}));
   client.on(Events.InteractionCreate, async (i) => {

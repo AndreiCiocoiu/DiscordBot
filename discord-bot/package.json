@@ -1,10 +1,15 @@
 {
   "name": "game-portal",
-  "version": "1.0.0",
-  "description": "Game deals portal with a Discord bot: live discounts from Steam and other stores, free games, announcements, wishlist price alerts.",
+  "version": "2.0.0",
+  "description": "Game deals, Discord community gaming rankings, events, LFG and tournaments",
   "main": "index.js",
-  "scripts": { "start": "node index.js" },
-  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "discord.js": "^14.27.0",
     "dotenv": "^16.4.5"

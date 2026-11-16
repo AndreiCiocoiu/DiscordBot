@@ -2,6 +2,7 @@
 // looked up; when it reaches the target, the owner gets a Discord message (once per price level).
 const { db, save } = require('./store');
 const deals = require('./deals');
+const hub = require('./hub');
 
 const MAX = 40;
 const mine = (uid) => (db.watch[uid] ||= []);
@@ -11,6 +12,7 @@ async function add(uid, b) {
   if (!(target >= 0) || target > 500) return { ok: false, msg: 'Scrie un preț țintă între 0 și 500 de dolari.' };
   const g = await deals.game(b.gameId).catch(() => null);
   if (!g) return { ok: false, msg: 'Nu am găsit jocul. Încearcă din nou peste un minut.' };
+  hub.samplePrice(String(b.gameId),g);
   const list = mine(uid), best = g.deals[0] || null;
   let e = list.find((x) => x.gameId === g.gameId);
   if (!e) {
@@ -38,6 +40,7 @@ async function check(notify) {
   for (const [uid, list] of Object.entries(db.watch)) {
     for (const e of list) {
       const g = now[e.gameId]; if (!g) continue;
+      hub.sampleBest(e.gameId,g.best.price);
       Object.assign(e, { price: g.best.price, store: g.best.store, url: g.best.url, low: g.low ?? e.low, checkedAt: Date.now() });
       if (g.best.price <= e.target && (e.notified === null || e.notified === undefined || g.best.price < e.notified)) {
         e.notified = g.best.price; sent++;

@@ -36,6 +36,7 @@ const ICONS = {
   exit: 'M10 4H5v16h5M14 8l4 4-4 4M18 12H9',
   bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0',
   steam: 'M4 5h16v14H4zM9 5v14',
+  users: 'M16 20v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M8.5 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM20 20v-2a4 4 0 0 0-3-3.9M17 2.2a4 4 0 0 1 0 7.6',
 };
 const icon = (name, size = 20) => svg('svg', { class: 'ico', viewBox: '0 0 24 24', width: size, height: size, 'aria-hidden': 'true' }, svg('path', { d: ICONS[name].replace(/(\d)\.(\d)00/g, '$1.$2') }));
 
@@ -409,6 +410,7 @@ async function openGame(gameId, seed = {}, focusWatch) {
           : g.deals?.length ? h('div', { class: 'shops' }, g.deals.map((d) => h('a', { class: 'shop', href: d.url, target: '_blank', rel: 'noopener nofollow' },
             h('span', { class: 'lg' }, S.stores[d.store]?.icon ? logo(S.stores[d.store].icon) : null), h('span', { text: S.stores[d.store]?.name || 'Magazin' }), h('span', { class: 'c', text: d.cut ? `-${d.cut}%` : 'preț întreg' }), h('b', { text: money(d.price) }))))
             : h('p', { class: 'muted', text: 'Nu am găsit prețuri pentru jocul ăsta acum.' }),
+        !loading && g.priceHistory?.length ? hubPriceGraph(g.priceHistory) : null,
         h('h3', { id: 'watch-h', text: on ? 'Îl urmărești. Poți schimba prețul țintă (în dolari).' : 'Anunță-mă pe Discord când scade la (în dolari)' }), watch,
         (g.appId || seed.appId) ? h('p', { style: { marginTop: '24px' } }, h('a', { class: 'btn small ghost', href: `https://store.steampowered.com/app/${g.appId || seed.appId}/`, target: '_blank', rel: 'noopener nofollow' }, 'Pagina de pe Steam', icon('out', 16))) : null));
     if (focusWatch && !loading) { focusWatch = false; setTimeout(() => { $('#watch-h')?.scrollIntoView({ block: 'center', behavior: REDUCED ? 'auto' : 'smooth' }); target.focus?.(); }, 250); }
@@ -443,18 +445,18 @@ function openSearch() {
 }
 
 // ---- shell ----
-const TABS = [['', 'Acasă', 'home'], ['reduceri', 'Reduceri', 'tag'], ['gratis', 'Gratis', 'gift'], ['anunturi', 'Anunțuri', 'horn'], ['wishlist', 'Wishlist', 'heart']];
-const PAGES = { '': pageHome, reduceri: pageDeals, gratis: pageFree, anunturi: pageNews, wishlist: pageWatch, setari: pageAdmin };
+const TABS = [['', 'Acasă', 'home'], ['reduceri', 'Reduceri', 'tag'], ['gratis', 'Gratis', 'gift'], ['anunturi', 'Anunțuri', 'horn'], ['wishlist', 'Wishlist', 'heart'], ['comunitate', 'Hub', 'users']];
+const PAGES = { '': pageHome, reduceri: pageDeals, gratis: pageFree, anunturi: pageNews, wishlist: pageWatch, setari: pageAdmin, ...hubPages };
 const route = () => { const r = location.hash.replace(/^#\/?/, '').split('?')[0]; return r in PAGES ? r : ''; };
 
 function shell() {
   const r = route(), freeN = S.home?.free?.now?.length || 0;
-  const links = (short) => TABS.map(([k, label, ic]) => h('a', { href: `#/${k}`, 'aria-current': k === r ? 'page' : null }, icon(ic, short ? 22 : 18), h('span', { text: label }), !short && k === 'gratis' && freeN ? h('span', { class: 'n', text: freeN }) : null));
+  const links = (short) => TABS.map(([k, label, ic]) => h('a', { href: `#/${k}`, 'aria-current': (k === r || (k === 'comunitate' && r in hubPages)) ? 'page' : null }, icon(ic, short ? 22 : 18), h('span', { text: label }), !short && k === 'gratis' && freeN ? h('span', { class: 'n', text: freeN }) : null));
   $('#nav').replaceChildren(...links(false)); $('#tabbar').replaceChildren(...links(true));
   const me = $('#me');
   if (S.user) {
     const menu = h('div', { class: 'menu', hidden: true },
-      h('a', { href: '#/wishlist' }, icon('heart', 18), 'Wishlist'), S.admin ? h('a', { href: '#/setari' }, icon('gear', 18), 'Setări') : null, h('a', { href: '/auth/logout' }, icon('exit', 18), 'Ieși din cont'));
+      h('a', { href: '#/wishlist' }, icon('heart', 18), 'Wishlist'), h('a',{href:'#/profil'},icon('users',18),'Profil & notificări'), S.admin ? h('a', { href: '#/setari' }, icon('gear', 18), 'Setări') : null, h('a', { href: '/auth/logout' }, icon('exit', 18), 'Ieși din cont'));
     const btn = h('button', { class: 'who', type: 'button', 'aria-expanded': 'false', 'aria-label': `Cont: ${S.user.name}`, onclick: (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); } },
       S.user.avatar ? h('img', { src: S.user.avatar, alt: '' }) : h('span', { class: 'av', text: S.user.name[0] }), h('span', { text: S.user.name }));
     me.replaceChildren(btn, menu);
