@@ -84,6 +84,8 @@ function start() {
       const me = await fetch('https://discord.com/api/users/@me', { headers: { Authorization: `Bearer ${tok.access_token}` } }).then((r) => r.json());
       if (!me?.id) return page(res, 400, 'Login failed', 'Discord did not send the account. Try again.');
       const s = { id: me.id, name: String(me.global_name || me.username || 'Driver').slice(0, 40), avatar: me.avatar ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=96` : null, exp: Date.now() + TTL_MS };
+      db.web[s.id] = Date.now(); save(); // onboarding step: logged in on the website
+      if (bot?.onboard) bot.onboard(s.id).catch(() => {});
       send(res, 302, '', { Location: '/', 'Set-Cookie': [setCookie(req, 'sc', sign(s), TTL_MS / 1000), setCookie(req, 'st', '', 0)] });
     } catch (err) { console.error('login:', err); page(res, 500, 'Login failed', 'Something went wrong on Discord. Try again.'); }
   }
@@ -132,13 +134,13 @@ function start() {
     let b; try { b = JSON.parse((await raw(req, 30_000)).toString() || '{}'); } catch { return json(res, 400, { error: 'Invalid request.' }); }
     let r;
     if (route === '/api/rsvp') r = convoys.rsvp(b.id, s, b.status);
-    else if (route === '/api/apply') { r = apply.submit(s, b); if (r.ok) bot?.applied(r.item); }
+    else if (route === '/api/apply') { r = apply.submit(s, b); if (r.ok) { r.item.src = 'web'; save(); bot?.applied(r.item); } }
     else if (route === '/api/link') {
       const steam = apply.steamOf(b.steam), m = steam && Object.values(db.members).find((x) => x.steam === steam && !x.left);
       if (!steam) r = { ok: false, msg: 'Add your Steam profile link (with the SteamID64 that starts with 7656119).' };
       else if (!m) r = { ok: false, msg: 'We cannot find that Steam account in the company on Trucky. If you just joined, wait a few minutes.' };
       else if (Object.entries(db.links).some(([d, t]) => t === m.id && d !== s.id)) r = { ok: false, msg: 'That driver is already linked to another Discord account. Talk to staff.' };
-      else { db.links[s.id] = m.id; save(); r = { ok: true, msg: `Your account is linked to ${m.name}.` }; }
+      else { db.links[s.id] = m.id; save(); r = { ok: true, msg: `Your account is linked to ${m.name}.` }; bot?.onboard?.(s.id).catch(() => {}); }
     }
     else if (route === '/api/unlink') { delete db.links[s.id]; save(); r = { ok: true, msg: 'Account unlinked.' }; }
     else {
@@ -160,6 +162,9 @@ function start() {
         for (const k of ['jobsChannel', 'convoyChannel', 'staffChannel']) if (k in b) p[k] = b[k] && ids.has(String(b[k])) ? String(b[k]) : null;
         for (const [k, n] of [['name', 40], ['tag', 8], ['tagline', 90], ['about', 1500]]) if (typeof b[k] === 'string' && b[k].trim()) p[k] = b[k].trim().slice(0, n);
         if ('discordInvite' in b) p.discordInvite = /^https:\/\/(discord\.gg|discord\.com\/invite)\/[\w-]+$/.test(String(b.discordInvite).trim()) ? String(b.discordInvite).trim() : '';
+        if ('truckyUrl' in b) p.truckyUrl = /^https:\/\/[\w.-]*truckyapp\.com\/\S*$/.test(String(b.truckyUrl).trim()) ? String(b.truckyUrl).trim().slice(0, 200) : '';
+        if (Array.isArray(b.discordRules)) p.discordRules = b.discordRules.map((x) => String(x).trim().slice(0, 300)).filter(Boolean).slice(0, 20);
+        if ('autoRemove' in b) p.autoRemove = !!b.autoRemove;
         if (Array.isArray(b.requirements)) p.requirements = b.requirements.map((x) => String(x).trim().slice(0, 120)).filter(Boolean).slice(0, 12);
         if ('truckyId' in b) p.truckyId = String(b.truckyId || '').replace(/\D/g, '').slice(0, 12);
         if ('tmpId' in b) p.tmpId = String(b.tmpId || '').match(/\d+/)?.[0] || '';
@@ -170,6 +175,7 @@ function start() {
           if (ranks.length) { ranks[0].km = 0; p.ranks = ranks; }
         }
         Object.assign(db.config, p); save();
+        bot?.refreshPanels?.();
         r = { ok: true, msg: 'Settings saved.', cfg: cfg() };
       }
       else if (route === '/api/test') r = (await bot.test(String(b.channel))) ? { ok: true, msg: 'Test message sent.' } : { ok: false, msg: 'Could not post in that channel.' };

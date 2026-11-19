@@ -12,7 +12,7 @@ const token = () => process.env.TRUCKY_TOKEN || '';
 const auth = () => (token() ? { 'x-access-token': token() } : {});
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const when = (s) => { const t = Date.parse(String(s || '').replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(s || '')) ? '' : 'Z')); return Number.isFinite(t) ? t : 0; };
-let listeners = { job: [], member: [] };
+let listeners = { job: [], member: [], cancel: [] };
 const on = (ev, fn) => listeners[ev].push(fn);
 
 // lists come back as [..], {data:[..]}, {data:{data:[..]}} or {response:[..]} depending on the endpoint
@@ -53,6 +53,7 @@ function upsertJob(j, fromWebhook) {
   if (db.jobs.length > MAX_JOBS) db.jobs.splice(0, db.jobs.length - MAX_JOBS);
   const done = j.status === 'completed' && (!was || was.status !== 'completed');
   if (done) for (const fn of listeners.job) try { fn(j, fromWebhook); } catch (err) { console.warn('job listener:', err.message); }
+  if (j.status === 'canceled' && (!was || was.status !== 'canceled')) for (const fn of listeners.cancel) try { fn(j, fromWebhook); } catch (err) { console.warn('cancel listener:', err.message); }
   return isNew || done;
 }
 function removeJob(id) { const i = db.jobs.findIndex((x) => x.id === String(id)); if (i >= 0) { db.jobs.splice(i, 1); return true; } return false; }

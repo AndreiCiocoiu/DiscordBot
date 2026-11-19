@@ -503,16 +503,22 @@ function configForm(c, chans) {
   const about = h('textarea', { class: 'field', id: 'c-about', maxlength: 1500 }); about.value = c.about || '';
   const reqs = h('textarea', { class: 'field', id: 'c-reqs', maxlength: 1500 }); reqs.value = (c.requirements || []).join('\n');
   const invite = inp('c-inv', c.discordInvite, { type: 'url', placeholder: 'https://discord.gg/…' });
+  const trUrl = inp('c-trurl', c.truckyUrl, { type: 'url', placeholder: 'https://hub.truckyapp.com/vtc/…' });
+  const rules = h('textarea', { class: 'field', id: 'c-rules', maxlength: 4000 }); rules.value = (c.discordRules || []).join('\n');
+  const autoRm = h('input', { type: 'checkbox', checked: c.autoRemove !== false });
   const rows = h('div', { class: 'rankrows' });
   const addRow = (r = { name: '', km: '' }) => { const row = h('div', null, h('input', { class: 'field', value: r.name, placeholder: 'Rank name', maxlength: 30, 'aria-label': 'Rank name' }), h('input', { class: 'field', type: 'number', min: 0, value: r.km, 'aria-label': 'Kilometres' }), h('button', { class: 'btn danger small', type: 'button', 'aria-label': 'Remove rank', onclick: () => row.remove() }, icon('x', 16))); rows.append(row); };
   c.ranks.forEach(addRow);
-  const save_ = () => act('/api/config', { ...Object.fromEntries(Object.entries(F).map(([k, el]) => [k, el.value])), recruitOpen: open.checked, about: about.value, requirements: reqs.value.split('\n'), discordInvite: invite.value, ranks: [...rows.children].map((r) => ({ name: r.children[0].value, km: r.children[1].value })) }, boot);
+  const save_ = () => act('/api/config', { ...Object.fromEntries(Object.entries(F).map(([k, el]) => [k, el.value])), recruitOpen: open.checked, about: about.value, requirements: reqs.value.split('\n'), discordInvite: invite.value, truckyUrl: trUrl.value, discordRules: rules.value.split('\n'), autoRemove: autoRm.checked, ranks: [...rows.children].map((r) => ({ name: r.children[0].value, km: r.children[1].value })) }, boot);
   const lab = (el, t) => h('div', null, h('label', { class: 'lab', for: el.id, text: t }), el);
   const test = (el) => h('button', { class: 'btn ghost small', type: 'button', style: { marginTop: '8px' }, onclick: () => (el.value ? act('/api/test', { channel: el.value }) : toast('Pick a channel first.', true)) }, 'Send a test');
   return [
     h('section', { class: 'panel card sec' }, h('h2', { text: 'Company' }), h('div', { class: 'two' }, lab(F.name, 'Name'), lab(F.tag, 'Tag'), lab(F.tagline, 'Tagline')),
       h('div', { class: 'two' }, lab(F.truckyId, 'Trucky company ID'), lab(F.tmpId, 'TruckersMP VTC'), lab(F.minJobKm, 'Ignore jobs shorter than (km)')), h('label', { class: 'check' }, open, 'Recruitment open')),
     h('section', { class: 'panel card sec' }, h('h2', { text: 'Front page' }), h('p', { class: 'muted', text: 'What newcomers see on the home page.' }), lab(about, 'About us'), lab(reqs, 'Requirements, one per line'), lab(invite, 'Discord server invite')),
+    h('section', { class: 'panel card sec' }, h('h2', { text: 'Discord server' }), h('p', { class: 'muted', text: 'Run /setup on Discord to build the channels and roles. These texts go into the panels the bot keeps there.' }),
+      lab(trUrl, 'Trucky company page, for the Join button (leave empty to use the company ID)'), lab(rules, 'Discord rules, one per line'),
+      h('label', { class: 'check' }, autoRm, 'Remove access on Discord when someone leaves the company on Trucky')),
     h('section', { class: 'panel card sec' }, h('h2', { text: 'Discord channels' }), chans.length ? null : h('p', { class: 'muted', text: 'No channels the bot can post in (it needs View Channel, Send Messages, Embed Links).' }),
       h('div', { class: 'two' }, h('div', null, lab(F.jobsChannel, 'Deliveries and rank-ups'), test(F.jobsChannel)), h('div', null, lab(F.convoyChannel, 'Convoys'), test(F.convoyChannel)), h('div', null, lab(F.staffChannel, 'Applications (staff)'), test(F.staffChannel)))),
     h('section', { class: 'panel card sec' }, h('h2', { text: 'Ranks' }), h('p', { class: 'muted', text: 'Total kilometres needed for each rank. The first one starts at 0.' }), rows, h('div', { class: 'actions' }, h('button', { class: 'btn ghost small', type: 'button', onclick: () => addRow() }, 'Add a rank'))),

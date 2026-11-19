@@ -10,7 +10,7 @@ function steamOf(v) {
 }
 const mine = (uid) => db.applications.filter((a) => a.discord === uid).sort((a, b) => b.at - a.at)[0] || null;
 
-function submit(user, b) {
+function validate(user, b) {
   if (!cfg().recruitOpen) return { ok: false, msg: 'Recruitment is closed right now.' };
   const prev = mine(user.id);
   if (prev && prev.status === 'pending') return { ok: false, msg: 'You already have a pending application. You will get an answer on Discord.' };
@@ -24,8 +24,20 @@ function submit(user, b) {
     games: ['ETS2', 'ATS'].filter((g) => (b.games || []).includes(g)), hours: clean(b.hours, 40), why, from: clean(b.from, 80), status: 'pending', at: Date.now() };
   if (!a.games.length) return { ok: false, msg: 'Pick what you play: ETS2, ATS or both.' };
   if (!b.rules) return { ok: false, msg: 'You need to agree to the company rules.' };
-  db.applications.push(a); save();
-  return { ok: true, msg: 'Application sent. Staff will reply on Discord.', item: a };
+  return { ok: true, item: a };
+}
+function submit(user, b) {
+  const r = validate(user, b); if (!r.ok) return r;
+  db.applications.push(r.item); save();
+  return { ok: true, msg: 'Application sent. Staff will reply on Discord.', item: r.item };
+}
+// before the form: can this person apply right now?
+function canApply(uid) {
+  if (!cfg().recruitOpen) return 'Recruitment is closed right now.';
+  const prev = mine(uid);
+  if (prev && prev.status === 'pending') return 'You already have a pending application. You will get an answer in your DMs.';
+  if (prev && prev.status === 'rejected' && Date.now() - prev.decided < 7 * 86400_000) return `You can apply again <t:${Math.floor((prev.decided + 7 * 86400_000) / 1000)}:R>.`;
+  return null;
 }
 function decide(id, staff, accept, note) {
   const a = db.applications.find((x) => x.id === String(id));
@@ -35,4 +47,4 @@ function decide(id, staff, accept, note) {
   save();
   return { ok: true, msg: accept ? `${a.name} was accepted.` : `${a.name} was declined.`, item: a };
 }
-module.exports = { submit, decide, mine, steamOf };
+module.exports = { submit, validate, canApply, decide, mine, steamOf };

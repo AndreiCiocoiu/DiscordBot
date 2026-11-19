@@ -18,6 +18,35 @@ Website and Discord bot for Diesel Union, a VTC on TruckersMP. Jobs, distances a
 
 Discord commands: `/profile`, `/top`, `/convoy`, `/apply`, `/portal`. The chosen channel gets every delivery and every rank-up; RSVPs get a DM an hour before a convoy.
 
+## Discord server (v2.1)
+
+Run `/setup` once (as an admin). The bot builds the whole server and can run it again at any time to repair it:
+
+| Category | Channels | Who sees it |
+|---|---|---|
+| Start Here | 📝┃apply | Only newcomers |
+| Finish Setup | ✅┃finish-setup | Only the **Approved** role |
+| Welcome to Diesel Union | 👋┃welcome, 📜┃discord-rules, 🏅┃ranks, 🔗┃diesel-links | Members (read-only) |
+| Diesel Updates | 📰┃vtc-news, 🤎┃new-drivers-and-promotions | Members (read-only) |
+| Convoys & Events | 🚛┃convoys, 📸┃convoy-photos, 📻 Convoy Radio 1/2 | Members |
+| Logbook | 📦┃deliveries, ❌┃cancelled-jobs, 🏆┃weekly-top | Members (read-only, bot posts) |
+| Community | 💬┃general, 📷┃screenshots, 🤖┃bot-commands, 🔊 Lounge | Members |
+| Support | ❓┃help, 📅┃leave-of-absence | Members |
+| Staff | 🗂┃applications, 💼┃staff-chat, 🧾┃bot-logs, 🔊 Staff Meeting | Staff |
+
+Roles: Management, Staff, one role per rank (Diesel Legend … Rookie), Union Member (access), Approved (finishing setup).
+
+How someone joins:
+1. In #apply they press **Apply**, answer 5 questions, accept the rules.
+2. The application lands in #applications with **Accept / Decline** buttons (also on the website).
+3. Accepted: they get the **Approved** role and a DM with the Trucky company link, the Trucky download and the website.
+4. When they are in the company on Trucky (same Steam account) and have logged in on the website, the bot gives **Union Member** and their rank role, removes Approved and welcomes them in #new-drivers-and-promotions. They can press **Check my progress** in #finish-setup; it also happens on its own.
+5. Rank roles follow their kilometres. Leaving the company on Trucky removes access (switch it off in Settings).
+
+Staff commands: `/verify member:@x` (check one person, `force:true` gives access anyway), `/setup hide_others:true` hides old channels from newcomers.
+
+The bot needs **Administrator** (or Manage Roles + Manage Channels) and its role must be at the **top** of the role list, above every Diesel Union role.
+
 ## Railway setup
 
 1. Put these files in the repo (replace the old ones) and push.
