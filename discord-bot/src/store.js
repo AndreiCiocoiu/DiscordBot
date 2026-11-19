@@ -42,6 +42,8 @@ const cfg = () => ({
   name: 'Diesel Union', tag: 'DU', tagline: 'United by the Road',
   truckyId: process.env.TRUCKY_COMPANY_ID || '', tmpId: process.env.TMP_VTC_ID || '93701',
   jobsChannel: null, convoyChannel: null, staffChannel: null, recruitOpen: true, minJobKm: 0,
+  // the three Truck Details channels: text, colour (hex) and a picture, set on the website
+  standards: { tag: { text: '', color: '', image: '' }, truck: { text: '', color: '', image: '' }, trailer: { text: '', color: '', image: '' } },
   discordInvite: '', truckyUrl: 'https://hub.truckyapp.com/vtc/diesel-union',
   discordRules: ['Be respectful. No insults, harassment, racism or drama.', 'Keep it clean: no NSFW, no spam, no advertising other VTCs or servers.', 'Use the right channel for the right thing.', 'Follow the TruckersMP rules on the road and in convoys. A TruckersMP ban can mean a removal from the company.', 'Listen to the convoy lead and staff during events.', 'Your Trucky profile has to stay in Diesel Union. If you leave the company on Trucky, you lose access here.', 'Going away for a while? Post in #leave-of-absence.'],
   about: 'Diesel Union is a virtual trucking company on TruckersMP, driving Euro Truck Simulator 2. We run convoys every week, track every job with Trucky and look out for each other on the road. It does not matter how many kilometres you have: show up, drive clean, and have a good time.',

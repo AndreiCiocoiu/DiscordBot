@@ -29,6 +29,7 @@ Run `/setup` once (as an admin). The bot builds the whole server and can run it 
 |---|---|---|
 | Start Here | 📝┃apply | Only newcomers |
 | Finish Setup | ✅┃finish-setup | Only the **Approved** role |
+| Truck Details | 🏷┃tag-name-and-colour, 🚚┃truck-colour, 🚛┃trailer-colour-and-livery | Members (read-only; text, colour and picture set in Website → Settings → Truck details) |
 | Welcome to Diesel Union | 👋┃welcome, 📜┃discord-rules, 🏅┃ranks, 🔗┃diesel-links | Members (read-only) |
 | Diesel Updates | 📰┃vtc-news, 🤎┃new-drivers-and-promotions | Members (read-only) |
 | Convoys & Events | 🚛┃convoys, 📸┃convoy-photos, 📻 Convoy Radio 1/2 | Members |
@@ -42,8 +43,8 @@ Roles: CEO, Co-CEO, Management, HR Team, Event Team, Media Team, Staff, one role
 How someone joins:
 1. In #apply they press **Apply**, answer 5 questions, accept the rules.
 2. The application lands in #applications with **Accept / Decline** buttons (also on the website).
-3. Accepted: they get the **Approved** role and a DM with the Trucky company link, the Trucky download and the website.
-4. When they are in the company on Trucky (same Steam account) and have logged in on the website, the bot gives **Union Member** and their rank role, removes Approved and welcomes them in #new-drivers-and-promotions. They can press **Check my progress** in #finish-setup; it also happens on its own.
+3. Accepted: they get the **Approved** role and a DM with the Trucky company link, the TruckersMP VTC link (they apply there too), the Trucky download and the website.
+4. When they are in the company on Trucky (same Steam account), in the VTC on TruckersMP (checked with the public TruckersMP API) and have logged in on the website, the bot gives **Union Member** and their rank role, removes Approved and welcomes them in #new-drivers-and-promotions. They can press **Check my progress** in #finish-setup; it also happens on its own.
 5. Rank roles follow their kilometres. Leaving the company on Trucky removes access (switch it off in Settings).
 
 Staff commands: `/verify member:@x` (check one person, `force:true` gives access anyway), `/setup hide_others:true` hides old channels from newcomers.

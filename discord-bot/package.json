@@ -1,6 +1,6 @@
 {
   "name": "diesel-union",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Diesel Union VTC portal: drivers, deliveries and leaderboards from Trucky, convoys, recruitment, with a Discord bot.",
   "main": "index.js",
   "scripts": {

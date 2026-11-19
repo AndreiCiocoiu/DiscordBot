@@ -3,6 +3,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits: P } = require('discord.js');
 const { db, save, cfg } = require('./store');
 const stats = require('./stats');
+const { getJson } = require('./fetcher');
 
 const BROWN = 0x8a5a2b, AMBER = 0xf2a03d, GREEN = 0x6fae5a;
 const km = (n) => `${Math.round(n).toLocaleString('en-GB')} km`;
@@ -16,7 +17,11 @@ const LAYOUT = [
   { cat: '🤎 Start Here 🤎', access: 'gate', channels: [
     { key: 'apply', name: '📝┃apply', ro: true, topic: 'Want to drive with Diesel Union? Press Apply below.' }] },
   { cat: '🤎 Finish Setup 🤎', access: 'approved', channels: [
-    { key: 'setup', name: '✅┃finish-setup', ro: true, topic: 'You were accepted. Do the three steps, then press Check my progress.' }] },
+    { key: 'setup', name: '✅┃finish-setup', ro: true, topic: 'You were accepted. Do the steps, then press Check my progress.' }] },
+  { cat: '🤎 Truck Details 🤎', access: 'member', channels: [
+    { key: 'tagInfo', name: '🏷┃tag-name-and-colour', ro: true, topic: 'How to write the Diesel Union tag and name in TruckersMP, and its colour.' },
+    { key: 'truckInfo', name: '🚚┃truck-colour', ro: true, topic: 'The company truck colour.' },
+    { key: 'trailerInfo', name: '🚛┃trailer-colour-and-livery', ro: true, topic: 'Trailer colour and the company livery.' }] },
   { cat: '🤎 Welcome to Diesel Union 🤎', access: 'member', channels: [
     { key: 'welcome', name: '👋┃welcome', ro: true },
     { key: 'rules', name: '📜┃discord-rules', ro: true },
@@ -195,15 +200,16 @@ function setupSteps() {
   const L = Object.fromEntries(links().map(([n, u]) => [n, u]));
   return [
     `**1. Join Diesel Union on Trucky.** ${L['Diesel Union on Trucky'] ? `Open our company page and press Join: ${L['Diesel Union on Trucky']}` : 'Search for Diesel Union in the Trucky VTC Hub and press Join.'} Use the same Steam account you applied with.`,
-    `**2. Install Trucky** and keep it running when you drive, so your jobs count: https://truckyapp.com/`,
-    `**3. Log in on our website** with Discord${siteUrl() ? `: ${siteUrl()}` : ''}.`,
-    '**4. Press Check my progress** in #finish-setup. When all three are done, the server opens for you. It also happens by itself within a few minutes.',
+    `**2. Apply to Diesel Union on TruckersMP.** ${L['TruckersMP VTC'] ? `Open ${L['TruckersMP VTC']} , log in and press Apply / Join.` : 'Find Diesel Union in the TruckersMP VTC list and apply.'} Staff accept you there too.`,
+    `**3. Install Trucky** and keep it running when you drive, so your jobs count: https://truckyapp.com/`,
+    `**4. Log in on our website** with Discord${siteUrl() ? `: ${siteUrl()}` : ''}.`,
+    '**5. Press Check my progress** in #finish-setup. When everything is ticked, the server opens for you. It also happens by itself within a few minutes.',
   ].join('\n\n');
 }
 function setupPanel() {
-  const e = new EmbedBuilder().setColor(GREEN).setTitle('You are accepted. Three steps left.').setDescription(setupSteps());
+  const e = new EmbedBuilder().setColor(GREEN).setTitle('You are accepted. A few steps left.').setDescription(setupSteps());
   const btn = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('du:check').setStyle(ButtonStyle.Success).setLabel('Check my progress').setEmoji('✅'));
-  return { embeds: [e], components: [btn, linkRow(links().filter(([n]) => n !== 'TruckersMP VTC'))] };
+  return { embeds: [e], components: [btn, linkRow(links())] };
 }
 function linksPanel() {
   const L = links();
@@ -223,9 +229,17 @@ function rulesPanel() {
 }
 function welcomePanel() {
   const c = cfg(), C = (k) => (ch(k) ? `<#${ch(k)}>` : `#${k}`);
-  return { embeds: [new EmbedBuilder().setColor(BROWN).setTitle(`Welcome to ${c.name}`).setDescription([`${c.tagline}.`, '', `${C('rules')} the rules`, `${C('ranks')} how ranks work`, `${C('links')} Trucky, TruckersMP and the website`, `${C('convoys')} upcoming convoys`, `${C('deliveries')} every delivery, live`, `${C('commands')} try /profile and /top`].join('\n'))] };
+  return { embeds: [new EmbedBuilder().setColor(BROWN).setTitle(`Welcome to ${c.name}`).setDescription([`${c.tagline}.`, '', `${C('rules')} the rules`, `${C('tagInfo')} ${C('truckInfo')} ${C('trailerInfo')} tag, truck and trailer`, `${C('ranks')} how ranks work`, `${C('links')} Trucky, TruckersMP and the website`, `${C('convoys')} upcoming convoys`, `${C('deliveries')} every delivery, live`, `${C('commands')} try /profile and /top`].join('\n'))] };
 }
-const PANELS = { apply: applyPanel, setup: setupPanel, links: linksPanel, ranks: ranksPanel, rules: rulesPanel, welcome: welcomePanel };
+const STANDARDS = { tagInfo: ['tag', '🏷 Tag name and colour'], truckInfo: ['truck', '🚚 Truck colour'], trailerInfo: ['trailer', '🚛 Trailer colour and livery'] };
+function standardPanel(key) {
+  const [k, title] = STANDARDS[key], s = (cfg().standards || {})[k] || {}, hex = /^#[0-9a-f]{6}$/i.test(s.color || '') ? s.color : null;
+  const e = new EmbedBuilder().setColor(hex ? parseInt(hex.slice(1), 16) : BROWN).setTitle(title).setDescription((s.text || 'Coming soon. Staff will post the details here.').slice(0, 4000));
+  if (hex) e.addFields({ name: 'Colour', value: `\`${hex.toUpperCase()}\``, inline: true });
+  if (https(s.image)) e.setImage(s.image);
+  return { embeds: [e] };
+}
+const PANELS = { tagInfo: () => standardPanel('tagInfo'), truckInfo: () => standardPanel('truckInfo'), trailerInfo: () => standardPanel('trailerInfo'), apply: applyPanel, setup: setupPanel, links: linksPanel, ranks: ranksPanel, rules: rulesPanel, welcome: welcomePanel };
 
 async function refreshPanels(g, only) {
   db.config.panels = { ...(db.config.panels || {}) };
@@ -247,12 +261,24 @@ async function progress(uid) {
   const linked = db.links[uid] && db.members[db.links[uid]];
   const steam = linked?.steam || app?.steam || null;
   const driver = linked && !linked.left ? linked : steam ? Object.values(db.members).find((m) => m.steam === steam && !m.left) : null;
-  return { app, accepted: app?.status === 'accepted', driver: driver || null, web: !!(db.web || {})[uid], steam };
+  return { app, accepted: app?.status === 'accepted', driver: driver || null, web: !!(db.web || {})[uid], steam, tmp: await inTmp(steam, app?.tmp) };
+}
+// is this person a member of our VTC on TruckersMP? true / false, or null when we cannot tell (no VTC ID, API down)
+async function inTmp(steam, tmpProfile) {
+  const id = cfg().tmpId; if (!id || (!steam && !tmpProfile)) return null;
+  try {
+    const d = await getJson(`https://api.truckersmp.com/v2/vtc/${encodeURIComponent(id)}/members`, { ttl: 60_000 });
+    const list = d?.response?.members || (Array.isArray(d?.response) ? d.response : null);
+    if (!Array.isArray(list)) return null;
+    const tmpUser = String(tmpProfile || '').match(/(?:user\/)?(\d{1,9})(?!\d)/)?.[1];
+    return list.some((m) => (steam && String(m.steam_id ?? m.steamID ?? '') === steam) || (tmpUser && String(m.user_id ?? m.userId ?? '') === tmpUser));
+  } catch { return null; }
 }
 
 function checklist(p, hasApproved) {
   const t = (ok, s) => `${ok ? '✅' : '⬜'} ${s}`;
-  return [t(p.accepted || hasApproved, 'Application accepted'), t(!!p.driver, p.driver ? `In the company on Trucky as **${p.driver.name}**` : 'Join Diesel Union on Trucky (with the Steam account you applied with)'), t(p.web, 'Logged in on the website with Discord')].join('\n');
+  return [t(p.accepted || hasApproved, 'Application accepted'), t(!!p.driver, p.driver ? `In the company on Trucky as **${p.driver.name}**` : 'Join Diesel Union on Trucky (with the Steam account you applied with)'),
+    ...(p.tmp === null ? [] : [t(p.tmp, p.tmp ? 'In the Diesel Union VTC on TruckersMP' : 'Apply to Diesel Union on TruckersMP and wait to be accepted')]), t(p.web, 'Logged in on the website with Discord')].join('\n');
 }
 
 // rank role for a linked driver: add the right one, drop the others

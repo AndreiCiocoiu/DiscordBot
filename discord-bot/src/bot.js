@@ -140,7 +140,7 @@ function start() {
       const gm = await member(a.discord), ap = G.roleId('approved');
       if (gm && ap) await gm.roles.add(ap, 'Application accepted').catch((err) => botlog(`⚠️ Could not give Approved to <@${a.discord}>: ${err.message}`));
       if (process.env.TRUCKY_TOKEN && !a.trucky) { const t = await trucky.addDriver(a.steam, a.name).catch(() => ({ msg: 'Trucky add failed.' })); a.trucky = t.msg; save(); }
-      const sent = await dm(a.discord, { embeds: [new EmbedBuilder().setColor(GREEN).setTitle('You are accepted into Diesel Union').setDescription(`${a.note ? `${a.note}\n\n` : ''}${G.setupSteps()}`)], components: [G.linkRow(G.links().filter(([n]) => n !== 'TruckersMP VTC'))] });
+      const sent = await dm(a.discord, { embeds: [new EmbedBuilder().setColor(GREEN).setTitle('You are accepted into Diesel Union').setDescription(`${a.note ? `${a.note}\n\n` : ''}${G.setupSteps()}`)], components: [G.linkRow(G.links())] });
       if (G.ch('setup')) { const m = await post(G.ch('setup'), { content: `<@${a.discord}> you are accepted. Follow the steps above.${sent ? '' : ' (Your DMs are closed, so everything is here.)'}`, allowedMentions: { users: [a.discord] } }); if (m) setTimeout(() => m.delete().catch(() => {}), 15 * 60_000); }
       botlog(`✅ ${a.name} (<@${a.discord}>) accepted by ${a.by}.${sent ? '' : ' DM closed.'}`);
       setTimeout(() => onboard(a.discord).catch(() => {}), 4000); // they may already be in the company on Trucky
@@ -165,7 +165,7 @@ function start() {
       const list = G.checklist(p, hasAp);
       if (!force) {
         if (!(p.accepted || hasAp)) return { done: false, p, text: `${list}\n\nThe application is not accepted yet.` };
-        if (!p.driver || !p.web) return { done: false, p, text: list };
+        if (!p.driver || !p.web || p.tmp === false) return { done: false, p, text: list };
       }
       if (p.driver) {
         const other = Object.entries(db.links).find(([d, t]) => t === p.driver.id && d !== uid);

@@ -164,6 +164,13 @@ function start() {
         if ('discordInvite' in b) p.discordInvite = /^https:\/\/(discord\.gg|discord\.com\/invite)\/[\w-]+$/.test(String(b.discordInvite).trim()) ? String(b.discordInvite).trim() : '';
         if ('truckyUrl' in b) p.truckyUrl = /^https:\/\/[\w.-]*truckyapp\.com\/\S*$/.test(String(b.truckyUrl).trim()) ? String(b.truckyUrl).trim().slice(0, 200) : '';
         if (Array.isArray(b.discordRules)) p.discordRules = b.discordRules.map((x) => String(x).trim().slice(0, 300)).filter(Boolean).slice(0, 20);
+        if (b.standards && typeof b.standards === 'object') {
+          p.standards = {};
+          for (const k of ['tag', 'truck', 'trailer']) {
+            const x = b.standards[k] || {}, col = String(x.color || '').trim(), img = String(x.image || '').trim();
+            p.standards[k] = { text: String(x.text || '').trim().slice(0, 3000), color: /^#?[0-9a-f]{6}$/i.test(col) ? `#${col.replace('#', '').toLowerCase()}` : '', image: /^https:\/\/\S+$/.test(img) ? img.slice(0, 400) : '' };
+          }
+        }
         if ('autoRemove' in b) p.autoRemove = !!b.autoRemove;
         if (Array.isArray(b.requirements)) p.requirements = b.requirements.map((x) => String(x).trim().slice(0, 120)).filter(Boolean).slice(0, 12);
         if ('truckyId' in b) p.truckyId = String(b.truckyId || '').replace(/\D/g, '').slice(0, 12);
