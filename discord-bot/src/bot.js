@@ -1,226 +1,149 @@
-// The Discord side: slash commands, the daily deals digest, free-game alerts, wishlist alerts, mirrored announcements.
-const { Client, GatewayIntentBits, Events, EmbedBuilder, SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, ActivityType } = require('discord.js');
+// The Discord side: slash commands, delivery feed, rank-ups, convoy announcements and reminders, recruitment.
+const { Client, GatewayIntentBits, Events, EmbedBuilder, SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } = require('discord.js');
 const { db, save, cfg } = require('./store');
-const deals = require('./deals');
-const free = require('./free');
-const watch = require('./watch');
-const news = require('./news');
-const hub = require('./hub');
+const stats = require('./stats');
+const trucky = require('./trucky');
+const convoys = require('./convoys');
 
-const YELLOW = 0xffd400, MINT = 0x3df2b0, CORAL = 0xff4d6d;
-const usd = (n) => `${Number(n).toFixed(2)} $`;
+const BROWN = 0x8a5a2b, AMBER = 0xf2a03d, GREEN = 0x6fae5a, RED = 0xc4553b;
+const km = (n) => `${Math.round(n).toLocaleString('ro-RO')} km`;
+const money = (n, game) => `${Math.round(n).toLocaleString('ro-RO')} ${game === 'ATS' ? '$' : '€'}`;
 const siteUrl = () => (process.env.WEB_URL || db.config.siteUrl || '').replace(/\/$/, '');
-const web = (u) => (/^https?:\/\//.test(String(u || '')) ? String(u) : null); // embeds refuse anything that is not a web address
-const cover = (d) => (d.appId ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${d.appId}/header.jpg` : web(d.thumb));
+const web = (u) => (/^https?:\/\//.test(String(u || '')) ? String(u) : null);
+const ts = (ms, f = 'F') => `<t:${Math.floor(ms / 1000)}:${f}>`;
+const PERIOD = { week: 'săptămâna asta', month: 'luna asta', all: 'din toate timpurile' };
 
 const commands = [
-  new SlashCommandBuilder().setName('reduceri').setDescription('Cele mai bune reduceri la jocuri, acum')
-    .addIntegerOption((o) => o.setName('pret_max').setDescription('Preț maxim în dolari').setMinValue(1).setMaxValue(49))
-    .addIntegerOption((o) => o.setName('reducere_min').setDescription('Reducere minimă în procente').setMinValue(10).setMaxValue(95)),
-  new SlashCommandBuilder().setName('gratis').setDescription('Jocurile gratuite de acum și cele care urmează'),
-  new SlashCommandBuilder().setName('joc').setDescription('Cel mai mic preț pentru un joc, în toate magazinele')
-    .addStringOption((o) => o.setName('nume').setDescription('Numele jocului').setRequired(true).setMaxLength(60)),
+  new SlashCommandBuilder().setName('profil').setDescription('Profilul de șofer Diesel Union')
+    .addUserOption((o) => o.setName('membru').setDescription('Al cui profil (implicit al tău)')),
+  new SlashCommandBuilder().setName('top').setDescription('Clasamentul șoferilor')
+    .addStringOption((o) => o.setName('perioada').setDescription('Perioada').addChoices({ name: 'Săptămâna asta', value: 'week' }, { name: 'Luna asta', value: 'month' }, { name: 'Total', value: 'all' }))
+    .addStringOption((o) => o.setName('dupa').setDescription('După ce').addChoices({ name: 'Kilometri', value: 'km' }, { name: 'Venit', value: 'income' }, { name: 'Curse', value: 'jobs' })),
+  new SlashCommandBuilder().setName('convoi').setDescription('Următorul convoi'),
+  new SlashCommandBuilder().setName('aplica').setDescription('Cum intri în Diesel Union'),
   new SlashCommandBuilder().setName('portal').setDescription('Linkul către portal'),
-  new SlashCommandBuilder().setName('top').setDescription('Top jucători după timpul de gaming')
-    .addStringOption(o=>o.setName('perioada').setDescription('Perioada').addChoices({name:'Săptămâna',value:'week'},{name:'Luna',value:'month'},{name:'Tot timpul',value:'all'})),
-  new SlashCommandBuilder().setName('profil').setDescription('Profilul tău din GamePortal'),
-  new SlashCommandBuilder().setName('evenimente').setDescription('Următoarele evenimente de gaming'),
-  new SlashCommandBuilder().setName('statistici').setDescription('Confidențialitatea statisticilor tale din GamePortal')
-    .addStringOption(o=>o.setName('actiune').setDescription('Alege dacă vrei să fii exclus sau să-ți ștergi datele').setRequired(true)
-      .addChoices({name:'Exclude-mă din clasamente',value:'exclude'}, {name:'Reactivează statisticile',value:'include'}, {name:'Șterge datele și exclude-mă',value:'delete'})),
 ];
 
-async function topDeals({ max, cut } = {}) {
-  const c = cfg();
-  const r = await deals.list({ sort: 'rating', steam: 70, max, cut: cut ?? c.minCut, size: 60 });
-  const seen = new Set();
-  return r.items.filter((d) => !seen.has(d.gameId) && seen.add(d.gameId)).slice(0, 10);
-}
-async function dealsEmbed(list, title) {
-  const st = await deals.stores().catch(() => ({}));
-  const e = new EmbedBuilder().setColor(YELLOW).setTitle(title)
-    .setDescription(list.map((d) => `**-${d.cut}%** [${d.title.replace(/[[\]]/g, '')}](${d.url})\n~~${usd(d.normal)}~~ **${usd(d.sale)}** la ${st[d.store]?.name || 'magazin'}`).join('\n\n').slice(0, 4000) || 'Nu am găsit reduceri cu filtrele astea.')
-    .setFooter({ text: 'Prețuri în dolari, de la CheapShark. Pot diferi puțin în regiunea ta.' });
-  if (list[0] && cover(list[0])) e.setThumbnail(cover(list[0]));
-  if (siteUrl()) e.setURL(siteUrl());
+function jobEmbed(j) {
+  const e = new EmbedBuilder().setColor(BROWN).setAuthor({ name: j.driverName, iconURL: web(j.avatar) || undefined })
+    .setTitle(`${j.from || '?'} → ${j.to || '?'}`.slice(0, 250))
+    .setDescription([`**${j.cargo || 'Marfă'}**${j.mass ? ` · ${(j.mass / 1000).toFixed(1)} t` : ''}`, `${km(j.km)} · ${money(j.income, j.game)} · avarii ${j.dmg}%`, j.truck ? `Camion: ${j.truck}` : null].filter(Boolean).join('\n'))
+    .setFooter({ text: `${j.game}${j.mp ? ` · ${j.server || 'TruckersMP'}` : ''}` }).setTimestamp(j.end || Date.now());
+  if (siteUrl()) e.setURL(`${siteUrl()}/#/curse`);
   return e;
 }
-function freeEmbed(g, soon) {
-  const e = new EmbedBuilder().setColor(MINT).setTitle(`${soon ? 'Urmează gratis' : 'Gratis acum'}: ${g.title}`.slice(0, 250)).setURL(web(g.url) || 'https://store.epicgames.com/free-games')
-    .setDescription(`${g.desc || ''}\n\n${soon ? `Începe <t:${Math.floor(g.start / 1000)}:R>` : `Până <t:${Math.floor(g.end / 1000)}:F> (<t:${Math.floor(g.end / 1000)}:R>)`}${g.worth ? `\nPreț normal: ${usd(g.worth)}` : ''}`.trim())
-    .setFooter({ text: g.store });
-  if (web(g.image)) e.setImage(g.image);
+function convoyEmbed(c, title) {
+  const e = new EmbedBuilder().setColor(AMBER).setTitle(`${title ? `${title}: ` : ''}${c.title}`.slice(0, 250))
+    .setDescription([`${ts(c.start)} (${ts(c.start, 'R')})`, c.from || c.to ? `**Traseu:** ${c.from || '?'} → ${c.to || '?'}` : null, c.server ? `**Server:** ${c.server}` : null, c.meet ? `**Întâlnire:** ${c.meet}` : null, c.dlc ? `**DLC:** ${c.dlc}` : null, c.desc ? `\n${c.desc.slice(0, 1200)}` : null].filter(Boolean).join('\n'))
+    .setFooter({ text: c.game });
+  if (web(c.image)) e.setImage(c.image);
+  if (siteUrl()) e.setURL(`${siteUrl()}/#/convoaie`);
   return e;
 }
 
 async function onCommand(i) {
-  const name = i.commandName;
-  if (name === 'portal') return i.reply({ content: siteUrl() ? `Portalul: ${siteUrl()}` : 'Adresa portalului nu e setată încă. Deschide site-ul o dată sau adaugă variabila WEB_URL.', flags: MessageFlags.Ephemeral });
-  if(name==='profil') {
-    hub.observeMember(i.user);
-    const p=hub.profile(i.user.id,i.user.id);
-    const msg=p?`**${p.name}**\nGaming: **${(p.totalMs/3600000).toFixed(1)}h** • Persona Non Grata: **${(p.redmMs/3600000).toFixed(1)}h**\nAchievements: ${p.badges.length} • Streak: ${p.streak} zile\n${siteUrl()?`${siteUrl()}/#/profil`:''}`:`Statistica se acumulează automat în comunitate, după configurarea tracking-ului pe bot.`;
-    return i.reply({content:msg,flags:MessageFlags.Ephemeral});
+  const n = i.commandName;
+  if (n === 'portal') return i.reply({ content: siteUrl() ? `Portalul Diesel Union: ${siteUrl()}` : 'Adresa portalului nu e setată încă.', flags: MessageFlags.Ephemeral });
+  if (n === 'aplica') return i.reply({ content: siteUrl() ? (cfg().recruitOpen ? `Aplică aici: ${siteUrl()}/#/aplica` : 'Recrutările sunt închise acum.') : 'Portalul nu are încă o adresă.', flags: MessageFlags.Ephemeral });
+  if (n === 'profil') {
+    const u = i.options.getUser('membru') || i.user;
+    const tid = db.links[u.id];
+    if (!tid) return i.reply({ content: u.id === i.user.id ? `Contul tău de Discord nu e legat de Trucky. Leagă-l din portal${siteUrl() ? `: ${siteUrl()}/#/cont` : ''}.` : `${u.username} nu și-a legat contul de Trucky.`, flags: MessageFlags.Ephemeral });
+    const p = stats.profile(tid);
+    if (!p) return i.reply({ content: 'Nu am găsit șoferul.', flags: MessageFlags.Ephemeral });
+    const e = new EmbedBuilder().setColor(BROWN).setTitle(p.name).setThumbnail(web(p.avatar) || u.displayAvatarURL())
+      .setDescription(`**${p.rank.name}**${p.role ? ` · ${p.role}` : ''}${p.rank.next ? `\nMai are ${km(p.rank.next.km - p.km)} până la ${p.rank.next.name}` : ''}`)
+      .addFields({ name: 'Total', value: `${km(p.km)}\n${p.jobs} curse`, inline: true }, { name: 'Luna asta', value: `${km(p.month?.km || 0)}\n${p.month?.jobs || 0} curse`, inline: true }, { name: 'Avarii medii', value: `${p.avgDmg}%`, inline: true });
+    if (siteUrl()) e.setURL(`${siteUrl()}/#/soferi/${p.id}`);
+    return i.reply({ embeds: [e] });
   }
-  if(name==='top') {
-    const p=i.options.getString('perioada')||'week',top=hub.rankings(p).players.slice(0,10);
-    return i.reply({content:`**Top Gaming · ${p}**\n${top.length?top.map((u,n)=>`${n+1}. ${u.name} — ${(u.ms/3600000).toFixed(1)}h`).join('\n'):'Nu există ore înregistrate încă.'}\n${siteUrl()?siteUrl()+'/#/rankings':''}`});
+  if (n === 'top') {
+    const per = i.options.getString('perioada') || 'month', by = i.options.getString('dupa') || 'km';
+    const rows = stats.board(per, by).slice(0, 10);
+    const fmt = (r) => (by === 'km' ? km(r.v) : by === 'jobs' ? `${r.v} curse` : `${Math.round(r.v).toLocaleString('ro-RO')} venit`);
+    const e = new EmbedBuilder().setColor(BROWN).setTitle(`Clasament ${PERIOD[per]}`)
+      .setDescription(rows.length ? rows.map((r, k) => `\`${String(k + 1).padStart(2)}\` **${r.name}**  ${fmt(r)}`).join('\n') : 'Nicio cursă încă în perioada asta.');
+    if (siteUrl()) e.setURL(`${siteUrl()}/#/clasament`);
+    return i.reply({ embeds: [e] });
   }
-  if(name==='statistici') {
-    const action=i.options.getString('actiune');
-    const s={id:i.user.id,name:i.user.globalName||i.user.username,avatar:i.user.displayAvatarURL({size:64})};
-    const result=action==='delete'?hub.erase(s.id):hub.updateProfile(s,{tracking:action==='include',public:action==='include'});
-    return i.reply({content:result.msg,flags:MessageFlags.Ephemeral});
-  }
-  if(name==='evenimente') {
-    const ev=hub.listItems('events').slice(0,5);
-    return i.reply({content:ev.length?ev.map(e=>`• **${e.title}** (${e.game}) — <t:${Math.floor(e.at/1000)}:F>`).join('\n')+`\n${siteUrl()?siteUrl()+'/#/evenimente':''}`:'Niciun eveniment momentan.'});
-  }
-  await i.deferReply();
-  if (name === 'reduceri') {
-    const list = await topDeals({ max: i.options.getInteger('pret_max') ?? undefined, cut: i.options.getInteger('reducere_min') ?? undefined });
-    return i.editReply({ embeds: [await dealsEmbed(list, 'Cele mai bune reduceri acum')] });
-  }
-  if (name === 'gratis') {
-    const f = await free.epic();
-    const embeds = [...f.now.map((g) => freeEmbed(g, false)), ...f.soon.map((g) => freeEmbed(g, true))].slice(0, 6);
-    return i.editReply(embeds.length ? { embeds } : { content: 'Nu am găsit jocuri gratuite acum. Mai încearcă mai târziu.' });
-  }
-  if (name === 'joc') {
-    const found = await deals.search(i.options.getString('nume'));
-    if (!found.length) return i.editReply('Nu am găsit niciun joc cu numele ăsta.');
-    const g = await deals.game(found[0].gameId), st = await deals.stores().catch(() => ({}));
-    if (!g || !g.deals.length) return i.editReply('Nu am găsit prețuri pentru jocul ăsta.');
-    const e = new EmbedBuilder().setColor(YELLOW).setTitle(g.title.slice(0, 250)).setURL(g.deals[0].url)
-      .setDescription(g.deals.slice(0, 8).map((d, k) => `${k === 0 ? '**' : ''}${usd(d.price)}${k === 0 ? '**' : ''}${d.cut ? ` (-${d.cut}%)` : ''} la [${st[d.store]?.name || 'magazin'}](${d.url})`).join('\n'))
-      .setFooter({ text: g.low ? `Cel mai mic preț din istorie: ${usd(g.low.price)}. Prețuri în dolari, de la CheapShark.` : 'Prețuri în dolari, de la CheapShark.' });
-    if (cover(g)) e.setThumbnail(cover(g));
-    return i.editReply({ embeds: [e] });
+  if (n === 'convoi') {
+    const next = convoys.list().find((c) => c.start > Date.now() - 1800_000);
+    return i.reply(next ? { embeds: [convoyEmbed(convoys.pub(db.convoys.find((c) => c.id === next.id)), 'Următorul convoi')] } : { content: 'Nu e niciun convoi programat.', flags: MessageFlags.Ephemeral });
   }
 }
 
 function start() {
-  const intents=[GatewayIntentBits.Guilds,GatewayIntentBits.GuildVoiceStates];
-  if(process.env.ENABLE_PRESENCE_TRACKING==='1') intents.push(GatewayIntentBits.GuildPresences);
-  const client = new Client({ intents });
+  const client = new Client({ intents: [GatewayIntentBits.Guilds] });
   const guild = () => (process.env.WEB_GUILD_ID && client.guilds.cache.get(process.env.WEB_GUILD_ID)) || client.guilds.cache.first();
   const channel = (id) => { const ch = id && client.channels.cache.get(id); return ch?.isTextBased?.() ? ch : null; };
+  const post = (id, payload) => { const ch = channel(id); return ch ? ch.send(payload).catch((err) => console.warn('post:', err.message)) : null; };
+  const dm = async (uid, payload) => { try { const u = await client.users.fetch(uid); await u.send(payload); return true; } catch { return false; } };
 
-  async function digest(force) {
-    const c = cfg(), ch = channel(c.dealsChannel);
-    if (!ch) return { ok: false, msg: 'Alege mai întâi canalul pentru reduceri.' };
-    const list = await topDeals();
-    if (!list.length) return { ok: false, msg: 'Nu am găsit reduceri de trimis acum.' };
-    await ch.send({ embeds: [await dealsEmbed(list, force ? 'Reduceri alese acum' : 'Reducerile zilei')] });
-    return { ok: true, msg: `Am trimis reducerile în #${ch.name}.` };
-  }
-  async function freeAlerts() {
-    const c = cfg(), ch = channel(c.dealsChannel);
-    const f = await free.epic();
-    for (const g of f.now) {
-      const key = `${g.id}:${g.start}`;
-      if (db.seenFree[key]) continue;
-      db.seenFree[key] = Date.now();
-      if (ch && c.freeAlerts) await ch.send({ embeds: [freeEmbed(g, false)] }).catch((err) => console.warn('free alert:', err.message));
-    }
-    for (const [k, at] of Object.entries(db.seenFree)) if (Date.now() - at > 90 * 86400_000) delete db.seenFree[k];
-    save();
-  }
-  async function watchAlerts() {
-    const st = await deals.stores().catch(() => ({}));
-    await watch.check(async (uid, e) => {
-      const emb = new EmbedBuilder().setColor(CORAL).setTitle(`${e.title} a ajuns la prețul tău`.slice(0, 250)).setURL(e.url)
-        .setDescription(`Acum **${usd(e.price)}** la ${st[e.store]?.name || 'magazin'}. Ținta ta era ${usd(e.target)}.${e.low !== null && e.price <= e.low ? '\nE cel mai mic preț din istorie.' : ''}`);
-      if (cover(e)) emb.setThumbnail(cover(e));
-      const user = await client.users.fetch(uid);
-      await user.send({ embeds: [emb] }); // fails when the person has DMs closed; nothing else to do then
-    });
-  }
-  // every 5 minutes: is it time for the daily digest? every 30: free games and wishlists
-  let n = 0;
-  async function tick() {
+  // a finished delivery: feed message, and a shout when someone reaches a new rank
+  trucky.on('job', (j, live) => {
+    if (!client.isReady() || !live) return; // only fresh webhook deliveries, not the backfill
+    post(cfg().jobsChannel, { embeds: [jobEmbed(j)] });
+    const total = db.jobs.filter((x) => x.driver === j.driver && x.status === 'completed' && x.km >= (cfg().minJobKm || 0)).reduce((a, x) => a + x.km, 0); // read the raw list: the new job is not saved yet
+    const before = stats.rankFor(total - j.km), after = stats.rankFor(total);
+    if (after.index > before.index) post(cfg().jobsChannel, { embeds: [new EmbedBuilder().setColor(AMBER).setTitle(`${j.driverName} a urcat în rang`).setDescription(`De acum e **${after.name}**, cu ${km(total)} parcurși cu Diesel Union.`)] });
+  });
+
+  async function tick(n) {
     try {
-      const c = cfg();
-      const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }).formatToParts(new Date()).map((p) => [p.type, p.value]));
-      const day = `${parts.year}-${parts.month}-${parts.day}`;
-      if (c.digest && c.dealsChannel && Number(parts.hour) % 24 >= c.hour && db.lastDigest !== day) { db.lastDigest = day; save(); await digest(false); }
-      hub.flushActive(); hub.reminders();
-      await hub.sendDms(async(id,text,link)=>{const u=await client.users.fetch(id);await u.send(`${text}${link?`\n${link.startsWith('/')?siteUrl()+link:link}`:''}`);});
-      if (n++ % 6 === 0) { await freeAlerts(); await watchAlerts(); }
-    } catch (err) { console.error('bot tick:', err.message); }
+      await trucky.pollJobs(n === 0 ? 6 : 2).catch((err) => { db.sync.jobs = { at: Date.now(), ok: false, error: err.message }; });
+      if (n % 6 === 0) await trucky.pollMembers().catch((err) => { db.sync.members = { at: Date.now(), ok: false, error: err.message }; });
+      // convoy reminder an hour before: in the channel, and privately to everyone who said they come
+      for (const c of db.convoys) {
+        if (!c.reminded && c.start - Date.now() < 3600_000 && c.start > Date.now()) {
+          c.reminded = true; save();
+          post(cfg().convoyChannel, { content: 'Convoiul începe într-o oră.', embeds: [convoyEmbed(c)] });
+          for (const uid of Object.keys(c.rsvp || {}).filter((u) => c.rsvp[u].status === 'yes')) await dm(uid, { content: `Convoiul **${c.title}** începe ${ts(c.start, 'R')}.`, embeds: [convoyEmbed(c)] });
+        }
+      }
+    } catch (err) { console.error('tick:', err.message); }
   }
 
   client.once(Events.ClientReady, async (c) => {
     console.log(`Logged in as ${c.user.tag}`);
-    try { const global = await c.application.commands.fetch(); if (global.size) await c.application.commands.set([]); } catch { /* ignore */ }
+    try { const g = await c.application.commands.fetch(); if (g.size) await c.application.commands.set([]); } catch { /* ignore */ }
     for (const g of c.guilds.cache.values()) await g.commands.set(commands.map((x) => x.toJSON())).catch((err) => console.error(`commands in ${g.name}:`, err.message));
-    // the first run only remembers which games are free now, so a restart does not re-announce them
-    if (!Object.keys(db.seenFree).length) { try { const f = await free.epic(); for (const g of f.now) db.seenFree[`${g.id}:${g.start}`] = Date.now(); save(); } catch { /* next tick */ } }
-    setTimeout(tick, 20_000); setInterval(tick, 5 * 60_000);
-    setInterval(()=>{try{
-      const g=guild();
-      if(process.env.ENABLE_PRESENCE_TRACKING==='1' && g)for(const p of g.presences.cache.values()){
-        const member=p.member, u=member?.user || client.users.cache.get(p.userId);
-        if(u&&!u.bot){hub.observeMember(u);hub.presence(p.userId,p.activities.find(a=>a.type===ActivityType.Playing)?.name||'');}
-      }
-      if(g)for(const vs of g.voiceStates.cache.values())if(vs.channelId && !vs.member?.user?.bot){
-        hub.observeMember(vs.member?.user || client.users.cache.get(vs.id));hub.voice(vs.id,true);
-      }
-      hub.flushActive();
-    }catch(e){console.error('hub activity:',e.message)}},60_000);
-  });
-  client.on(Events.PresenceUpdate,(oldP,newP)=>{
-    if(!newP||process.env.ENABLE_PRESENCE_TRACKING!=='1'||newP.guild?.id!==guild()?.id)return;
-    const u=newP.member?.user || client.users.cache.get(newP.userId);
-    if(!u || u.bot)return;
-    hub.observeMember(u);
-    hub.presence(newP.userId,newP.activities.find(a=>a.type===ActivityType.Playing)?.name||'');
-  });
-  client.on(Events.VoiceStateUpdate,(oldS,newS)=>{
-    if(oldS.guild.id!==guild()?.id && newS.guild.id!==guild()?.id)return;
-    const u=newS.member?.user || client.users.cache.get(newS.id);
-    if(u?.bot)return;
-    if(u)hub.observeMember(u);
-    hub.voice(newS.id,!!newS.channelId);
   });
   client.on(Events.GuildCreate, (g) => g.commands.set(commands.map((x) => x.toJSON())).catch(() => {}));
   client.on(Events.InteractionCreate, async (i) => {
     if (!i.isChatInputCommand()) return;
-    try { if(i.guildId===guild()?.id && !i.user.bot)hub.observeMember(i.user); await onCommand(i); }
-    catch (err) {
-      console.error('command error:', err);
-      const msg = 'Nu am putut lua prețurile acum. Mai încearcă peste un minut.';
-      if (i.deferred || i.replied) await i.editReply(msg).catch(() => {}); else await i.reply({ content: msg, flags: MessageFlags.Ephemeral }).catch(() => {});
-    }
+    try { await onCommand(i); }
+    catch (err) { console.error('command:', err); const msg = 'Ceva nu a mers. Mai încearcă o dată.'; if (i.deferred || i.replied) await i.editReply(msg).catch(() => {}); else await i.reply({ content: msg, flags: MessageFlags.Ephemeral }).catch(() => {}); }
   });
 
+  let n = 0;
+  setTimeout(() => { tick(n++); setInterval(() => tick(n++), 5 * 60_000); }, 8000); // Trucky polling runs even if Discord is down
+
   return {
-    client, guild, digest,
-    // is this Discord user allowed to manage the portal? (Manage Server on the main server, or listed in ADMIN_IDS)
-    async isAdmin(uid) {
-      if (String(process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).includes(uid)) return true;
-      const g = guild(); if (!g) return false;
-      if (g.ownerId === uid) return true;
-      try { const m = await g.members.fetch(uid); return m.permissions.has(PermissionFlagsBits.ManageGuild); } catch { return false; }
+    client,
+    async role(uid) { // 'admin' | 'staff' | null
+      if (String(process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).includes(uid)) return 'admin';
+      const g = guild(); if (!g) return null;
+      if (g.ownerId === uid) return 'admin';
+      try {
+        const m = await g.members.fetch(uid);
+        if (m.permissions.has(PermissionFlagsBits.ManageGuild)) return 'admin';
+        if (process.env.STAFF_ROLE_ID && m.roles.cache.has(process.env.STAFF_ROLE_ID)) return 'staff';
+      } catch { /* not on the server */ }
+      return null;
     },
     channels() {
       const g = guild(), me = g?.members.me; if (!g || !me) return [];
-      return [...g.channels.cache.values()]
-        .filter((c) => (c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement) && c.permissionsFor(me)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]))
-        .sort((a, b) => (a.parent?.rawPosition ?? -1) - (b.parent?.rawPosition ?? -1) || a.rawPosition - b.rawPosition)
-        .map((c) => ({ id: c.id, name: c.name, group: c.parent?.name || '' }));
+      return [...g.channels.cache.values()].filter((c) => (c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement) && c.permissionsFor(me)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]))
+        .sort((a, b) => (a.parent?.rawPosition ?? -1) - (b.parent?.rawPosition ?? -1) || a.rawPosition - b.rawPosition).map((c) => ({ id: c.id, name: c.name, group: c.parent?.name || '' }));
     },
-    async postNews(item) {
-      const ch = channel(cfg().newsChannel);
-      if (!ch) return { ok: false, msg: 'Alege mai întâi canalul pentru anunțuri, în Setări.' };
-      const e = new EmbedBuilder().setColor(YELLOW).setTitle(item.title).setDescription(item.body.slice(0, 4000)).setFooter({ text: `${news.TAGS[item.tag]} de la ${item.by.name}` }).setTimestamp(item.at);
-      if (item.link) e.setURL(item.link);
-      if (item.image) e.setImage(item.image);
-      try { await ch.send({ embeds: [e] }); return { ok: true, msg: `Trimis și în #${ch.name}.` }; }
-      catch (err) { console.warn('postNews:', err.message); return { ok: false, msg: 'Nu am putut trimite pe Discord. Botul are nevoie de Send Messages și Embed Links în canal.' }; }
-    },
+    convoyAdded: (c) => post(cfg().convoyChannel, { embeds: [convoyEmbed(c, 'Convoi nou')] }),
+    applied: (a) => post(cfg().staffChannel, { embeds: [new EmbedBuilder().setColor(BROWN).setTitle(`Aplicare nouă: ${a.name}`).setDescription(`<@${a.discord}> · ${a.age} ani · ${a.games.join(' și ')}\n\n${a.why.slice(0, 900)}`).setURL(siteUrl() ? `${siteUrl()}/#/staff` : null).setTimestamp(a.at)] }),
+    decided: (a) => dm(a.discord, { embeds: [new EmbedBuilder().setColor(a.status === 'accepted' ? GREEN : RED)
+      .setTitle(a.status === 'accepted' ? 'Bun venit în Diesel Union' : 'Aplicarea ta la Diesel Union')
+      .setDescription(a.status === 'accepted' ? `Ai fost acceptat. Instalează Trucky și intră în compania Diesel Union ca să-ți fie numărate cursele.${a.note ? `\n\n${a.note}` : ''}` : `De data asta nu ai fost acceptat.${a.note ? `\n\n${a.note}` : ''}\nPoți aplica din nou peste o săptămână.`)] }),
+    test: (id) => post(id, { embeds: [new EmbedBuilder().setColor(BROWN).setTitle('Test Diesel Union').setDescription('Botul poate scrie în canalul ăsta.')] }),
     login: () => client.login(process.env.DISCORD_TOKEN),
   };
 }
 
-module.exports = { start, commands, _onCommand: onCommand };
+module.exports = { start, commands, _onCommand: onCommand, jobEmbed, convoyEmbed };

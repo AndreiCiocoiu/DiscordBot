@@ -1,15 +1,13 @@
 {
-  "name": "game-portal",
-  "version": "2.0.0",
-  "description": "Game deals, Discord community gaming rankings, events, LFG and tournaments",
+  "name": "diesel-union",
+  "version": "1.0.0",
+  "description": "Diesel Union VTC portal: drivers, deliveries and leaderboards from Trucky, convoys, recruitment, with a Discord bot.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "deploy": "node index.js"
+    "deploy": "node -e \"console.log('Nothing to deploy: slash commands are registered when the bot starts.')\""
   },
-  "engines": {
-    "node": ">=18"
-  },
+  "engines": { "node": ">=18" },
   "dependencies": {
     "discord.js": "^14.27.0",
     "dotenv": "^16.4.5"

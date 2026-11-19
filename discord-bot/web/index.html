@@ -4,37 +4,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#0c0a17">
-  <meta name="description" content="Reduceri la jocuri de pe Steam și alte magazine, jocuri gratis și anunțuri, într-un singur loc.">
-  <title>{{NAME}}: reduceri la jocuri</title>
+  <meta name="theme-color" content="#140d08">
+  <meta name="description" content="{{NAME}}: companie de transport virtual pe TruckersMP. Șoferi, curse, clasament, convoaie și recrutare.">
+  <title>{{NAME}}</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/big-shoulders-display-latin-900-normal.woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div id="ambient" aria-hidden="true"><i></i><i></i></div>
-  <canvas id="fx" aria-hidden="true"></canvas>
   <a class="skip" href="#view">Sari la conținut</a>
   <header class="top">
-    <a class="brand" href="#/" aria-label="{{NAME}}, prima pagină"><span class="brand-tag" aria-hidden="true">%</span><span class="brand-name">{{NAME}}</span></a>
+    <a class="brand" href="#/" aria-label="{{NAME}}, prima pagină">
+      <svg class="nut" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 3 42 13.5v21L24 45 6 34.5v-21z"/><text x="24" y="31" text-anchor="middle">DU</text></svg>
+      <span class="brand-name">{{NAME}}</span>
+    </a>
     <nav id="nav" class="nav" aria-label="Secțiuni"></nav>
-    <div class="tools">
-      <button id="find" class="tool" type="button" aria-label="Caută un joc"></button>
-      <select id="cur" class="cur" aria-label="Moneda afișată"></select>
-      <div id="me" class="me"></div>
-    </div>
+    <div id="me" class="me"></div>
   </header>
   <main id="view" class="page" tabindex="-1"></main>
-  <footer class="foot">
-    <p class="foot-community"><a href="#/comunitate">Comunitatea Persona Non Grata · Clasamente, evenimente și turnee</a></p>
-    <p>Prețurile vin de la <a href="https://www.cheapshark.com" target="_blank" rel="noopener">CheapShark</a> și sunt în dolari; în alte monede sunt aproximative. Jocurile gratuite vin din Epic Games Store. Prețul final îl vezi în magazin.</p>
-  </footer>
+  <footer class="foot"><p>Cursele și kilometrii vin din Trucky. Venitul e cel din joc: euro în ETS2, dolari în ATS.</p></footer>
   <nav id="tabbar" class="tabbar" aria-label="Secțiuni"></nav>
-  <aside id="sheet" class="sheet" hidden aria-label="Detalii joc"></aside>
-  <div id="palette" class="palette" hidden></div>
+  <aside id="drawer" class="drawer" hidden aria-label="Profil șofer"></aside>
   <div id="scrim" class="scrim" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>
   <noscript><p class="notice">Pagina are nevoie de JavaScript.</p></noscript>
-  <script src="/hub.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

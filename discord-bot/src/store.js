@@ -1,32 +1,41 @@
-// One JSON file on the persistent volume: portal settings, announcements, wishlists.
+// One JSON file on the persistent volume: members, deliveries, convoys, applications, settings.
 const fs = require('fs');
 const path = require('path');
 
 const DATA_DIR = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, '..', 'data');
-const FILE = path.join(DATA_DIR, 'portal.json');
+const FILE = path.join(DATA_DIR, 'diesel.json');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const DEFAULTS = { config: {}, news: [], watch: {}, seenFree: {}, lastDigest: '' };
+const DEFAULTS = { config: {}, members: {}, jobs: [], convoys: [], applications: [], links: {}, sync: {}, version: 1 };
 function load() {
-  try { return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(FILE, 'utf8')) }; }
+  try { return { ...structuredClone(DEFAULTS), ...JSON.parse(fs.readFileSync(FILE, 'utf8')) }; }
   catch (err) {
-    if (err.code !== 'ENOENT') { try { fs.renameSync(FILE, `${FILE}.bak`); console.warn('store: portal.json was corrupt, moved to portal.json.bak'); } catch { /* ignore */ } }
+    if (err.code !== 'ENOENT') { try { fs.renameSync(FILE, `${FILE}.bak`); console.warn('store: diesel.json was corrupt, moved to diesel.json.bak'); } catch { /* ignore */ } }
     return structuredClone(DEFAULTS);
   }
 }
 const db = load();
 
-let timer = null;
+let timer = null, rev = 0;
 function flush() {
   if (timer) { clearTimeout(timer); timer = null; }
   const tmp = `${FILE}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(db));
   fs.renameSync(tmp, FILE);
 }
-function save() { if (!timer) timer = setTimeout(() => { timer = null; try { flush(); } catch (err) { console.error('store save:', err.message); } }, 300); }
+function save() { rev++; if (!timer) timer = setTimeout(() => { timer = null; try { flush(); } catch (err) { console.error('store save:', err.message); } }, 400); }
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { try { flush(); } catch { /* ignore */ } process.exit(0); });
 
-// settings with their defaults
-const cfg = () => ({ dealsChannel: null, newsChannel: null, hour: 18, minCut: 50, digest: true, freeAlerts: true, ...db.config });
+// Driver ranks by total kilometres. Staff can change them on the site.
+const RANKS = [
+  { name: 'Ucenic', km: 0 }, { name: 'Șofer', km: 2500 }, { name: 'Șofer de cursă lungă', km: 10000 },
+  { name: 'Veteran', km: 30000 }, { name: 'Maestru al drumului', km: 75000 }, { name: 'Legendă Diesel', km: 150000 },
+];
+const cfg = () => ({
+  name: 'Diesel Union', tag: 'DU', tagline: 'Drumuri lungi. Oameni de încredere.',
+  truckyId: process.env.TRUCKY_COMPANY_ID || '', tmpId: process.env.TMP_VTC_ID || '',
+  jobsChannel: null, convoyChannel: null, staffChannel: null, recruitOpen: true, minJobKm: 0,
+  ranks: RANKS, ...db.config,
+});
 
-module.exports = { db, save, flush, cfg, DATA_DIR };
+module.exports = { db, save, flush, cfg, DATA_DIR, rev: () => rev };
