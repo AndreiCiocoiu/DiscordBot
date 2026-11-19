@@ -15,6 +15,13 @@ function load() {
   }
 }
 const db = load();
+// one-off updates to settings saved by older versions
+if ((db.version || 1) < 2) {
+  if (!db.config.tmpId) delete db.config.tmpId; // empty means "not set": use the default
+  if (!db.config.truckyUrl) delete db.config.truckyUrl;
+  if (typeof db.config.about === 'string') db.config.about = db.config.about.replace(' and American Truck Simulator', '');
+  db.version = 2;
+}
 
 let timer = null, rev = 0;
 function flush() {
@@ -33,11 +40,11 @@ const RANKS = [
 ];
 const cfg = () => ({
   name: 'Diesel Union', tag: 'DU', tagline: 'United by the Road',
-  truckyId: process.env.TRUCKY_COMPANY_ID || '', tmpId: process.env.TMP_VTC_ID || '',
+  truckyId: process.env.TRUCKY_COMPANY_ID || '', tmpId: process.env.TMP_VTC_ID || '93701',
   jobsChannel: null, convoyChannel: null, staffChannel: null, recruitOpen: true, minJobKm: 0,
-  discordInvite: '', truckyUrl: '',
+  discordInvite: '', truckyUrl: 'https://hub.truckyapp.com/vtc/diesel-union',
   discordRules: ['Be respectful. No insults, harassment, racism or drama.', 'Keep it clean: no NSFW, no spam, no advertising other VTCs or servers.', 'Use the right channel for the right thing.', 'Follow the TruckersMP rules on the road and in convoys. A TruckersMP ban can mean a removal from the company.', 'Listen to the convoy lead and staff during events.', 'Your Trucky profile has to stay in Diesel Union. If you leave the company on Trucky, you lose access here.', 'Going away for a while? Post in #leave-of-absence.'],
-  about: 'Diesel Union is a virtual trucking company on TruckersMP, driving Euro Truck Simulator 2 and American Truck Simulator. We run convoys every week, track every job with Trucky and look out for each other on the road. It does not matter how many kilometres you have: show up, drive clean, and have a good time.',
+  about: 'Diesel Union is a virtual trucking company on TruckersMP, driving Euro Truck Simulator 2. We run convoys every week, track every job with Trucky and look out for each other on the road. It does not matter how many kilometres you have: show up, drive clean, and have a good time.',
   requirements: ['A TruckersMP account with no active bans', 'Discord, so you can join voice during convoys', 'Trucky installed, so your jobs are counted', 'Respect on the road, for everyone', 'At least one convoy a month'],
   ranks: RANKS, ...db.config,
 });

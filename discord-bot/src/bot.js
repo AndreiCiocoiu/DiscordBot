@@ -87,19 +87,15 @@ function applyModal(uid) {
     input('steam', 'Steam profile link or SteamID64', TextInputStyle.Short, 'https://steamcommunity.com/profiles/7656119…', true, 120, d.steam),
     input('tmp', 'TruckersMP profile link or ID', TextInputStyle.Short, 'https://truckersmp.com/user/…', true, 80, d.tmp),
     input('age', 'How old are you?', TextInputStyle.Short, '18', true, 3, d.age),
-    input('games', 'What do you play, and how many hours?', TextInputStyle.Short, 'ETS2 and ATS, about 400 hours', true, 80, d.gamesText),
+    input('hours', 'How many hours do you have in ETS2?', TextInputStyle.Short, 'About 400 hours', true, 60, d.hours),
     input('why', 'Tell us about yourself. Why Diesel Union?', TextInputStyle.Paragraph, 'At least 30 characters', true, 1000, d.why));
-}
-function gamesOf(t) {
-  const s = String(t || '').toLowerCase(), both = /\bboth\b|amandou|ambele/.test(s);
-  return [...new Set([...(both || /ets|euro/.test(s) ? ['ETS2'] : []), ...(both || /\bats\b|american/.test(s) ? ['ATS'] : [])])];
 }
 function appEmbed(a) {
   const st = { pending: ['Pending', BROWN], accepted: ['Accepted', GREEN], rejected: ['Declined', RED] }[a.status] || ['?', BROWN];
   const tmp = /^\d+$/.test(a.tmp || '') ? `https://truckersmp.com/user/${a.tmp}` : a.tmp;
   return new EmbedBuilder().setColor(st[1]).setTitle(`Application: ${a.name}`).setThumbnail(web(a.avatar) || null)
     .addFields(
-      { name: 'Discord', value: `<@${a.discord}>`, inline: true }, { name: 'Age', value: String(a.age), inline: true }, { name: 'Plays', value: `${a.games.join(' and ')}${a.hours ? `\n${a.hours}` : ''}`.slice(0, 200), inline: true },
+      { name: 'Discord', value: `<@${a.discord}>`, inline: true }, { name: 'Age', value: String(a.age), inline: true }, { name: 'ETS2 hours', value: (a.hours || '?').slice(0, 200), inline: true },
       { name: 'Steam', value: `https://steamcommunity.com/profiles/${a.steam}`, inline: false }, { name: 'TruckersMP', value: (tmp || 'not given').slice(0, 200), inline: false },
       { name: 'About them', value: a.why.slice(0, 1000) },
       { name: 'Status', value: `${st[0]}${a.by ? ` by ${a.by}` : ''}${a.note ? `\n${a.note}` : ''}${a.onboarded ? `\nAccess granted ${ts(a.onboarded, 'R')}` : ''}${a.trucky ? `\n${a.trucky}` : ''}`.slice(0, 1000) })
@@ -202,9 +198,9 @@ function start() {
 
   // a finished delivery: logbook post, and a promotion (with the role) when someone reaches a new rank
   trucky.on('job', (j, live) => {
-    if (!client.isReady() || !live) return; // only fresh webhook deliveries, not the backfill
+    if (!client.isReady() || !live || j.game !== 'ETS2') return; // only fresh ETS2 webhook deliveries, not the backfill
     post(cfg().jobsChannel, { embeds: [jobEmbed(j)] });
-    const total = db.jobs.filter((x) => x.driver === j.driver && x.status === 'completed' && x.km >= (cfg().minJobKm || 0)).reduce((a, x) => a + x.km, 0); // read the raw list: the new job is not saved yet
+    const total = db.jobs.filter((x) => x.driver === j.driver && x.status === 'completed' && x.game === 'ETS2' && x.km >= (cfg().minJobKm || 0)).reduce((a, x) => a + x.km, 0); // read the raw list: the new job is not saved yet
     const before = stats.rankFor(total - j.km), after = stats.rankFor(total);
     if (after.index > before.index) {
       const uid = Object.keys(db.links).find((d) => db.links[d] === j.driver);
@@ -214,7 +210,7 @@ function start() {
     }
   });
   trucky.on('cancel', (j, live) => {
-    if (!client.isReady() || !live || !G.ch('canceled')) return;
+    if (!client.isReady() || !live || j.game !== 'ETS2' || !G.ch('canceled')) return;
     post(G.ch('canceled'), { embeds: [new EmbedBuilder().setColor(RED).setAuthor({ name: j.driverName, iconURL: web(j.avatar) || undefined }).setTitle(`Cancelled: ${j.from || '?'} → ${j.to || '?'}`.slice(0, 250)).setDescription(`${j.cargo || 'Cargo'}${j.km ? ` · ${km(j.km)} driven` : ''}`).setFooter({ text: j.game }).setTimestamp(j.end || Date.now())] });
   });
   // the company on Trucky: joining finishes onboarding, leaving removes access
@@ -316,11 +312,11 @@ function start() {
     const [, what, id] = i.customId.split(':');
     if (what === 'applym') {
       const f = (k) => i.fields.getTextInputValue(k);
-      const gamesText = f('games'), b = { steam: f('steam'), tmp: f('tmp'), age: f('age'), why: f('why'), games: gamesOf(gamesText), hours: gamesText, gamesText };
+      const b = { steam: f('steam'), tmp: f('tmp'), age: f('age'), why: f('why'), hours: f('hours') };
       drafts.set(i.user.id, { b, at: Date.now() }); setTimeout(() => { if (Date.now() - (drafts.get(i.user.id)?.at || 0) >= 30 * 60_000) drafts.delete(i.user.id); }, 30 * 60_000 + 1000);
       const v = apply.validate({ id: i.user.id, name: i.user.username }, { ...b, rules: true });
       const again = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('du:apply').setStyle(ButtonStyle.Primary).setLabel('Fix my answers'));
-      if (!v.ok) return i.reply(eph(`⚠️ ${v.msg === 'Pick what you play: ETS2, ATS or both.' ? 'Write which game you play: ETS2, ATS or both.' : v.msg}`, { components: [again] }));
+      if (!v.ok) return i.reply(eph(`⚠️ ${v.msg}`, { components: [again] }));
       const rules = (cfg().discordRules || []).map((x, k) => `**${k + 1}.** ${x}`).join('\n').slice(0, 3000);
       return i.reply(eph(`**Last step: the rules.**\n\n${rules}\n\nDo you accept them and the TruckersMP rules?`, { components: [new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('du:applyok').setStyle(ButtonStyle.Success).setLabel('I accept, send my application'), new ButtonBuilder().setCustomId('du:apply').setStyle(ButtonStyle.Secondary).setLabel('Edit answers'))] }));
@@ -340,7 +336,7 @@ function start() {
       try {
         const log = await G.setup(i.guild, { hideOthers: !!i.options.getBoolean('hide_others') });
         const made = log.filter((l) => l.startsWith('+')).length, warn = log.filter((l) => l.startsWith('!') || l.startsWith('~'));
-        return i.editReply(`**Diesel Union is set up.** ${made ? `Created ${made} roles/channels, ` : ''}fixed permissions and posted the panels.\n${warn.length ? `\n${warn.join('\n')}\n` : ''}\nNext:\n• Give staff the **Staff** or **Management** role.\n• Give current drivers **Union Member** (or let them press Check my progress).\n• Put the Trucky join link in Website → Staff → Settings if the button goes to the wrong page.`.slice(0, 1990));
+        return i.editReply(`**Diesel Union is set up.** ${made ? `Created ${made} roles/channels, ` : ''}fixed permissions and posted the panels.\n${warn.length ? `\n${warn.join('\n')}\n` : ''}\nNext:\n• Give yourself **CEO**, and your team CEO, Co-CEO, Management, HR Team, Staff, Event Team or Media Team.\n• Give current drivers **Union Member** (or let them press Check my progress).\n• Put the Trucky join link in Website → Staff → Settings if the button goes to the wrong page.`.slice(0, 1990));
       } catch (err) { return i.editReply(`Setup stopped: ${err.message}`); }
     }
     if (i.commandName === 'verify') {
@@ -395,4 +391,4 @@ function start() {
   };
 }
 
-module.exports = { start, commands, _onCommand: onCommand, jobEmbed, convoyEmbed, appEmbed, gamesOf, applyModal };
+module.exports = { start, commands, _onCommand: onCommand, jobEmbed, convoyEmbed, appEmbed, applyModal };

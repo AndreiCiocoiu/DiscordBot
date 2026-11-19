@@ -16,7 +16,7 @@ function startOf(period, now = Date.now()) {
 // completed deliveries, oldest first (jobs arrive out of order from the webhook and the API)
 let doneMemo = { rev: -1, list: [] };
 function done() {
-  if (doneMemo.rev !== rev()) doneMemo = { rev: rev(), list: db.jobs.filter((j) => j.status === 'completed' && j.km >= (cfg().minJobKm || 0)).sort((a, b) => a.end - b.end) };
+  if (doneMemo.rev !== rev()) doneMemo = { rev: rev(), list: db.jobs.filter((j) => j.status === 'completed' && j.game === 'ETS2' && j.km >= (cfg().minJobKm || 0)).sort((a, b) => a.end - b.end) };
   return doneMemo.list;
 }
 

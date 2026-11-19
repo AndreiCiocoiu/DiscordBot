@@ -21,8 +21,7 @@ function validate(user, b) {
   const why = clean(b.why, 1200);
   if (why.length < 30) return { ok: false, msg: 'Tell us a little about yourself (at least 30 characters).' };
   const a = { id: crypto.randomBytes(5).toString('hex'), discord: user.id, name: user.name, avatar: user.avatar || null, steam, tmp: clean(b.tmp, 80), age,
-    games: ['ETS2', 'ATS'].filter((g) => (b.games || []).includes(g)), hours: clean(b.hours, 40), why, from: clean(b.from, 80), status: 'pending', at: Date.now() };
-  if (!a.games.length) return { ok: false, msg: 'Pick what you play: ETS2, ATS or both.' };
+    games: ['ETS2'], hours: clean(b.hours, 40), why, from: clean(b.from, 80), status: 'pending', at: Date.now() };
   if (!b.rules) return { ok: false, msg: 'You need to agree to the company rules.' };
   return { ok: true, item: a };
 }

@@ -219,7 +219,7 @@ const STEPS = [
 const FAQ = [
   ['Do I have to play on TruckersMP?', 'Convoys are on TruckersMP. Jobs can be single player too: Trucky counts both.'],
   ['Which DLCs do I need?', 'None are required. When a convoy needs a map DLC, the announcement says so in advance.'],
-  ['ETS2 or ATS?', 'Both. Every job is logged under its own game.'],
+  ['Do you play ATS?', 'No. Diesel Union drives Euro Truck Simulator 2 only, so only ETS2 jobs count.'],
   ['Is there a minimum distance?', 'It is not a race. What matters is staying active and joining convoys when you can.'],
   ['How are ranks worked out?', 'From the total kilometres you deliver with Trucky since joining. The thresholds are shown above.'],
 ];
@@ -233,7 +233,7 @@ async function pageHome() {
     h('div', { class: 'hero-in' }, medallion(true),
       h('h1', { 'aria-label': S.cfg.name }, h('span', { class: 'a', text: w1 || '' }), rest.length ? h('span', { class: 'b', text: rest.join(' ') }) : null),
       h('p', { class: 'tagline', text: S.cfg.tagline }),
-      h('p', { class: 'lead', text: `A virtual trucking company on TruckersMP${S.cfg.tag ? `, tag [${S.cfg.tag}]` : ''}. Euro Truck Simulator 2 and American Truck Simulator.` }),
+      h('p', { class: 'lead', text: `A virtual trucking company on TruckersMP${S.cfg.tag ? `, tag [${S.cfg.tag}]` : ''}. Euro Truck Simulator 2.` }),
       h('div', { class: 'cta' }, S.cfg.recruitOpen && !S.member ? h('a', { class: 'btn', href: '#/aplica' }, 'Apply to join', icon('arrow', 18)) : S.member ? h('a', { class: 'btn', href: '#/curse' }, 'Company jobs', icon('arrow', 18)) : null,
         h('button', { class: 'btn ghost', type: 'button', onclick: scrollTo_ }, 'Learn more'))),
     h('button', { class: 'cue', type: 'button', 'aria-label': 'Scroll down', onclick: scrollTo_ }, h('span')));
@@ -343,7 +343,7 @@ async function openDriver(id) {
         h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.month?.km || 0) }), h('span', { text: 'km this month' })),
         h('div', { class: 'tile' }, h('b', { class: 'num', text: `${p.avgDmg}%` }), h('span', { text: 'average damage' })),
         h('div', { class: 'tile' }, h('b', { class: 'num', text: p.longest ? n0(p.longest.km) : '0' }), h('span', { text: 'longest job (km)' })),
-        h('div', { class: 'tile' }, h('b', { text: p.games.ATS > p.games.ETS2 ? 'ATS' : 'ETS2' }), h('span', { text: 'favourite game' }))),
+        h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.month?.jobs || 0) }), h('span', { text: 'jobs this month' }))),
       h('div', { class: 'next' }, next ? [h('b', { text: `${kmS(next.km - p.km)} to ${next.name}` }), h('span', { class: 'prog' }, h('i', { style: { width: `${Math.round(Math.max(0.02, k) * 100)}%` } }))] : h('b', { text: 'Reached the top rank.' })),
       h('h3', { text: 'Last six months' }), chart,
       p.fav ? h('p', { class: 'muted small', text: `Delivers most often to ${p.fav}.` }) : null,
@@ -372,7 +372,7 @@ async function pageJobs() {
   let t; const q = h('input', { class: 'field', type: 'search', placeholder: 'City, cargo or driver', 'aria-label': 'Search jobs', oninput: () => { clearTimeout(t); t = setTimeout(() => { F.q = q.value.trim(); load(true); }, 300); } });
   load(true);
   return [h('div', { class: 'pagehead' }, h('h1', { text: 'Jobs' }), h('p', { text: 'Every delivery the company made, straight from Trucky.' })),
-    h('div', { class: 'toolbar' }, q, seg('period', [['week', 'This week'], ['month', 'This month'], ['all', 'All time']]), seg('game', [['', 'Both games'], ['ETS2', 'ETS2'], ['ATS', 'ATS']])),
+    h('div', { class: 'toolbar' }, q, seg('period', [['week', 'This week'], ['month', 'This month'], ['all', 'All time']])),
     summary, list, h('p', { style: { textAlign: 'center', marginTop: '18px' } }, more)];
 }
 
@@ -410,10 +410,10 @@ async function pageConvoys() {
 function convoyForm() {
   const f = {};
   const field = (k, label, attrs = {}) => { f[k] = h(attrs.tag || 'input', { class: 'field', id: `cv-${k}`, ...attrs, tag: undefined }); return h('div', null, h('label', { class: 'lab', for: `cv-${k}`, text: label }), f[k]); };
-  const game = h('select', { class: 'field', id: 'cv-game' }, h('option', { value: 'ETS2' }, 'Euro Truck Simulator 2'), h('option', { value: 'ATS' }, 'American Truck Simulator'));
+  const game = { value: 'ETS2' }; // ETS2 only
   const ann = h('input', { type: 'checkbox', checked: true });
   const box = h('details', { class: 'panel card sec' }, h('summary', { style: { cursor: 'pointer', fontWeight: 700 } }, 'Add a convoy'),
-    h('div', { class: 'two' }, field('title', 'Title', { type: 'text', maxlength: 80, placeholder: 'For example: Friday night convoy' }), field('start', 'Date and time', { type: 'datetime-local' }), h('div', null, h('label', { class: 'lab', for: 'cv-game', text: 'Game' }), game), field('server', 'Server', { type: 'text', maxlength: 40, placeholder: 'Simulation 1' })),
+    h('div', { class: 'two' }, field('title', 'Title', { type: 'text', maxlength: 80, placeholder: 'For example: Friday night convoy' }), field('start', 'Date and time', { type: 'datetime-local' }), field('server', 'Server', { type: 'text', maxlength: 40, placeholder: 'Simulation 1' })),
     h('div', { class: 'two' }, field('from', 'Departure', { type: 'text', maxlength: 60, placeholder: 'Calais, Euroacres' }), field('to', 'Destination', { type: 'text', maxlength: 60, placeholder: 'Duisburg, Posped' }), field('meet', 'Meeting point', { type: 'text', maxlength: 80 }), field('dlc', 'Required DLC', { type: 'text', maxlength: 120, placeholder: 'None' })),
     field('desc', 'Details', { tag: 'textarea', maxlength: 1500 }), field('image', 'Image link, optional', { type: 'url', placeholder: 'https://' }),
     h('label', { class: 'check' }, ann, 'Announce it on Discord'),
@@ -437,16 +437,15 @@ async function pageApply() {
   const from = h('input', { class: 'field', id: 'ap-from', type: 'text', maxlength: 80, placeholder: 'City or country' });
   const hours = h('input', { class: 'field', id: 'ap-hours', type: 'text', maxlength: 40, placeholder: 'For example: 10 hours a week' });
   const why = h('textarea', { class: 'field', id: 'ap-why', maxlength: 1200, placeholder: 'How long you have played, what you like to haul, why Diesel Union.' });
-  const ets = h('input', { type: 'checkbox', checked: true }), ats = h('input', { type: 'checkbox' }), rules = h('input', { type: 'checkbox' });
+  const rules = h('input', { type: 'checkbox' });
   return [head_,
     mine?.status === 'rejected' ? h('p', { class: 'muted sec', text: `Your last application was declined ${ago(mine.decided)}.${mine.note ? ` Reason: ${mine.note}` : ''}` }) : null,
     h('section', { class: 'panel card sec' },
       h('div', { class: 'two' }, h('div', null, h('label', { class: 'lab', for: 'ap-steam', text: 'Steam profile' }), steam), h('div', null, h('label', { class: 'lab', for: 'ap-tmp', text: 'TruckersMP profile, optional' }), tmp)),
-      h('div', { class: 'two' }, h('div', null, h('label', { class: 'lab', for: 'ap-age', text: 'Age' }), age), h('div', null, h('label', { class: 'lab', for: 'ap-from', text: 'Where you are from' }), from), h('div', null, h('label', { class: 'lab', for: 'ap-hours', text: 'How much you play' }), hours)),
-      h('p', { class: 'lab', style: { marginBottom: 0 }, text: 'What you play' }), h('div', { style: { display: 'flex', gap: '20px' } }, h('label', { class: 'check' }, ets, 'Euro Truck Simulator 2'), h('label', { class: 'check' }, ats, 'American Truck Simulator')),
+      h('div', { class: 'two' }, h('div', null, h('label', { class: 'lab', for: 'ap-age', text: 'Age' }), age), h('div', null, h('label', { class: 'lab', for: 'ap-from', text: 'Where you are from' }), from), h('div', null, h('label', { class: 'lab', for: 'ap-hours', text: 'Hours in ETS2' }), hours)),
       h('label', { class: 'lab', for: 'ap-why', text: 'About you' }), why,
       h('label', { class: 'check' }, rules, 'I agree to run Trucky on my jobs and to follow the company and TruckersMP rules.'),
-      h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => act('/api/apply', { steam: steam.value, tmp: tmp.value, age: age.value, from: from.value, hours: hours.value, why: why.value, games: [ets.checked && 'ETS2', ats.checked && 'ATS'].filter(Boolean), rules: rules.checked }, render) }, icon('pen', 18), 'Send application')))];
+      h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => act('/api/apply', { steam: steam.value, tmp: tmp.value, age: age.value, from: from.value, hours: hours.value, why: why.value, games: ['ETS2'], rules: rules.checked }, render) }, icon('pen', 18), 'Send application')))];
 }
 
 async function pageAccount() {

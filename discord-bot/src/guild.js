@@ -23,10 +23,10 @@ const LAYOUT = [
     { key: 'ranks', name: '🏅┃ranks', ro: true, topic: 'Ranks are given automatically by total kilometres on Trucky.' },
     { key: 'links', name: '🔗┃diesel-links', ro: true, topic: 'Trucky, TruckersMP and the website.' }] },
   { cat: '🤎 Diesel Updates 🤎', access: 'member', channels: [
-    { key: 'news', name: '📰┃vtc-news', ro: true },
+    { key: 'news', name: '📰┃vtc-news', ro: true, writers: ['media', 'events'] },
     { key: 'newDrivers', name: '🤎┃new-drivers-and-promotions', ro: true, topic: 'New drivers and rank promotions, posted by the bot.' }] },
   { cat: '🤎 Convoys & Events 🤎', access: 'member', channels: [
-    { key: 'convoys', name: '🚛┃convoys', ro: true, topic: 'Upcoming convoys. RSVP on the website.' },
+    { key: 'convoys', name: '🚛┃convoys', ro: true, writers: ['events'], topic: 'Upcoming convoys. RSVP on the website.' },
     { key: 'convoyPhotos', name: '📸┃convoy-photos' },
     { key: 'radio1', name: '📻 Convoy Radio 1', voice: true },
     { key: 'radio2', name: '📻 Convoy Radio 2', voice: true }] },
@@ -35,7 +35,8 @@ const LAYOUT = [
     { key: 'canceled', name: '❌┃cancelled-jobs', ro: true, topic: 'Jobs cancelled on Trucky.' },
     { key: 'weekly', name: '🏆┃weekly-top', ro: true, topic: 'Top drivers of the week, every Monday.' }] },
   { cat: '🤎 Community 🤎', access: 'member', channels: [
-    { key: 'general', name: '💬┃general' },
+    { key: 'generalRo', name: '🇷🇴┃general-romana', topic: 'Chat general, în română.' },
+    { key: 'generalEn', name: '🇬🇧┃general-english', topic: 'General chat, in English.' },
     { key: 'screenshots', name: '📷┃screenshots' },
     { key: 'commands', name: '🤖┃bot-commands', topic: '/profile, /top, /convoy' },
     { key: 'lounge', name: '🔊 Lounge', voice: true }] },
@@ -53,9 +54,15 @@ const FEEDS = { jobsChannel: 'deliveries', convoyChannel: 'convoys', staffChanne
 
 const RANK_COLORS = [0xa1887f, 0xc08a5a, 0xd4a373, 0xb5651d, 0xe9a25b, 0xffc061, 0xffd98a, 0xfff0c4];
 const STAFF_PERMS = [P.ManageMessages, P.ModerateMembers, P.MuteMembers, P.MoveMembers, P.ManageThreads, P.ManageNicknames];
+// the leadership and team roles, top to bottom. staff: true = can review applications, sees the Staff category and the staff pages on the website
 const ROLE_DEFS = () => [
-  { key: 'management', name: 'Management', color: 0xe9a25b, hoist: true, perms: [...STAFF_PERMS, P.KickMembers] },
-  { key: 'staff', name: 'Staff', color: 0xc77d3a, hoist: true, perms: STAFF_PERMS },
+  { key: 'ceo', name: 'CEO', color: 0xffc94d, hoist: true, staff: true, perms: [P.Administrator] },
+  { key: 'coceo', name: 'Co-CEO', color: 0xf5b041, hoist: true, staff: true, perms: [P.Administrator] },
+  { key: 'management', name: 'Management', color: 0xe9a25b, hoist: true, staff: true, perms: [...STAFF_PERMS, P.KickMembers, P.BanMembers] },
+  { key: 'hr', name: 'HR Team', color: 0xd98c4a, hoist: true, staff: true, perms: STAFF_PERMS },
+  { key: 'events', name: 'Event Team', color: 0xc77d3a, hoist: true, perms: [P.MuteMembers, P.MoveMembers] },
+  { key: 'media', name: 'Media Team', color: 0xb86b3a, hoist: true, perms: [] },
+  { key: 'staff', name: 'Staff', color: 0xa65f33, hoist: true, staff: true, perms: STAFF_PERMS },
   // rank roles, highest first so they stack in the member list
   ...[...cfg().ranks].sort((a, b) => b.km - a.km).map((r, i, all) => ({ key: `rank:${r.name}`, name: r.name, color: RANK_COLORS[Math.min(all.length - 1 - i, RANK_COLORS.length - 1)], hoist: true, perms: [] })),
   { key: 'member', name: 'Union Member', color: 0, hoist: false, perms: [] },
@@ -64,11 +71,12 @@ const ROLE_DEFS = () => [
 
 const roles = () => db.config.roles || {};
 const roleId = (k) => roles()[k] || (k === 'member' ? process.env.MEMBER_ROLE_ID : k === 'staff' ? process.env.STAFF_ROLE_ID : null) || null;
-const staffRoleIds = () => [roleId('management'), roleId('staff')].filter(Boolean);
+const STAFF_KEYS = ['ceo', 'coceo', 'management', 'hr', 'staff'];
+const staffRoleIds = () => STAFF_KEYS.map(roleId).filter(Boolean);
 const rankRoleIds = () => Object.entries(roles()).filter(([k]) => k.startsWith('rank:')).map(([, v]) => v);
 const ch = (k) => (db.config.channels || {})[k] || null;
 
-function overwrites(g, access, ro, botId, kind = 'cat') {
+function overwrites(g, access, ro, botId, kind = 'cat', writers = []) {
   const everyone = g.roles.everyone.id, member = roleId('member'), approved = roleId('approved');
   const voice = kind !== 'text', text = kind !== 'voice';
   const VIEW = [P.ViewChannel, P.ReadMessageHistory, ...(voice ? [P.Connect] : [])];
@@ -76,6 +84,7 @@ function overwrites(g, access, ro, botId, kind = 'cat') {
   const o = [{ id: botId, allow: [...VIEW, ...TALK, P.EmbedLinks, P.AttachFiles, P.ManageMessages, P.AddReactions] }];
   for (const s of staffRoleIds()) o.push({ id: s, allow: [...VIEW, ...TALK] });
   const see = (id) => o.push({ id, allow: VIEW, deny: ro ? TALK : [] });
+  for (const w of writers) if (roleId(w)) o.push({ id: roleId(w), allow: [...VIEW, ...TALK] }); // e.g. the Event Team posts in #convoys
   if (access === 'gate') { o.push({ id: everyone, allow: VIEW, deny: ro ? TALK : [] }); if (member) o.push({ id: member, deny: [P.ViewChannel] }); if (approved) o.push({ id: approved, deny: [P.ViewChannel] }); }
   else {
     o.push({ id: everyone, deny: [P.ViewChannel] });
@@ -108,7 +117,9 @@ async function setup(g, { hideOthers = false } = {}) {
   catch (err) { log.push(`! could not order the roles (${err.message}). Drag the bot's role to the top of the list and run /setup again.`); }
   save();
 
-  // categories and channels
+  // categories and channels (forget keys from older layouts, so those channels count as "old")
+  const keys = new Set(LAYOUT.flatMap((sec) => [`cat:${sec.cat}`, ...sec.channels.map((c) => c.key)]));
+  for (const k of Object.keys(db.config.channels)) if (!keys.has(k)) delete db.config.channels[k];
   let pos = 0;
   for (const sec of LAYOUT) {
     const catKey = `cat:${sec.cat}`;
@@ -122,7 +133,7 @@ async function setup(g, { hideOthers = false } = {}) {
     for (const c of sec.channels) {
       const type = c.voice ? ChannelType.GuildVoice : ChannelType.GuildText;
       let x = g.channels.cache.get(db.config.channels[c.key]) || g.channels.cache.find((y) => y.type === type && y.name === c.name);
-      const perms = overwrites(g, sec.access, !!c.ro, me.id, c.voice ? 'voice' : 'text');
+      const perms = overwrites(g, sec.access, !!c.ro, me.id, c.voice ? 'voice' : 'text', c.writers || []);
       if (!x) { x = await g.channels.create({ name: c.name, type, parent: cat.id, topic: c.topic, permissionOverwrites: perms, reason: 'Diesel Union /setup' }); log.push(`+ ${c.name}`); }
       else { if (x.parentId !== cat.id) await x.setParent(cat.id, { lockPermissions: false }); await x.permissionOverwrites.set(perms); }
       await x.setPosition(cpos++).catch(() => {});

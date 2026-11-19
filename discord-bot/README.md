@@ -18,7 +18,10 @@ Website and Discord bot for Diesel Union, a VTC on TruckersMP. Jobs, distances a
 
 Discord commands: `/profile`, `/top`, `/convoy`, `/apply`, `/portal`. The chosen channel gets every delivery and every rank-up; RSVPs get a DM an hour before a convoy.
 
-## Discord server (v2.1)
+## Discord server
+
+Diesel Union is ETS2 only: ATS jobs are ignored everywhere.
+
 
 Run `/setup` once (as an admin). The bot builds the whole server and can run it again at any time to repair it:
 
@@ -30,11 +33,11 @@ Run `/setup` once (as an admin). The bot builds the whole server and can run it 
 | Diesel Updates | 📰┃vtc-news, 🤎┃new-drivers-and-promotions | Members (read-only) |
 | Convoys & Events | 🚛┃convoys, 📸┃convoy-photos, 📻 Convoy Radio 1/2 | Members |
 | Logbook | 📦┃deliveries, ❌┃cancelled-jobs, 🏆┃weekly-top | Members (read-only, bot posts) |
-| Community | 💬┃general, 📷┃screenshots, 🤖┃bot-commands, 🔊 Lounge | Members |
+| Community | 🇷🇴┃general-romana, 🇬🇧┃general-english, 📷┃screenshots, 🤖┃bot-commands, 🔊 Lounge | Members |
 | Support | ❓┃help, 📅┃leave-of-absence | Members |
-| Staff | 🗂┃applications, 💼┃staff-chat, 🧾┃bot-logs, 🔊 Staff Meeting | Staff |
+| Staff (CEO, Co-CEO, Management, HR Team, Staff) | 🗂┃applications, 💼┃staff-chat, 🧾┃bot-logs, 🔊 Staff Meeting | Staff |
 
-Roles: Management, Staff, one role per rank (Diesel Legend … Rookie), Union Member (access), Approved (finishing setup).
+Roles: CEO, Co-CEO, Management, HR Team, Event Team, Media Team, Staff, one role per rank (Diesel Legend … Rookie), Union Member (access), Approved (finishing setup).
 
 How someone joins:
 1. In #apply they press **Apply**, answer 5 questions, accept the rules.
