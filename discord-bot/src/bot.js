@@ -1,5 +1,7 @@
 // The Discord side: slash commands, delivery feed, rank-ups, convoy announcements and reminders, recruitment.
-const { Client, GatewayIntentBits, Events, EmbedBuilder, SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { Client, GatewayIntentBits, Events, EmbedBuilder, SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, AttachmentBuilder } = require('discord.js');
+const media = require('./media');
+const path = require('path');
 const { db, save, cfg } = require('./store');
 const stats = require('./stats');
 const trucky = require('./trucky');
@@ -43,9 +45,22 @@ function convoyEmbed(c, title) {
   const e = new EmbedBuilder().setColor(AMBER).setTitle(`${title ? `${title}: ` : ''}${c.title}`.slice(0, 250))
     .setDescription([`${ts(c.start)} (${ts(c.start, 'R')})`, c.from || c.to ? `**Route:** ${c.from || '?'} → ${c.to || '?'}` : null, c.server ? `**Server:** ${c.server}` : null, c.meet ? `**Meeting point:** ${c.meet}` : null, c.dlc ? `**DLC:** ${c.dlc}` : null, c.desc ? `\n${c.desc.slice(0, 1200)}` : null].filter(Boolean).join('\n'))
     .setFooter({ text: c.game });
-  if (web(c.image)) e.setImage(c.image);
   if (siteUrl()) e.setURL(`${siteUrl()}/#/convoaie`);
   return e;
+}
+// an embed with its picture: our own uploads go along as an attachment, links are used as they are
+function withImage(e, image) {
+  const f = media.file(image);
+  if (f) { const name = `image${path.extname(f)}`; e.setImage(`attachment://${name}`); return { embeds: [e], files: [new AttachmentBuilder(f, { name })] }; }
+  if (web(image)) e.setImage(image);
+  return { embeds: [e], files: [] };
+}
+const linkButton = (url, label) => (/^https?:\/\//.test(url || '') ? [new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(url).setLabel(String(label || 'Open link').slice(0, 80)))] : []);
+function convoyMsg(c, title) {
+  const btns = [];
+  if (/^https?:\/\//.test(c.link || '')) btns.push(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(c.link).setLabel('Event page'));
+  if (siteUrl()) btns.push(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(`${siteUrl()}/#/convoaie`).setLabel('RSVP on the website'));
+  return { ...withImage(convoyEmbed(c, title), c.image), components: btns.length ? [new ActionRowBuilder().addComponents(btns)] : [] };
 }
 
 async function onCommand(i) {
@@ -74,7 +89,7 @@ async function onCommand(i) {
   }
   if (n === 'convoy') {
     const next = convoys.list().find((c) => c.start > Date.now() - 1800_000);
-    return i.reply(next ? { embeds: [convoyEmbed(convoys.pub(db.convoys.find((c) => c.id === next.id)), 'Next convoy')] } : { content: 'No convoy is planned.', flags: MessageFlags.Ephemeral });
+    return i.reply(next ? convoyMsg(db.convoys.find((c) => c.id === next.id), 'Next convoy') : { content: 'No convoy is planned.', flags: MessageFlags.Ephemeral });
   }
 }
 
@@ -259,10 +274,10 @@ function start() {
       if (client.isReady()) await weekly();
       // convoy reminder an hour before: in the channel, and privately to everyone who said they come
       for (const c of db.convoys) {
-        if (!c.reminded && c.start - Date.now() < 3600_000 && c.start > Date.now()) {
+        if (!c.reminded && !c.draft && c.start - Date.now() < 3600_000 && c.start > Date.now()) {
           c.reminded = true; save();
-          post(cfg().convoyChannel, { content: 'The convoy starts in one hour.', embeds: [convoyEmbed(c)] });
-          for (const uid of Object.keys(c.rsvp || {}).filter((u) => c.rsvp[u].status === 'yes')) await dm(uid, { content: `The convoy **${c.title}** starts ${ts(c.start, 'R')}.`, embeds: [convoyEmbed(c)] });
+          post(cfg().convoyChannel, { content: 'The convoy starts in one hour.', ...convoyMsg(c) });
+          for (const uid of Object.keys(c.rsvp || {}).filter((u) => c.rsvp[u].status === 'yes')) await dm(uid, { content: `The convoy **${c.title}** starts ${ts(c.start, 'R')}.`, ...convoyMsg(c) });
         }
       }
     } catch (err) { console.error('tick:', err.message); }
@@ -313,13 +328,15 @@ function start() {
     if (what === 'applym') {
       const f = (k) => i.fields.getTextInputValue(k);
       const b = { steam: f('steam'), tmp: f('tmp'), age: f('age'), why: f('why'), hours: f('hours') };
+      await i.deferReply({ flags: MessageFlags.Ephemeral }); // looking up a custom Steam link can take a moment
+      const steamId = await apply.resolveSteam(b.steam); if (steamId) b.steam = steamId;
       drafts.set(i.user.id, { b, at: Date.now() }); setTimeout(() => { if (Date.now() - (drafts.get(i.user.id)?.at || 0) >= 30 * 60_000) drafts.delete(i.user.id); }, 30 * 60_000 + 1000);
       const v = apply.validate({ id: i.user.id, name: i.user.username }, { ...b, rules: true });
       const again = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('du:apply').setStyle(ButtonStyle.Primary).setLabel('Fix my answers'));
-      if (!v.ok) return i.reply(eph(`⚠️ ${v.msg}`, { components: [again] }));
+      if (!v.ok) return i.editReply({ content: `⚠️ ${v.msg}`, components: [again] });
       const rules = (cfg().discordRules || []).map((x, k) => `**${k + 1}.** ${x}`).join('\n').slice(0, 3000);
-      return i.reply(eph(`**Last step: the rules.**\n\n${rules}\n\nDo you accept them and the TruckersMP rules?`, { components: [new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('du:applyok').setStyle(ButtonStyle.Success).setLabel('I accept, send my application'), new ButtonBuilder().setCustomId('du:apply').setStyle(ButtonStyle.Secondary).setLabel('Edit answers'))] }));
+      return i.editReply({ content: `**Last step: the rules.**\n\n${rules}\n\nDo you accept them and the TruckersMP rules?`, components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('du:applyok').setStyle(ButtonStyle.Success).setLabel('I accept, send my application'), new ButtonBuilder().setCustomId('du:apply').setStyle(ButtonStyle.Secondary).setLabel('Edit answers'))] });
     }
     if (what === 'decm') {
       if (!(await role(i.user.id))) return i.reply(eph('Only staff can decide applications.'));
@@ -384,11 +401,52 @@ function start() {
         .sort((a, b) => (a.parent?.rawPosition ?? -1) - (b.parent?.rawPosition ?? -1) || a.rawPosition - b.rawPosition).map((c) => ({ id: c.id, name: c.name, group: c.parent?.name || '' }));
     },
     refreshPanels: () => { const g = guild(); return g && db.config.panels ? G.refreshPanels(g).catch(() => {}) : null; },
-    convoyAdded: (c) => post(cfg().convoyChannel, { embeds: [convoyEmbed(c, 'New convoy')] }),
+    // ---- panel: posts and convoys from the website ----
+    async access(uid) { // what this person may do in the panel
+      const r = await role(uid), gm = await member(uid), teams = gm ? G.teamsOf(gm) : [];
+      const post = r === 'admin' || teams.includes('ceo') || teams.includes('coceo');
+      return { role: r, teams, caps: { post, media: post || teams.includes('media'), events: post || !!r || teams.includes('events') } };
+    },
+    mediaChannels: () => G.MEDIA_KEYS.map(G.ch).filter(Boolean),
+    async publish(p) { // { channel, title, text, color, image, link, linkLabel, ping, plain }
+      const ch = channel(p.channel); if (!ch) return { ok: false, msg: 'The bot cannot post in that channel.' };
+      const pg = G.ping(p.ping);
+      let payload;
+      if (p.plain) {
+        const f = media.file(p.image);
+        payload = { content: [pg.content, p.title ? `**${p.title}**` : null, p.text, !f && web(p.image) ? p.image : null].filter(Boolean).join('\n').slice(0, 2000), files: f ? [new AttachmentBuilder(f, { name: `image${path.extname(f)}` })] : [] };
+      } else {
+        const e = new EmbedBuilder().setColor(p.color ?? BROWN);
+        if (p.title) e.setTitle(p.title); if (p.text) e.setDescription(p.text);
+        e.setFooter({ text: cfg().name }).setTimestamp();
+        payload = { content: pg.content, ...withImage(e, p.image) };
+      }
+      payload.components = linkButton(p.link, p.linkLabel);
+      payload.allowedMentions = pg.allowedMentions;
+      if (!payload.content && !payload.embeds?.length && !payload.files?.length) return { ok: false, msg: 'Write something first.' };
+      try { const m = await ch.send(payload); return { ok: true, ref: { c: ch.id, m: m.id }, channelName: ch.name }; }
+      catch (err) { return { ok: false, msg: `Discord refused it: ${err.message}` }; }
+    },
+    async unpost(ref) {
+      const ch = ref && channel(ref.c); if (!ch) return false;
+      const m = await ch.messages.fetch(ref.m).catch(() => null); if (!m) return false;
+      return m.delete().then(() => true).catch(() => false);
+    },
+    async convoyPost(c, ping) { // announce, or edit the announcement if it is already out
+      if (c.post) {
+        const ch = channel(c.post.c), m = ch && await ch.messages.fetch(c.post.m).catch(() => null);
+        if (m) { await m.edit({ ...convoyMsg(c, 'Convoy'), attachments: [] }).catch((err) => console.warn('convoy edit:', err.message)); return c.post; }
+      }
+      const pg = G.ping(ping || c.ping);
+      const m = await post(cfg().convoyChannel, { content: pg.content, allowedMentions: pg.allowedMentions, ...convoyMsg(c, 'New convoy') });
+      if (m) { c.post = { c: m.channelId, m: m.id }; save(); }
+      return c.post || null;
+    },
+    convoyAdded(c) { return this.convoyPost(c); },
     applied: (a) => logApp(a),
     test: (id) => post(id, { embeds: [new EmbedBuilder().setColor(BROWN).setTitle('Diesel Union test').setDescription('The bot can post in this channel.')] }),
     login: () => client.login(process.env.DISCORD_TOKEN),
   };
 }
 
-module.exports = { start, commands, _onCommand: onCommand, jobEmbed, convoyEmbed, appEmbed, applyModal };
+module.exports = { start, commands, _onCommand: onCommand, jobEmbed, convoyEmbed, convoyMsg, appEmbed, applyModal };

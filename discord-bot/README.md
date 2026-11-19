@@ -51,6 +51,18 @@ Staff commands: `/verify member:@x` (check one person, `force:true` gives access
 
 The bot needs **Administrator** (or Manage Roles + Manage Channels) and its role must be at the **top** of the role list, above every Diesel Union role.
 
+## Discord panel (website → account menu → Discord panel)
+
+| Who | What they can do |
+|---|---|
+| CEO, Co-CEO (and server admins) | Post anything in any channel, plan convoys, delete what the bot posted |
+| Media Manager | Post in #vtc-news, #convoy-photos and #screenshots |
+| Event Team (and staff) | Plan convoys: drafts, publish, edit (the Discord post is updated), delete |
+
+Posts: title, message, colour, picture (uploaded from your computer or a link), a link button and a ping:
+none, @everyone, @everyone hidden under a spoiler, the Union Member role, or that role hidden under a spoiler.
+Uploaded pictures are kept on the volume (`uploads/`) and sent to Discord as attachments.
+
 ## Railway setup
 
 1. Put these files in the repo (replace the old ones) and push.

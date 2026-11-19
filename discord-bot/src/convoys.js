@@ -2,31 +2,43 @@
 const crypto = require('crypto');
 const { db, save, cfg } = require('./store');
 const { getJson } = require('./fetcher');
+const media = require('./media');
 
 const clean = (s, n) => String(s ?? '').replace(/\r/g, '').replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim().slice(0, n);
 const okUrl = (u) => { try { const x = new URL(String(u)); return /^https?:$/.test(x.protocol) ? x.href.slice(0, 400) : ''; } catch { return ''; } };
 
+const PINGS = ['none', 'everyone', 'everyone-hidden', 'members', 'members-hidden'];
+// create, or update when b.id is given. draft = only the planning team sees it, nothing is posted yet
 function add(by, b) {
   const title = clean(b.title, 80), start = Number(b.start);
   if (title.length < 3) return { ok: false, msg: 'Give the convoy a title.' };
   if (!(start > Date.now() - 3600_000)) return { ok: false, msg: 'Pick the convoy date and time.' };
-  const c = { id: crypto.randomBytes(5).toString('hex'), title, start, game: b.game === 'ATS' ? 'ATS' : 'ETS2', server: clean(b.server, 40), from: clean(b.from, 60), to: clean(b.to, 60),
-    meet: clean(b.meet, 80), dlc: clean(b.dlc, 120), desc: clean(b.desc, 1500), image: okUrl(b.image), link: okUrl(b.link), rsvp: {}, by: { id: by.id, name: by.name }, at: Date.now(), reminded: false };
+  const fields = { title, start, game: 'ETS2', server: clean(b.server, 40), from: clean(b.from, 60), to: clean(b.to, 60),
+    meet: clean(b.meet, 80), dlc: clean(b.dlc, 120), desc: clean(b.desc, 1500), image: media.image(b.image), link: okUrl(b.link),
+    ping: PINGS.includes(b.ping) ? b.ping : 'none', draft: !!b.draft };
+  if (b.id) {
+    const c = db.convoys.find((x) => x.id === String(b.id)); if (!c) return { ok: false, msg: 'That convoy no longer exists.' };
+    if (c.start !== start) c.reminded = false;
+    if (c.post && fields.draft) fields.draft = false; // already on Discord: it stays published
+    Object.assign(c, fields, { edited: { name: by.name, at: Date.now() } }); save();
+    return { ok: true, msg: 'Convoy saved.', item: c, updated: true };
+  }
+  const c = { id: crypto.randomBytes(5).toString('hex'), ...fields, rsvp: {}, by: { id: by.id, name: by.name }, at: Date.now(), reminded: false };
   db.convoys.push(c); save();
-  return { ok: true, msg: 'Convoy added.', item: c };
+  return { ok: true, msg: fields.draft ? 'Saved as a draft. Only the planning team sees it.' : 'Convoy added.', item: c };
 }
-function remove(id) { const i = db.convoys.findIndex((c) => c.id === String(id)); if (i < 0) return { ok: false, msg: 'That convoy no longer exists.' }; db.convoys.splice(i, 1); save(); return { ok: true, msg: 'Convoy deleted.' }; }
+function remove(id) { const i = db.convoys.findIndex((c) => c.id === String(id)); if (i < 0) return { ok: false, msg: 'That convoy no longer exists.' }; const [c] = db.convoys.splice(i, 1); save(); return { ok: true, msg: 'Convoy deleted.', item: c }; }
 function rsvp(id, user, status) {
-  const c = db.convoys.find((x) => x.id === String(id)); if (!c) return { ok: false, msg: 'That convoy no longer exists.' };
+  const c = db.convoys.find((x) => x.id === String(id)); if (!c || c.draft) return { ok: false, msg: 'That convoy no longer exists.' };
   if (!['yes', 'maybe', 'no'].includes(status)) return { ok: false, msg: 'Pick an answer.' };
   c.rsvp[user.id] = { name: user.name, avatar: user.avatar || null, status, at: Date.now() }; save();
   return { ok: true, msg: status === 'yes' ? 'You are on the list. See you on the road.' : status === 'maybe' ? 'Marked as maybe.' : 'Noted, you are not coming.' };
 }
 const pub = (c, uid) => {
   const r = Object.values(c.rsvp || {});
-  return { ...c, rsvp: undefined, yes: r.filter((x) => x.status === 'yes').map(({ name, avatar }) => ({ name, avatar })), maybe: r.filter((x) => x.status === 'maybe').length, mine: uid ? c.rsvp?.[uid]?.status || null : null };
+  return { ...c, rsvp: undefined, post: undefined, posted: !!c.post, yes: r.filter((x) => x.status === 'yes').map(({ name, avatar }) => ({ name, avatar })), maybe: r.filter((x) => x.status === 'maybe').length, mine: uid ? c.rsvp?.[uid]?.status || null : null };
 };
-const list = (uid) => db.convoys.slice().sort((a, b) => a.start - b.start).map((c) => pub(c, uid));
+const list = (uid, drafts = false) => db.convoys.filter((c) => drafts || !c.draft).sort((a, b) => a.start - b.start).map((c) => pub(c, uid));
 
 // the VTC's events on TruckersMP (hosted and attending), read-only
 async function tmpEvents() {
@@ -46,4 +58,4 @@ async function tmpEvents() {
   return out.sort((a, b) => a.start - b.start).slice(0, 12);
 }
 
-module.exports = { add, remove, rsvp, list, pub, tmpEvents };
+module.exports = { add, remove, rsvp, list, pub, tmpEvents, PINGS };

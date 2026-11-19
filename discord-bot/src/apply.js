@@ -8,6 +8,23 @@ function steamOf(v) {
   const m = s.match(/(?:profiles\/)?(7656119\d{10})/);
   return m ? m[1] : null;
 }
+// any way people paste their Steam account -> SteamID64. Custom links (steamcommunity.com/id/name) are looked up on Steam.
+const BASE = 76561197960265728n, vanity = new Map();
+async function resolveSteam(v) {
+  const s = String(v || '').trim(); if (!s) return null;
+  const direct = steamOf(s); if (direct) return direct;
+  let m = s.match(/STEAM_[0-5]:([01]):(\d+)/i); if (m) return String(BASE + BigInt(m[2]) * 2n + BigInt(m[1]));
+  m = s.match(/\[?U:1:(\d+)\]?/i); if (m) return String(BASE + BigInt(m[1]));
+  m = s.match(/steamcommunity\.com\/id\/([\w.-]{2,64})/i) || s.match(/^([\w-]{2,32})$/);
+  if (!m) return null;
+  const name = m[1].toLowerCase(); if (vanity.has(name)) return vanity.get(name);
+  try {
+    const r = await fetch(`https://steamcommunity.com/id/${encodeURIComponent(name)}/?xml=1`, { headers: { 'User-Agent': 'DieselUnionPortal' }, signal: AbortSignal.timeout(8000) });
+    const id = (await r.text()).match(/<steamID64>(7656119\d{10})<\/steamID64>/)?.[1] || null;
+    if (id) { vanity.set(name, id); if (vanity.size > 2000) vanity.clear(); }
+    return id;
+  } catch { return null; }
+}
 const mine = (uid) => db.applications.filter((a) => a.discord === uid).sort((a, b) => b.at - a.at)[0] || null;
 
 function validate(user, b) {
@@ -16,7 +33,7 @@ function validate(user, b) {
   if (prev && prev.status === 'pending') return { ok: false, msg: 'You already have a pending application. You will get an answer on Discord.' };
   if (prev && prev.status === 'rejected' && Date.now() - prev.decided < 7 * 86400_000) return { ok: false, msg: 'You can apply again one week after the last answer.' };
   const steam = steamOf(b.steam), age = Math.round(Number(b.age));
-  if (!steam) return { ok: false, msg: 'Add your Steam profile link or SteamID64 (it starts with 7656119).' };
+  if (!steam) return { ok: false, msg: 'We could not find that Steam profile. Paste the link to your profile, like steamcommunity.com/id/yourname or steamcommunity.com/profiles/7656119…, and check that the profile exists.' };
   if (!(age >= 13 && age <= 99)) return { ok: false, msg: 'Enter your age.' };
   const why = clean(b.why, 1200);
   if (why.length < 30) return { ok: false, msg: 'Tell us a little about yourself (at least 30 characters).' };
@@ -46,4 +63,4 @@ function decide(id, staff, accept, note) {
   save();
   return { ok: true, msg: accept ? `${a.name} was accepted.` : `${a.name} was declined.`, item: a };
 }
-module.exports = { submit, validate, canApply, decide, mine, steamOf };
+module.exports = { resolveSteam, submit, validate, canApply, decide, mine, steamOf };

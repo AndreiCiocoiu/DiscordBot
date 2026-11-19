@@ -40,11 +40,13 @@ const ICONS = {
   check: 'M5 12.500 10 17 19 7',
   route: 'M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM6 15V9a3 3 0 0 1 3-3h3M18 9v6a3 3 0 0 1-3 3h-3',
   chev: 'M6 9l6 6 6-6',
+  img: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01',
+  send: 'M4 12 20 4l-6 16-3-7zM11 13l9-9',
   discord: 'M8 7c-2 .500-3 1-3 1-1.500 3-2 6-1.500 9 1.500 1.300 3 2 4.500 2l1-1.700M16 7c2 .500 3 1 3 1 1.500 3 2 6 1.500 9-1.500 1.300-3 2-4.500 2l-1-1.700M7.500 16c3 1.500 6 1.500 9 0M9.500 13h.01M14.500 13h.01M9 6.500c2-.500 4-.500 6 0',
 };
 const icon = (n, s = 20) => svg('svg', { class: 'ico', viewBox: '0 0 24 24', width: s, height: s, 'aria-hidden': 'true' }, svg('path', { d: ICONS[n].replace(/(\d)\.(\d)00/g, '$1.$2') }));
 
-const S = { user: null, role: null, member: false, cfg: { name: 'Diesel Union', ranks: [], requirements: [] }, login: false, driver: null, anim: true };
+const S = { user: null, role: null, caps: {}, teams: [], member: false, cfg: { name: 'Diesel Union', ranks: [], requirements: [] }, login: false, driver: null, anim: true };
 let cleanups = [];
 async function api(path, body) {
   const res = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined);
@@ -190,7 +192,7 @@ function convoyCard(c, full) {
       full && c.desc ? h('p', { class: 'desc', text: c.desc }) : null),
     h('div', { class: 'rsvp' },
       c.tmp ? h('a', { class: 'btn ghost small', href: c.link, target: '_blank', rel: 'noopener' }, 'View on TruckersMP', icon('out', 16))
-        : [faces(c), soon > -3 * 3600_000 ? rsvpButtons(c) : null, S.role && full ? h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Delete the convoy "${c.title}"?`)) act('/api/convoys/remove', { id: c.id }, render); } }, 'Delete') : null]));
+        : [faces(c), soon > -3 * 3600_000 ? rsvpButtons(c) : null, S.caps.events && full ? h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Delete the convoy "${c.title}"?`)) act('/api/convoys/remove', { id: c.id }, render); } }, 'Delete') : null]));
   return card;
 }
 function faces(c) {
@@ -401,27 +403,157 @@ async function pageConvoys() {
   const r = await api('/api/convoys'), d = r.ok ? r.data : { convoys: [], tmp: [] };
   const up = d.convoys.filter((c) => c.start > Date.now() - 3 * 3600_000), past = d.convoys.filter((c) => c.start <= Date.now() - 3 * 3600_000).reverse().slice(0, 6);
   const out = [h('div', { class: 'pagehead' }, h('h1', { text: 'Convoys' }), h('p', { text: 'We hit the road together. RSVP and the bot reminds you on Discord an hour before.' }))];
-  if (S.role) out.push(convoyForm());
-  out.push(h('section', { class: 'sec' }, head('Upcoming'), up.length ? h('div', { class: 'convoys' }, up.map((c) => convoyCard(c, true))) : empty('No convoys planned', S.role ? 'Add one with the form above.' : 'Staff announce the next convoy here and on Discord.')));
+  if (S.caps.events) out.push(h('p', { class: 'actions' }, h('a', { class: 'btn', href: '#/panel' }, icon('flag', 18), 'Plan a convoy')));
+  out.push(h('section', { class: 'sec' }, head('Upcoming'), up.length ? h('div', { class: 'convoys' }, up.map((c) => convoyCard(c, true))) : empty('No convoys planned', S.caps.events ? 'Plan one in the Discord panel.' : 'Staff announce the next convoy here and on Discord.')));
   if (d.tmp.length) out.push(h('section', { class: 'sec' }, head('On TruckersMP', 'Events the company hosts or attends.'), h('div', { class: 'convoys' }, d.tmp.map((c) => convoyCard(c, false)))));
   if (past.length) out.push(h('section', { class: 'sec' }, head('Past convoys'), h('div', { class: 'convoys' }, past.map((c) => convoyCard(c, false)))));
   return out;
 }
-function convoyForm() {
-  const f = {};
-  const field = (k, label, attrs = {}) => { f[k] = h(attrs.tag || 'input', { class: 'field', id: `cv-${k}`, ...attrs, tag: undefined }); return h('div', null, h('label', { class: 'lab', for: `cv-${k}`, text: label }), f[k]); };
-  const game = { value: 'ETS2' }; // ETS2 only
-  const ann = h('input', { type: 'checkbox', checked: true });
-  const box = h('details', { class: 'panel card sec' }, h('summary', { style: { cursor: 'pointer', fontWeight: 700 } }, 'Add a convoy'),
-    h('div', { class: 'two' }, field('title', 'Title', { type: 'text', maxlength: 80, placeholder: 'For example: Friday night convoy' }), field('start', 'Date and time', { type: 'datetime-local' }), field('server', 'Server', { type: 'text', maxlength: 40, placeholder: 'Simulation 1' })),
-    h('div', { class: 'two' }, field('from', 'Departure', { type: 'text', maxlength: 60, placeholder: 'Calais, Euroacres' }), field('to', 'Destination', { type: 'text', maxlength: 60, placeholder: 'Duisburg, Posped' }), field('meet', 'Meeting point', { type: 'text', maxlength: 80 }), field('dlc', 'Required DLC', { type: 'text', maxlength: 120, placeholder: 'None' })),
-    field('desc', 'Details', { tag: 'textarea', maxlength: 1500 }), field('image', 'Image link, optional', { type: 'url', placeholder: 'https://' }),
-    h('label', { class: 'check' }, ann, 'Announce it on Discord'),
-    h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: async () => {
-      const start = f.start.value ? new Date(f.start.value).getTime() : 0;
-      await act('/api/convoys', { title: f.title.value, start, game: game.value, server: f.server.value, from: f.from.value, to: f.to.value, meet: f.meet.value, dlc: f.dlc.value, desc: f.desc.value, image: f.image.value, announce: ann.checked }, render);
-    } }, icon('flag', 18), 'Add convoy')));
-  return box;
+// ---- team panel: post on Discord (CEO, Co-CEO, Media Manager) and plan convoys (Event Team) ----
+const PING_LABEL = { none: 'No ping', 'everyone-hidden': '@everyone, hidden under a spoiler', everyone: '@everyone', 'members-hidden': 'All drivers (Union Member), hidden under a spoiler', members: 'All drivers (Union Member)' };
+const pingPicker = (list, cur, id) => h('select', { class: 'field', id }, list.map((p) => h('option', { value: p, selected: p === (cur || 'none') }, PING_LABEL[p])));
+function pingPreview(kind) {
+  if (!kind || kind === 'none') return null;
+  const t = kind.startsWith('everyone') ? '@everyone' : '@Union Member';
+  return h('div', null, kind.endsWith('hidden') ? h('span', { class: 'spoiler', title: 'Hidden under a spoiler: people still get the ping', text: t }) : h('span', { class: 'mention', text: t }));
+}
+// big photos are shrunk in the browser before upload (GIFs go as they are, to keep the animation)
+function shrink(file) {
+  return new Promise((ok, bad) => {
+    const rd = new FileReader();
+    rd.onerror = () => bad(new Error('Could not read the file.'));
+    rd.onload = () => {
+      if (file.type === 'image/gif') return ok(rd.result);
+      const im = new Image();
+      im.onerror = () => bad(new Error('That file is not a picture.'));
+      im.onload = () => {
+        const k = Math.min(1, 1920 / Math.max(im.width, im.height));
+        if (k === 1 && file.size < 2_500_000) return ok(rd.result);
+        const c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        const out = c.toDataURL('image/webp', 0.86);
+        ok(out.startsWith('data:image/webp') ? out : c.toDataURL('image/jpeg', 0.88));
+      };
+      im.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  });
+}
+function imagePicker(cur, id, onchange) {
+  let value = cur || '';
+  const prev = h('div', { class: 'pick-prev' });
+  const url = h('input', { class: 'field', type: 'url', 'aria-label': 'Picture link', placeholder: 'or paste a picture link (https://…)', value: value && !value.startsWith('/u/') ? value : '', oninput: () => { value = url.value.trim(); show(); } });
+  const file = h('input', { type: 'file', class: 'sr', id, accept: 'image/png,image/jpeg,image/webp,image/gif', tabindex: '-1' });
+  const btn = h('button', { class: 'btn ghost small', type: 'button', onclick: () => file.click() }, icon('img', 18), 'Upload a picture');
+  file.addEventListener('change', async () => {
+    const f = file.files[0]; if (!f) return;
+    btn.disabled = true; btn.lastChild.textContent = 'Uploading…';
+    try { const r = await api('/api/upload', { data: await shrink(f) }); if (r.ok) { value = r.data.url; url.value = ''; show(); toast('Picture uploaded.'); } else toast(r.data.msg || r.data.error, true); }
+    catch (err) { toast(err.message, true); }
+    btn.disabled = false; btn.lastChild.textContent = 'Upload a picture'; file.value = '';
+  });
+  function show(first) {
+    prev.replaceChildren(...[value ? h('img', { src: value, alt: 'Chosen picture' }) : h('span', { class: 'muted small', text: 'No picture yet.' }),
+      value ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => { value = ''; url.value = ''; show(); } }, 'Remove') : null].filter(Boolean));
+    if (onchange && !first) onchange(value);
+  }
+  show(true);
+  return { el: h('div', { class: 'picker' }, h('div', { class: 'pick-row' }, file, btn, url), prev), get value() { return value; } };
+}
+const field_ = (el, label) => h('div', null, h('label', { class: 'lab', for: el.id, text: label }), el);
+function chanPicker(chans, id) {
+  const g = new Map(); for (const x of chans) { if (!g.has(x.group)) g.set(x.group, []); g.get(x.group).push(x); }
+  return h('select', { class: 'field', id }, [...g].map(([n, xs]) => { const o = xs.map((x) => h('option', { value: x.id }, `# ${x.name}`)); return n ? h('optgroup', { label: n }, o) : o; }));
+}
+
+function composer(d) {
+  if (!d.channels.length) return empty('No channels', 'The bot cannot post anywhere yet. Run /setup on Discord.');
+  const ch = chanPicker(d.channels, 'po-ch');
+  const title = h('input', { class: 'field', id: 'po-t', maxlength: 250, placeholder: 'Optional' });
+  const text = h('textarea', { class: 'field', id: 'po-x', maxlength: 4000, rows: 7, placeholder: 'Discord formatting works: **bold**, *italic*, > quote, - list' });
+  const color = h('input', { type: 'color', id: 'po-c', value: '#8a5a2b', class: 'swatch' });
+  const link = h('input', { class: 'field', id: 'po-l', type: 'url', placeholder: 'https://…' }), linkLabel = h('input', { class: 'field', id: 'po-ll', maxlength: 80, placeholder: 'Open link' });
+  const ping = pingPicker(d.pings, 'none', 'po-p'), plain = h('input', { type: 'checkbox' });
+  const pv = h('div', { class: 'dc-prev', 'aria-label': 'Preview' });
+  const img = imagePicker('', 'po-img', () => draw());
+  function draw() {
+    const box = plain.checked
+      ? h('div', null, title.value ? h('b', { class: 'dc-plain-t', text: title.value }) : null, h('p', { class: 'dc-text', text: text.value }), img.value ? h('img', { class: 'dc-img', src: img.value, alt: '' }) : null)
+      : (title.value || text.value || img.value) ? h('div', { class: 'dc-embed', style: { '--c': color.value } }, title.value ? h('b', { text: title.value }) : null, text.value ? h('p', { text: text.value }) : null, img.value ? h('img', { src: img.value, alt: '' }) : null, h('small', { text: S.cfg.name })) : h('p', { class: 'muted small', text: 'Your post shows up here.' });
+    pv.replaceChildren(h('div', { class: 'dc-who' }, h('img', { src: '/img/logo-160.webp', alt: '' }), h('span', { text: S.cfg.name }), h('i', { text: 'BOT' })), h('div', { class: 'dc-body' }, pingPreview(ping.value), box, /^https?:\/\//.test(link.value) ? h('span', { class: 'dc-btn', text: linkLabel.value || 'Open link' }) : null));
+  }
+  for (const el of [title, text, color, link, linkLabel, ping, plain]) el.addEventListener('input', draw);
+  plain.addEventListener('change', draw);
+  draw();
+  const send_ = (e) => { const b = e.currentTarget; b.disabled = true; act('/api/post', { channel: ch.value, title: title.value, text: text.value, color: color.value, image: img.value, link: link.value, linkLabel: linkLabel.value, ping: ping.value, plain: plain.checked }, () => { S.panelTab = 'history'; render(); }).finally(() => { b.disabled = false; }); };
+  return h('section', { class: 'composer sec' },
+    h('div', { class: 'panel card' },
+      h('div', { class: 'two' }, field_(ch, 'Channel'), field_(ping, 'Ping')),
+      field_(title, 'Title'), field_(text, 'Message'),
+      h('p', { class: 'lab', text: 'Picture' }), img.el,
+      h('div', { class: 'two', style: { marginTop: '14px' } }, field_(link, 'Button link, optional'), field_(linkLabel, 'Button text')),
+      h('div', { class: 'pick-row', style: { marginTop: '6px' } }, h('label', { class: 'lab', for: 'po-c', text: 'Colour', style: { margin: 0 } }), color, h('label', { class: 'check', style: { margin: 0 } }, plain, 'Plain message, without the box')),
+      h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: send_ }, icon('send', 18), 'Post on Discord'))),
+    h('div', null, h('p', { class: 'lab', text: 'Preview' }), pv));
+}
+
+const dtLocal = (ms) => { const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+function planner(d) {
+  const c = d.convoys.find((x) => x.id === S.editConvoy) || null, f = {};
+  const inp = (k, label, attrs = {}) => { f[k] = h(attrs.tag || 'input', { class: 'field', id: `pl-${k}`, ...attrs, tag: undefined }); if (c && c[k] !== undefined && k !== 'start') f[k].value = c[k]; return field_(f[k], label); };
+  const form = [
+    h('div', { class: 'two' }, inp('title', 'Title', { maxlength: 80, placeholder: 'Friday night convoy' }), inp('start', 'Date and time', { type: 'datetime-local' }), inp('server', 'Server', { maxlength: 40, placeholder: 'Simulation 1' })),
+    h('div', { class: 'two' }, inp('from', 'Departure', { maxlength: 60, placeholder: 'Calais, Euroacres' }), inp('to', 'Destination', { maxlength: 60, placeholder: 'Duisburg, Posped' }), inp('meet', 'Meeting point', { maxlength: 80 }), inp('dlc', 'Required DLC', { maxlength: 120, placeholder: 'None' })),
+    inp('desc', 'Details', { tag: 'textarea', maxlength: 1500, rows: 5 })];
+  if (c) f.start.value = dtLocal(c.start);
+  const img = imagePicker(c?.image || '', 'pl-img');
+  const link = h('input', { class: 'field', id: 'pl-link', type: 'url', placeholder: 'https://truckersmp.com/events/…', value: c?.link || '' });
+  const ping = pingPicker(d.pings, c?.ping || 'none', 'pl-ping');
+  const body = (draft, announce) => ({ id: c?.id, title: f.title.value, start: f.start.value ? new Date(f.start.value).getTime() : 0, server: f.server.value, from: f.from.value, to: f.to.value, meet: f.meet.value, dlc: f.dlc.value, desc: f.desc.value, image: img.value, link: link.value, ping: ping.value, draft, announce });
+  const done = () => { S.editConvoy = null; render(); };
+  const btns = c && c.posted
+    ? [h('button', { class: 'btn', type: 'button', onclick: () => act('/api/convoys', body(false, true), done) }, icon('send', 18), 'Save and update the Discord post')]
+    : [h('button', { class: 'btn', type: 'button', onclick: () => act('/api/convoys', body(false, true), done) }, icon('send', 18), 'Publish and announce'),
+      h('button', { class: 'btn ghost', type: 'button', onclick: () => act('/api/convoys', body(true, false), done) }, 'Save as draft')];
+  if (c) btns.push(h('button', { class: 'btn ghost', type: 'button', onclick: () => { S.editConvoy = null; render(); } }, 'Cancel'));
+  return h('section', { class: 'panel card sec', id: 'planner' }, h('h2', { text: c ? `Edit: ${c.title}` : 'Plan a convoy' }),
+    h('p', { class: 'muted', text: 'Drafts are only visible to the team. Publishing puts it on the website and in the convoys channel.' }),
+    form, h('p', { class: 'lab', text: 'Banner picture' }), img.el,
+    h('div', { class: 'two', style: { marginTop: '14px' } }, field_(link, 'Event link, optional (TruckersMP event page)'), field_(ping, 'Ping when it is announced')),
+    h('div', { class: 'actions' }, btns));
+}
+function convoyRows(d) {
+  const list = d.convoys.filter((c) => c.start > Date.now() - 3 * 3600_000 || c.draft);
+  if (!list.length) return empty('Nothing planned', 'Plan the next convoy with the form above.');
+  return h('div', { class: 'plist' }, list.map((c) => h('div', { class: 'prow panel' },
+    c.image ? h('img', { class: 'thumb', src: c.image, alt: '' }) : null,
+    h('div', { class: 'grow' }, h('b', { text: c.title }), h('span', { class: 'muted small', text: `${dateL(c.start)} ${timeL(c.start)}${c.from || c.to ? ` · ${c.from || '?'} → ${c.to || '?'}` : ''}${c.yes ? ` · ${c.yes.length} going` : ''}` })),
+    h('span', { class: `pill ${c.draft ? 'pending' : 'accepted'}`, text: c.draft ? 'Draft' : c.posted ? 'On Discord' : 'Published' }),
+    h('button', { class: 'btn ghost small', type: 'button', onclick: () => { S.editConvoy = c.id; render().then(() => $('#planner')?.scrollIntoView({ behavior: 'smooth' })); } }, 'Edit'),
+    c.draft ? h('button', { class: 'btn small', type: 'button', onclick: () => act('/api/convoys/publish', { id: c.id, ping: c.ping }, render) }, 'Publish') : null,
+    h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Delete "${c.title}"? The Discord post goes too.`)) act('/api/convoys/remove', { id: c.id }, render); } }, 'Delete'))));
+}
+function history(d) {
+  if (!d.posts.length) return empty('Nothing posted yet', 'What you post from here shows up in this list, so you can delete it later.');
+  return h('div', { class: 'plist sec' }, d.posts.map((p) => h('div', { class: 'prow panel' },
+    p.image ? h('img', { class: 'thumb', src: p.image, alt: '' }) : null,
+    h('div', { class: 'grow' }, h('b', { text: p.title || '(picture)' }), h('span', { class: 'muted small', text: `#${p.channel} · ${p.by.name} · ${ago(p.at)}${p.ping !== 'none' ? ` · ${PING_LABEL[p.ping]}` : ''}` })),
+    h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm('Delete this post from Discord?')) act('/api/post/delete', { id: p.id }, render); } }, 'Delete'))));
+}
+const TEAM_NAME = { ceo: 'CEO', coceo: 'Co-CEO', management: 'Management', hr: 'HR Team', events: 'Event Team', media: 'Media Manager', staff: 'Staff' };
+async function pagePanel() {
+  if (!S.user) return [empty('Log in with Discord', 'The panel is for the team.', loginBtn())];
+  const r = await api('/api/panel'); if (!r.ok) return [empty('Team only', r.data.error || 'Try again.')];
+  const d = r.data, c = d.caps;
+  const tabs = [...(c.media ? [['post', 'Post on Discord']] : []), ...(c.events ? [['convoys', 'Convoys and events']] : []), ...(c.media ? [['history', 'Posted']] : [])];
+  const tab = tabs.some((t) => t[0] === S.panelTab) ? S.panelTab : tabs[0][0];
+  const what = c.post ? 'Post in any channel, plan convoys and manage what the bot posted.' : [c.media ? 'Post in the news, convoy photos and screenshots channels.' : null, c.events ? 'Plan convoys and announce them.' : null].filter(Boolean).join(' ');
+  const out = [h('div', { class: 'pagehead' }, h('h1', { text: 'Discord panel' }), h('p', { text: what }), d.teams.length ? h('div', { class: 'chips' }, d.teams.map((t) => h('span', { class: 'pill pending', text: TEAM_NAME[t] || t }))) : null),
+    h('div', { class: 'tabsline' }, tabs.map(([k, l]) => h('button', { class: `btn small ${tab === k ? '' : 'ghost'}`, type: 'button', onclick: () => { S.panelTab = k; render(); } }, l)))];
+  if (tab === 'post') out.push(composer(d));
+  if (tab === 'convoys') out.push(planner(d), h('section', { class: 'sec' }, head('Planned', 'Drafts and upcoming convoys.'), convoyRows(d)));
+  if (tab === 'history') out.push(history(d));
+  return out;
 }
 
 async function pageApply() {
@@ -533,7 +665,7 @@ function configForm(c, chans) {
 
 // ---- shell ----
 const TABS = [['', 'Home', 'home'], ['soferi', 'Drivers', 'users'], ['curse', 'Jobs', 'truck'], ['clasament', 'Leaderboard', 'trophy'], ['convoaie', 'Convoys', 'flag']];
-const PAGES = { '': pageHome, soferi: pageDrivers, curse: pageJobs, clasament: pageBoard, convoaie: pageConvoys, aplica: pageApply, cont: pageAccount, staff: pageStaff };
+const PAGES = { '': pageHome, soferi: pageDrivers, curse: pageJobs, clasament: pageBoard, convoaie: pageConvoys, aplica: pageApply, cont: pageAccount, staff: pageStaff, panel: pagePanel };
 const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/'); return { page: r[0] in PAGES ? r[0] : '', arg: r[1] || null }; };
 
 function shell() {
@@ -546,7 +678,7 @@ function shell() {
   const me = $('#me');
   if (S.user) {
     const menu = h('div', { class: 'menu', hidden: true }, S.driver ? h('a', { href: `#/soferi/${S.driver.id}` }, icon('users', 18), 'My profile') : null, h('a', { href: '#/cont' }, icon('link', 18), S.driver ? 'My account' : 'Link your account'),
-      !S.member && S.cfg.recruitOpen ? h('a', { href: '#/aplica' }, icon('pen', 18), 'Apply') : null, S.role ? h('a', { href: '#/staff' }, icon('gear', 18), 'Staff') : null, h('a', { href: '/auth/logout' }, icon('exit', 18), 'Log out'));
+      !S.member && S.cfg.recruitOpen ? h('a', { href: '#/aplica' }, icon('pen', 18), 'Apply') : null, S.caps.media || S.caps.events ? h('a', { href: '#/panel' }, icon('send', 18), 'Discord panel') : null, S.role ? h('a', { href: '#/staff' }, icon('gear', 18), 'Staff') : null, h('a', { href: '/auth/logout' }, icon('exit', 18), 'Log out'));
     const btn = h('button', { class: 'who', type: 'button', 'aria-expanded': 'false', 'aria-label': `Account: ${S.user.name}`, onclick: (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); } }, av(S.driver?.avatar || S.user.avatar, S.user.name), h('span', { text: S.driver?.name || S.user.name }));
     me.replaceChildren(btn, menu);
   } else me.replaceChildren(S.login ? h('a', { class: 'btn small', href: '/auth/login' }, 'Log in') : '');
@@ -564,7 +696,7 @@ async function render() {
   if (my !== tok) return;
   view.replaceChildren(...nodes.flat(Infinity).filter(Boolean));
   lastPage = page; reveal(view);
-  document.title = page ? `${(TABS.find((t) => t[0] === page) || [0, { aplica: 'Apply', cont: 'My account', staff: 'Staff' }[page]])[1]} · ${S.cfg.name}` : S.cfg.name;
+  document.title = page ? `${(TABS.find((t) => t[0] === page) || [0, { aplica: 'Apply', cont: 'My account', staff: 'Staff', panel: 'Discord panel' }[page]])[1]} · ${S.cfg.name}` : S.cfg.name;
   if (page === 'soferi' && arg) openDriver(arg);
 }
 addEventListener('hashchange', () => { const { page, arg } = route(); if (!(page === 'soferi' && arg)) { closeDrawerOnly(); if (page !== lastPage) scrollTo(0, 0); } render(); });
@@ -593,7 +725,7 @@ function intro() {
 intro();
 async function boot() {
   const r = await api('/api/me').catch(() => null);
-  if (r?.ok) Object.assign(S, { user: r.data.user, role: r.data.role, member: !!r.data.member, cfg: r.data.cfg, login: r.data.login, driver: r.data.driver });
+  if (r?.ok) Object.assign(S, { user: r.data.user, role: r.data.role, caps: r.data.caps || {}, teams: r.data.teams || [], member: !!r.data.member, cfg: r.data.cfg, login: r.data.login, driver: r.data.driver });
   $('.brand-name').textContent = S.cfg.name;
   await render();
 }

@@ -11,6 +11,9 @@ const stats = require('./stats');
 const trucky = require('./trucky');
 const convoys = require('./convoys');
 const apply = require('./apply');
+const media = require('./media');
+const G = require('./guild');
+const cleanT = (s, n) => String(s ?? '').replace(/\r/g, '').replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim().slice(0, n);
 
 const ROOT = path.join(__dirname, '..');
 const TTL_MS = 7 * 86400_000;
@@ -50,6 +53,7 @@ function limited(req, max = 240) {
 async function raw(req, max = 2_000_000) { const c = []; let n = 0; for await (const x of req) { n += x.length; if (n > max) throw new Error('too big'); c.push(x); } return Buffer.concat(c); }
 const publicCfg = () => { const c = cfg(); return { name: c.name, tag: c.tag, tagline: c.tagline, recruitOpen: c.recruitOpen, ranks: c.ranks, about: c.about, requirements: c.requirements, discordInvite: c.discordInvite,
   tmpUrl: c.tmpId ? `https://truckersmp.com/vtc/${c.tmpId}` : '', trucky: !!c.truckyId }; };
+const PANEL = new Set(['/api/upload', '/api/post', '/api/post/delete', '/api/convoys', '/api/convoys/publish', '/api/convoys/remove']);
 const PRIVATE = new Set(['/api/drivers', '/api/driver', '/api/jobs', '/api/board']);
 const recent = (n) => stats.done().slice(-n).reverse();
 
@@ -66,6 +70,53 @@ function start() {
     if (await roleOf(s)) return true;
     return !!(bot && await bot.isMember(s.id));
   };
+
+  // ---- the team panel: CEO / Co-CEO post anywhere, Media Manager in the media channels, Event Team plans convoys ----
+  const access = async (s) => { if (!s || !bot?.access) return null; const a = await bot.access(s.id); return a.caps.post || a.caps.media || a.caps.events ? a : null; };
+  const pingsFor = (acc) => (acc.caps.post || acc.caps.events ? convoys.PINGS : ['none', 'members', 'members-hidden']);
+  async function panel(route, b, s, acc) {
+    const by = { id: s.id, name: s.name };
+    if (route === '/api/upload') return media.store(b.data);
+    if (route === '/api/post') {
+      if (!acc.caps.media) return null;
+      const allowed = acc.caps.post ? new Set(bot.channels().map((c) => c.id)) : new Set(bot.mediaChannels());
+      if (!allowed.has(String(b.channel))) return { ok: false, msg: 'Pick a channel you can post in.' };
+      const ping = pingsFor(acc).includes(b.ping) ? b.ping : 'none';
+      const color = /^#[0-9a-f]{6}$/i.test(b.color || '') ? parseInt(b.color.slice(1), 16) : undefined;
+      const link = /^https?:\/\/\S+$/.test(String(b.link || '').trim()) ? String(b.link).trim().slice(0, 400) : '';
+      const p = { channel: String(b.channel), title: cleanT(b.title, 250), text: String(b.text ?? '').replace(/\r/g, '').slice(0, 4000), color, image: media.image(b.image), link, linkLabel: cleanT(b.linkLabel, 80) || 'Open link', ping, plain: !!b.plain };
+      if (!p.title && !p.text.trim() && !p.image) return { ok: false, msg: 'Write a title or a message, or add a picture.' };
+      const out = await bot.publish(p); if (!out.ok) return out;
+      db.posts.push({ id: crypto.randomBytes(5).toString('hex'), ref: out.ref, channel: out.channelName, title: p.title || p.text.slice(0, 60), image: p.image, ping, by, at: Date.now() });
+      if (db.posts.length > 300) db.posts.splice(0, db.posts.length - 300);
+      save();
+      return { ok: true, msg: `Posted in #${out.channelName}.` };
+    }
+    if (route === '/api/post/delete') {
+      const i = db.posts.findIndex((p) => p.id === String(b.id)); if (i < 0) return { ok: false, msg: 'That post is gone already.' };
+      if (!acc.caps.post && db.posts[i].by.id !== s.id) return null;
+      await bot.unpost(db.posts[i].ref); db.posts.splice(i, 1); save();
+      return { ok: true, msg: 'Deleted from Discord.' };
+    }
+    if (!acc.caps.events) return null;
+    if (route === '/api/convoys') {
+      if (!pingsFor(acc).includes(b.ping)) b.ping = 'none';
+      const r = convoys.add(by, b); if (!r.ok) return r;
+      if (!r.item.draft && (b.announce || r.item.post)) { const ref = await bot.convoyPost(r.item, b.ping); if (!ref) r.msg += ' (Could not post on Discord: check the convoys channel.)'; else if (!r.updated) r.msg = 'Convoy added and announced on Discord.'; else r.msg = 'Convoy saved and the Discord post updated.'; }
+      return { ok: true, msg: r.msg, id: r.item.id };
+    }
+    if (route === '/api/convoys/publish') {
+      const c = db.convoys.find((x) => x.id === String(b.id)); if (!c) return { ok: false, msg: 'That convoy no longer exists.' };
+      c.draft = false; if (pingsFor(acc).includes(b.ping)) c.ping = b.ping; save();
+      const ref = await bot.convoyPost(c, c.ping);
+      return ref ? { ok: true, msg: 'Published and announced on Discord.' } : { ok: true, msg: 'Published on the website. The bot could not post on Discord.' };
+    }
+    if (route === '/api/convoys/remove') {
+      const r = convoys.remove(b.id); if (r.ok && r.item.post) await bot.unpost(r.item.post);
+      return r;
+    }
+    return null;
+  }
 
   async function login(req, res) {
     if (!process.env.DISCORD_CLIENT_SECRET) return page(res, 503, 'Login not set up', 'An admin needs to add the DISCORD_CLIENT_SECRET variable on Railway.');
@@ -95,8 +146,8 @@ function start() {
     if (req.method === 'GET') {
       if (PRIVATE.has(route) && !(await memberOf(s))) return json(res, s ? 403 : 401, { error: s ? 'Drivers only.' : 'Log in with Discord.', private: true });
       if (route === '/api/me') {
-        const role = await roleOf(s);
-        return json(res, 200, { user: s ? { id: s.id, name: s.name, avatar: s.avatar } : null, role, member: await memberOf(s), cfg: publicCfg(), login: !!process.env.DISCORD_CLIENT_SECRET, driver: s && db.links[s.id] ? stats.driverCard(db.links[s.id]) : null });
+        const role = await roleOf(s), acc = s && bot?.access ? await bot.access(s.id) : null;
+        return json(res, 200, { user: s ? { id: s.id, name: s.name, avatar: s.avatar } : null, role, caps: acc?.caps || {}, teams: acc?.teams || [], member: await memberOf(s), cfg: publicCfg(), login: !!process.env.DISCORD_CLIENT_SECRET, driver: s && db.links[s.id] ? stats.driverCard(db.links[s.id]) : null });
       }
       if (route === '/api/home') {
         const a = stats.all(), next = convoys.list(s?.id).filter((c) => c.start > Date.now() - 1800_000).slice(0, 2);
@@ -116,6 +167,13 @@ function start() {
       }
       if (route === '/api/board') return json(res, 200, { rows: stats.board(q.period, q.metric), from: stats.startOf(['week', 'month', 'all'].includes(q.period) ? q.period : 'month') });
       if (route === '/api/convoys') return json(res, 200, { convoys: convoys.list(s?.id), tmp: await convoys.tmpEvents() });
+      if (route === '/api/panel') {
+        const acc = await access(s); if (!acc) return json(res, s ? 403 : 401, { error: 'This page is for the team.' });
+        const all = bot.channels(), mediaIds = new Set(bot.mediaChannels());
+        return json(res, 200, { caps: acc.caps, teams: acc.teams, channels: acc.caps.post ? all : all.filter((c) => mediaIds.has(c.id)), pings: pingsFor(acc), memberRole: !!G.roleId('member'),
+          posts: db.posts.slice(-60).reverse().filter((p) => acc.caps.post || p.by.id === s.id || mediaIds.has(p.ref.c)),
+          convoys: acc.caps.events ? convoys.list(s.id, true) : [] });
+      }
       if (route === '/api/apply') return s ? json(res, 200, { app: apply.mine(s.id), open: cfg().recruitOpen }) : json(res, 401, { error: 'Log in with Discord.' });
       if (route === '/api/staff') {
         const role = await roleOf(s); if (!role) return json(res, 403, { error: 'Staff only.' });
@@ -131,23 +189,22 @@ function start() {
     if (origin && origin !== baseUrl(req)) return json(res, 403, { error: 'Origin not allowed.' });
     if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: 'Send JSON.' });
     if (!s) return json(res, 401, { error: 'Log in with Discord first.' });
-    let b; try { b = JSON.parse((await raw(req, 30_000)).toString() || '{}'); } catch { return json(res, 400, { error: 'Invalid request.' }); }
+    let b; try { b = JSON.parse((await raw(req, route === '/api/upload' ? 9_000_000 : 30_000)).toString() || '{}'); } catch { return json(res, 400, { error: 'Invalid request (a picture may be too big).' }); }
     let r;
     if (route === '/api/rsvp') r = convoys.rsvp(b.id, s, b.status);
-    else if (route === '/api/apply') { r = apply.submit(s, b); if (r.ok) { r.item.src = 'web'; save(); bot?.applied(r.item); } }
+    else if (route === '/api/apply') { b.steam = (await apply.resolveSteam(b.steam)) || b.steam; r = apply.submit(s, b); if (r.ok) { r.item.src = 'web'; save(); bot?.applied(r.item); } }
     else if (route === '/api/link') {
-      const steam = apply.steamOf(b.steam), m = steam && Object.values(db.members).find((x) => x.steam === steam && !x.left);
-      if (!steam) r = { ok: false, msg: 'Add your Steam profile link (with the SteamID64 that starts with 7656119).' };
+      const steam = await apply.resolveSteam(b.steam), m = steam && Object.values(db.members).find((x) => x.steam === steam && !x.left);
+      if (!steam) r = { ok: false, msg: 'We could not find that Steam profile. Paste your profile link (steamcommunity.com/id/… or /profiles/…).' };
       else if (!m) r = { ok: false, msg: 'We cannot find that Steam account in the company on Trucky. If you just joined, wait a few minutes.' };
       else if (Object.entries(db.links).some(([d, t]) => t === m.id && d !== s.id)) r = { ok: false, msg: 'That driver is already linked to another Discord account. Talk to staff.' };
       else { db.links[s.id] = m.id; save(); r = { ok: true, msg: `Your account is linked to ${m.name}.` }; bot?.onboard?.(s.id).catch(() => {}); }
     }
     else if (route === '/api/unlink') { delete db.links[s.id]; save(); r = { ok: true, msg: 'Account unlinked.' }; }
+    else if (PANEL.has(route)) { const acc = await access(s); if (!acc) return json(res, 403, { error: 'Only the team can do that.' }); r = await panel(route, b, s, acc); if (!r) return json(res, 403, { error: 'Your role cannot do that.' }); }
     else {
       const role = await roleOf(s); if (!role) return json(res, 403, { error: 'Only staff can do that.' });
-      if (route === '/api/convoys') { r = convoys.add(s, b); if (r.ok && b.announce) bot?.convoyAdded(r.item); }
-      else if (route === '/api/convoys/remove') r = convoys.remove(b.id);
-      else if (route === '/api/apply/decide') {
+      if (route === '/api/apply/decide') {
         r = apply.decide(b.id, s, !!b.accept, b.note);
         if (r.ok) { if (r.item.status === 'accepted' && b.trucky) { const t = await require('./trucky').addDriver(r.item.steam, r.item.name); r.msg += ` ${t.msg}`; } bot?.decided(r.item); }
       }
@@ -199,6 +256,10 @@ function start() {
         let data = fs.readFileSync(path.join(ROOT, stat[0]));
         if (url.pathname === '/') data = data.toString().replaceAll('{{NAME}}', esc(cfg().name));
         return send(res, 200, data, { 'Content-Type': stat[1], 'Cache-Control': url.pathname.startsWith('/fonts/') ? 'public, max-age=31536000, immutable' : url.pathname.startsWith('/img/') ? 'public, max-age=86400' : 'no-cache' });
+      }
+      if (req.method === 'GET' && url.pathname.startsWith('/u/')) {
+        const f = media.file(url.pathname); if (!f) return page(res, 404, 'Picture not found', 'This picture was removed.');
+        return send(res, 200, fs.readFileSync(f), { 'Content-Type': media.type(f), 'Cache-Control': 'public, max-age=31536000, immutable' });
       }
       if (url.pathname === '/trucky/webhook') {
         if (req.method !== 'POST') return json(res, 405, { error: 'POST only' });

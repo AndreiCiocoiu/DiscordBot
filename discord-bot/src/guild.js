@@ -66,7 +66,7 @@ const ROLE_DEFS = () => [
   { key: 'management', name: 'Management', color: 0xe9a25b, hoist: true, staff: true, perms: [...STAFF_PERMS, P.KickMembers, P.BanMembers] },
   { key: 'hr', name: 'HR Team', color: 0xd98c4a, hoist: true, staff: true, perms: STAFF_PERMS },
   { key: 'events', name: 'Event Team', color: 0xc77d3a, hoist: true, perms: [P.MuteMembers, P.MoveMembers] },
-  { key: 'media', name: 'Media Team', color: 0xb86b3a, hoist: true, perms: [] },
+  { key: 'media', name: 'Media Manager', was: 'Media Team', color: 0xb86b3a, hoist: true, perms: [] },
   { key: 'staff', name: 'Staff', color: 0xa65f33, hoist: true, staff: true, perms: STAFF_PERMS },
   // rank roles, highest first so they stack in the member list
   ...[...cfg().ranks].sort((a, b) => b.km - a.km).map((r, i, all) => ({ key: `rank:${r.name}`, name: r.name, color: RANK_COLORS[Math.min(all.length - 1 - i, RANK_COLORS.length - 1)], hoist: true, perms: [] })),
@@ -78,6 +78,18 @@ const roles = () => db.config.roles || {};
 const roleId = (k) => roles()[k] || (k === 'member' ? process.env.MEMBER_ROLE_ID : k === 'staff' ? process.env.STAFF_ROLE_ID : null) || null;
 const STAFF_KEYS = ['ceo', 'coceo', 'management', 'hr', 'staff'];
 const staffRoleIds = () => STAFF_KEYS.map(roleId).filter(Boolean);
+// which team roles a member has: ['ceo', 'events', ...]
+const TEAM_KEYS = ['ceo', 'coceo', 'management', 'hr', 'events', 'media', 'staff'];
+const teamsOf = (gm) => TEAM_KEYS.filter((k) => roleId(k) && gm.roles.cache.has(roleId(k)));
+// where the Media Manager may post
+const MEDIA_KEYS = ['news', 'convoyPhotos', 'screenshots'];
+// the ping that goes in front of a post. hidden = inside a spoiler, so the grey bar covers it (it still pings)
+function ping(kind) {
+  const role = roleId('member');
+  if (kind === 'everyone' || kind === 'everyone-hidden') return { content: kind === 'everyone' ? '@everyone' : '||@everyone||', allowedMentions: { parse: ['everyone'] } };
+  if ((kind === 'members' || kind === 'members-hidden') && role) return { content: kind === 'members' ? `<@&${role}>` : `||<@&${role}>||`, allowedMentions: { roles: [role] } };
+  return { content: undefined, allowedMentions: { parse: [] } };
+}
 const rankRoleIds = () => Object.entries(roles()).filter(([k]) => k.startsWith('rank:')).map(([, v]) => v);
 const ch = (k) => (db.config.channels || {})[k] || null;
 
@@ -109,7 +121,8 @@ async function setup(g, { hideOthers = false } = {}) {
   // roles
   const made = [];
   for (const d of ROLE_DEFS()) {
-    let r = g.roles.cache.get(db.config.roles[d.key]) || g.roles.cache.find((x) => x.name === d.name && !x.managed);
+    let r = g.roles.cache.get(db.config.roles[d.key]) || g.roles.cache.find((x) => (x.name === d.name || x.name === d.was) && !x.managed);
+    if (r && d.was && r.name === d.was) { await r.setName(d.name).catch(() => {}); log.push(`~ renamed ${d.was} to ${d.name}`); }
     if (!r) { r = await g.roles.create({ name: d.name, color: d.color, hoist: d.hoist, permissions: d.perms, mentionable: false, reason: 'Diesel Union /setup' }); log.push(`+ role ${d.name}`); }
     db.config.roles[d.key] = r.id; made.push(r);
   }
@@ -292,4 +305,4 @@ async function syncRank(gm) {
   return p.rank.name;
 }
 
-module.exports = { LAYOUT, FEEDS, setup, refreshPanels, applyPanel, setupPanel, linksPanel, ranksPanel, setupSteps, links, linkRow, progress, checklist, syncRank, roleId, staffRoleIds, rankRoleIds, ch };
+module.exports = { teamsOf, MEDIA_KEYS, ping, LAYOUT, FEEDS, setup, refreshPanels, applyPanel, setupPanel, linksPanel, ranksPanel, setupSteps, links, linkRow, progress, checklist, syncRank, roleId, staffRoleIds, rankRoleIds, ch };
