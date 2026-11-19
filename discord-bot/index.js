@@ -10,7 +10,7 @@ process.on('uncaughtException', (err) => console.error('Uncaught exception:', er
 let files = []; try { files = fs.readdirSync(DATA_DIR); } catch { /* new */ }
 console.log(`Storage: ${DATA_DIR} (${files.length} files: ${files.join(', ') || 'none'})`);
 if (process.env.RAILWAY_ENVIRONMENT && !process.env.RAILWAY_VOLUME_MOUNT_PATH && !process.env.DATA_DIR) console.warn('WARNING: no Railway Volume attached. Data is wiped on every restart. Add a Volume mounted at /app/data.');
-if (!process.env.TRUCKY_COMPANY_ID) console.warn('Trucky: TRUCKY_COMPANY_ID is not set (it can also be set on the site, Staff -> Setări).');
+if (!process.env.TRUCKY_COMPANY_ID) console.warn('Trucky: TRUCKY_COMPANY_ID is not set (it can also be set on the site, Staff -> Settings).');
 
 const site = web.start();
 const bot = botMod.start();

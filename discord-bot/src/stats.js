@@ -58,7 +58,7 @@ function roster() { return Object.values(db.members).filter((m) => !m.left).map(
 function board(period = 'month', metric = 'km') {
   const p = ['week', 'month', 'all'].includes(period) ? period : 'month', k = ['km', 'income', 'jobs'].includes(metric) ? metric : 'km';
   const per = all().per;
-  return Object.entries(per).map(([id, s]) => ({ ...driverCard(id) ?? { id, name: 'Fost șofer' }, v: s[p][k], jobsP: s[p].jobs, kmP: s[p].km, incomeP: s[p].income }))
+  return Object.entries(per).map(([id, s]) => ({ ...driverCard(id) ?? { id, name: 'Former driver' }, v: s[p][k], jobsP: s[p].jobs, kmP: s[p].km, incomeP: s[p].income }))
     .filter((r) => r.v > 0).sort((a, b) => b.v - a.v).slice(0, 100);
 }
 
@@ -68,7 +68,7 @@ function profile(id) {
   const jobs = done().filter((j) => j.driver === id);
   // the last six months, kilometres per month
   const months = []; const now = new Date();
-  for (let i = 5; i >= 0; i--) { const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1)); months.push({ key: `${d.getUTCFullYear()}-${d.getUTCMonth()}`, label: d.toLocaleDateString('ro-RO', { month: 'short' }), km: 0 }); }
+  for (let i = 5; i >= 0; i--) { const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1)); months.push({ key: `${d.getUTCFullYear()}-${d.getUTCMonth()}`, label: d.toLocaleDateString('en-GB', { month: 'short' }), km: 0 }); }
   for (const j of jobs) { const d = new Date(j.end); const mo = months.find((x) => x.key === `${d.getUTCFullYear()}-${d.getUTCMonth()}`); if (mo) mo.km += j.km; }
   const fav = Object.entries(s?.cities || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
   const longest = jobs.reduce((a, j) => (j.km > (a?.km || 0) ? j : a), null);

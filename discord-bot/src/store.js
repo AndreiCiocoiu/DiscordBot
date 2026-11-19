@@ -28,13 +28,16 @@ for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { try { flush(); 
 
 // Driver ranks by total kilometres. Staff can change them on the site.
 const RANKS = [
-  { name: 'Ucenic', km: 0 }, { name: 'Șofer', km: 2500 }, { name: 'Șofer de cursă lungă', km: 10000 },
-  { name: 'Veteran', km: 30000 }, { name: 'Maestru al drumului', km: 75000 }, { name: 'Legendă Diesel', km: 150000 },
+  { name: 'Rookie', km: 0 }, { name: 'Driver', km: 2500 }, { name: 'Long Hauler', km: 10000 },
+  { name: 'Veteran', km: 30000 }, { name: 'Road Master', km: 75000 }, { name: 'Diesel Legend', km: 150000 },
 ];
 const cfg = () => ({
-  name: 'Diesel Union', tag: 'DU', tagline: 'Drumuri lungi. Oameni de încredere.',
+  name: 'Diesel Union', tag: 'DU', tagline: 'United by the Road',
   truckyId: process.env.TRUCKY_COMPANY_ID || '', tmpId: process.env.TMP_VTC_ID || '',
   jobsChannel: null, convoyChannel: null, staffChannel: null, recruitOpen: true, minJobKm: 0,
+  discordInvite: '',
+  about: 'Diesel Union is a virtual trucking company on TruckersMP, driving Euro Truck Simulator 2 and American Truck Simulator. We run convoys every week, track every job with Trucky and look out for each other on the road. It does not matter how many kilometres you have: show up, drive clean, and have a good time.',
+  requirements: ['A TruckersMP account with no active bans', 'Discord, so you can join voice during convoys', 'Trucky installed, so your jobs are counted', 'Respect on the road, for everyone', 'At least one convoy a month'],
   ranks: RANKS, ...db.config,
 });
 

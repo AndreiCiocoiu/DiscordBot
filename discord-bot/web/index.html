@@ -1,33 +1,38 @@
 <!doctype html>
-<html lang="ro">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#140d08">
-  <meta name="description" content="{{NAME}}: companie de transport virtual pe TruckersMP. Șoferi, curse, clasament, convoaie și recrutare.">
+  <meta name="description" content="{{NAME}}: a virtual trucking company on TruckersMP. Weekly convoys, jobs tracked with Trucky, and open recruitment.">
   <title>{{NAME}}</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <link rel="preload" as="image" href="/img/cover.webp" type="image/webp">
   <link rel="preload" as="font" type="font/woff2" href="/fonts/big-shoulders-display-latin-900-normal.woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <a class="skip" href="#view">Sari la conținut</a>
+  <div id="intro" class="intro" aria-hidden="true">
+    <div class="intro-coin"><span class="ring"></span><img src="/img/logo-512.webp" alt=""></div>
+    <p class="intro-line">United by the Road</p>
+  </div>
+  <a class="skip" href="#view">Skip to content</a>
   <header class="top">
-    <a class="brand" href="#/" aria-label="{{NAME}}, prima pagină">
-      <svg class="nut" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 3 42 13.5v21L24 45 6 34.5v-21z"/><text x="24" y="31" text-anchor="middle">DU</text></svg>
+    <a class="brand" href="#/" aria-label="{{NAME}}, home">
+      <span class="nut"><img src="/img/logo-160.webp" alt="" width="44" height="44"></span>
       <span class="brand-name">{{NAME}}</span>
     </a>
-    <nav id="nav" class="nav" aria-label="Secțiuni"></nav>
+    <nav id="nav" class="nav" aria-label="Sections"></nav>
     <div id="me" class="me"></div>
   </header>
   <main id="view" class="page" tabindex="-1"></main>
-  <footer class="foot"><p>Cursele și kilometrii vin din Trucky. Venitul e cel din joc: euro în ETS2, dolari în ATS.</p></footer>
-  <nav id="tabbar" class="tabbar" aria-label="Secțiuni"></nav>
-  <aside id="drawer" class="drawer" hidden aria-label="Profil șofer"></aside>
+  <footer class="foot"><p>Jobs and distances come from Trucky. Income is in-game money: euros in ETS2, dollars in ATS.</p></footer>
+  <nav id="tabbar" class="tabbar" aria-label="Sections"></nav>
+  <aside id="drawer" class="drawer" hidden aria-label="Driver profile"></aside>
   <div id="scrim" class="scrim" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>
-  <noscript><p class="notice">Pagina are nevoie de JavaScript.</p></noscript>
+  <noscript><p class="notice">This page needs JavaScript.</p></noscript>
   <script src="/app.js" defer></script>
 </body>
 </html>

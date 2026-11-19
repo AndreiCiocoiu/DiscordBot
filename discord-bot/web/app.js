@@ -36,10 +36,15 @@ const ICONS = {
   link: 'M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1',
   out: 'M8 16 16 8M9 8h7v7',
   refresh: 'M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7',
+  lock: 'M6 11h12v10H6zM8 11V8a4 4 0 0 1 8 0v3',
+  check: 'M5 12.500 10 17 19 7',
+  route: 'M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM6 15V9a3 3 0 0 1 3-3h3M18 9v6a3 3 0 0 1-3 3h-3',
+  chev: 'M6 9l6 6 6-6',
+  discord: 'M8 7c-2 .500-3 1-3 1-1.500 3-2 6-1.500 9 1.500 1.300 3 2 4.500 2l1-1.700M16 7c2 .500 3 1 3 1 1.500 3 2 6 1.500 9-1.500 1.300-3 2-4.500 2l-1-1.700M7.500 16c3 1.500 6 1.500 9 0M9.500 13h.01M14.500 13h.01M9 6.500c2-.500 4-.500 6 0',
 };
 const icon = (n, s = 20) => svg('svg', { class: 'ico', viewBox: '0 0 24 24', width: s, height: s, 'aria-hidden': 'true' }, svg('path', { d: ICONS[n].replace(/(\d)\.(\d)00/g, '$1.$2') }));
 
-const S = { user: null, role: null, cfg: { name: 'Diesel Union', ranks: [] }, login: false, driver: null, anim: true };
+const S = { user: null, role: null, member: false, cfg: { name: 'Diesel Union', ranks: [], requirements: [] }, login: false, driver: null, anim: true };
 let cleanups = [];
 async function api(path, body) {
   const res = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined);
@@ -48,15 +53,15 @@ async function api(path, body) {
 }
 let tt;
 function toast(msg, bad) { const t = $('#toast'); t.textContent = msg; t.className = `toast${bad ? ' bad' : ''}`; t.hidden = false; t.style.animation = 'none'; void t.offsetWidth; t.style.animation = ''; clearTimeout(tt); tt = setTimeout(() => { t.hidden = true; }, bad ? 5200 : 3600); }
-async function act(path, body, after) { const r = await api(path, body); toast(r.data.msg || r.data.error || 'Ceva nu a mers.', !r.ok); if (r.ok && after) await after(r.data); return r.ok; }
+async function act(path, body, after) { const r = await api(path, body); toast(r.data.msg || r.data.error || 'Something went wrong.', !r.ok); if (r.ok && after) await after(r.data); return r.ok; }
 
-const n0 = (v) => Math.round(v || 0).toLocaleString('ro-RO');
+const n0 = (v) => Math.round(v || 0).toLocaleString('en-GB');
 const kmS = (v) => `${n0(v)} km`;
 const cash = (v, game) => `${n0(v)} ${game === 'ATS' ? '$' : '€'}`;
-const dateL = (ms) => new Date(ms).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' });
-const timeL = (ms) => new Date(ms).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
-function ago(ms) { if (!ms) return ''; const m = Math.round((Date.now() - ms) / 60000); if (m < 1) return 'acum'; if (m < 60) return `acum ${m} min`; if (m < 1440) return `acum ${Math.round(m / 60)} h`; const d = Math.round(m / 1440); return d < 30 ? `acum ${d} ${d === 1 ? 'zi' : 'zile'}` : dateL(ms); }
-function until(ms) { let s = Math.max(0, Math.floor((ms - Date.now()) / 1000)); const d = Math.floor(s / 86400); s -= d * 86400; const p = (x) => String(x).padStart(2, '0'); return `${d ? `${d}z ` : ''}${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`; }
+const dateL = (ms) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+const timeL = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+function ago(ms) { if (!ms) return ''; const m = Math.round((Date.now() - ms) / 60000); if (m < 1) return 'just now'; if (m < 60) return `${m} min ago`; if (m < 1440) return `${Math.round(m / 60)} h ago`; const d = Math.round(m / 1440); return d < 30 ? `${d} ${d === 1 ? 'day' : 'days'} ago` : dateL(ms); }
+function until(ms) { let s = Math.max(0, Math.floor((ms - Date.now()) / 1000)); const d = Math.floor(s / 86400); s -= d * 86400; const p = (x) => String(x).padStart(2, '0'); return `${d ? `${d}d ` : ''}${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`; }
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 function av(src, name, cls = 'av') {
@@ -73,86 +78,73 @@ function chevrons(rank) {
     Array.from({ length: n }, (_, i) => svg('path', { d: `M${i * 7} 2 l6 5 -6 5`, fill: 'none', stroke: 'currentColor', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))));
 }
 const skel = (n, hgt = 120) => Array.from({ length: n }, () => h('div', { class: 'sk', style: { minHeight: `${hgt}px` }, 'aria-hidden': 'true' }));
-const empty = (title, text, action) => h('div', { class: 'empty' }, h('b', { text: title }), text, action || null);
-const head = (title, sub, href, more) => h('div', { class: 'sec-head' }, h('h2', { text: title }), sub ? h('p', { text: sub }) : null, href ? h('a', { class: 'more', href, text: more || 'Vezi tot' }) : null);
-const loginBtn = (txt) => (S.login ? h('a', { class: 'btn', href: '/auth/login' }, txt || 'Intră cu Discord') : h('p', { class: 'muted', text: 'Login-ul cu Discord nu e configurat încă.' }));
+const empty = (title, text, action) => h('div', { class: 'empty' }, h('b', { text: title }), h('p', { class: 'msg', text }), action || null);
+const head = (title, sub, href, more) => h('div', { class: 'sec-head' }, h('h2', { text: title }), sub ? h('p', { text: sub }) : null, href ? h('a', { class: 'more', href, text: more || 'See all' }) : null);
+const loginBtn = (txt) => (S.login ? h('a', { class: 'btn', href: '/auth/login' }, txt || 'Log in with Discord') : h('p', { class: 'muted', text: 'Discord login is not set up yet.' }));
 
-// ---- the night highway behind the hero ----
-function highway(cv) {
-  const ctx = cv.getContext('2d'); let W = 0, H = 0, dpr = 1, raf = 0, run = false, t0 = performance.now(), mx = 0, tmx = 0;
-  const poles = Array.from({ length: 10 }, (_, i) => i / 10);
-  const hills = Array.from({ length: 3 }, (_, k) => Array.from({ length: 40 }, (_, i) => Math.sin(i * (0.5 + k * 0.23) + k * 2) * 0.5 + Math.sin(i * 1.7 + k) * 0.25));
-  const stars = Array.from({ length: 70 }, () => [Math.random(), Math.random() * 0.4, Math.random()]);
-  function size() { dpr = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); draw(performance.now()); }
-  function draw(now) {
-    const t = (now - t0) / 1000; mx += (tmx - mx) * 0.05;
-    const hz = H * 0.5, vx = W * (W < 700 ? 0.5 : 0.66) + mx * 40;
-    const sky = ctx.createLinearGradient(0, 0, 0, hz);
-    sky.addColorStop(0, '#120b07'); sky.addColorStop(0.6, '#3a1f10'); sky.addColorStop(1, '#a4521e');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, hz + 1);
-    for (const [x, y, p] of stars) { ctx.globalAlpha = 0.25 + 0.35 * Math.abs(Math.sin(t * 0.8 + p * 9)); ctx.fillStyle = '#f3e6d0'; ctx.fillRect(x * W, y * hz, 1.4, 1.4); }
-    ctx.globalAlpha = 1;
-    const sun = ctx.createRadialGradient(vx, hz, 0, vx, hz, W * 0.45);
-    sun.addColorStop(0, 'rgba(255,170,80,.55)'); sun.addColorStop(0.25, 'rgba(230,120,40,.18)'); sun.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = sun; ctx.fillRect(0, 0, W, hz + 2);
-    hills.forEach((hl, k) => {
-      ctx.fillStyle = ['#3b2414', '#2b190e', '#1d1109'][k];
-      ctx.beginPath(); ctx.moveTo(0, hz);
-      const shift = (mx * (k + 1) * 14) - 20;
-      for (let i = 0; i < hl.length; i++) ctx.lineTo((i / (hl.length - 1)) * (W + 40) + shift, hz - (12 + k * 10) - hl[i] * (14 + k * 10));
-      ctx.lineTo(W + 40, hz); ctx.closePath(); ctx.fill();
-    });
-    const ground = ctx.createLinearGradient(0, hz, 0, H);
-    ground.addColorStop(0, '#1a0f08'); ground.addColorStop(1, '#0d0805');
-    ctx.fillStyle = ground; ctx.fillRect(0, hz, W, H - hz);
-    // road
-    const bw = W * 1.5, bx = vx - bw / 2 - mx * 60;
-    ctx.fillStyle = '#17110c';
-    ctx.beginPath(); ctx.moveTo(vx - 4, hz); ctx.lineTo(vx + 4, hz); ctx.lineTo(bx + bw, H); ctx.lineTo(bx, H); ctx.closePath(); ctx.fill();
-    const lerp = (a, b, k) => a + (b - a) * k;
-    const at = (z, side) => { const k = z * z; return [lerp(vx + side * 4, side < 0 ? bx : bx + bw, k), lerp(hz, H, k)]; };
-    ctx.strokeStyle = 'rgba(243,230,208,.35)'; ctx.lineWidth = 2;
-    for (const side of [-0.92, 0.92]) { ctx.beginPath(); const a = at(0, side), b = at(1, side); ctx.moveTo(vx + side * 4, hz); ctx.lineTo(lerp(vx, side < 0 ? bx : bx + bw, 1) * 0.92 + vx * 0.08, H); ctx.stroke(); }
-    // lane dashes coming at us
-    const speed = REDUCED ? 0 : 0.45;
-    for (let i = 0; i < 14; i++) {
-      const z1 = ((i / 14 + t * speed) % 1), z2 = Math.min(1, z1 + 0.035);
-      const [x1, y1] = [lerp(vx, vx + (bx + bw / 2 - vx), z1 * z1), lerp(hz, H, z1 * z1)];
-      const [x2, y2] = [lerp(vx, vx + (bx + bw / 2 - vx), z2 * z2), lerp(hz, H, z2 * z2)];
-      const w1 = 1 + z1 * z1 * 14, w2 = 1 + z2 * z2 * 14;
-      ctx.fillStyle = `rgba(242,160,61,${0.25 + z1 * 0.7})`;
-      ctx.beginPath(); ctx.moveTo(x1 - w1 / 2, y1); ctx.lineTo(x1 + w1 / 2, y1); ctx.lineTo(x2 + w2 / 2, y2); ctx.lineTo(x2 - w2 / 2, y2); ctx.closePath(); ctx.fill();
-    }
-    // reflector poles on both sides
-    for (const p of poles) {
-      const z = (p + t * speed * 0.5) % 1, k = z * z;
-      for (const side of [-1, 1]) {
-        const x = lerp(vx + side * 6, side < 0 ? bx - W * 0.05 : bx + bw + W * 0.05, k), y = lerp(hz, H, k), ph = 4 + k * 70;
-        ctx.fillStyle = `rgba(30,20,12,${0.4 + k})`; ctx.fillRect(x - (1 + k * 3) / 2, y - ph, 1 + k * 3, ph);
-        ctx.fillStyle = side < 0 ? `rgba(255,120,60,${0.3 + k})` : `rgba(255,220,150,${0.3 + k})`; ctx.fillRect(x - (1 + k * 3) / 2, y - ph, 1 + k * 3, 2 + k * 6);
-      }
-    }
-    // a truck ahead: two tail lights and a trailer silhouette
-    const tz = 0.32 + Math.sin(t * 0.3) * 0.015, tk = tz * tz, tx = lerp(vx, vx + (bx + bw * 0.62 - vx), tk), ty = lerp(hz, H, tk), tw = 14 + tk * 160, th = tw * 0.75;
-    ctx.fillStyle = '#0e0905'; ctx.fillRect(tx - tw / 2, ty - th, tw, th);
-    for (const s of [-1, 1]) {
-      const lx = tx + s * tw * 0.42, ly = ty - th * 0.12, g = ctx.createRadialGradient(lx, ly, 0, lx, ly, tw * 0.4);
-      g.addColorStop(0, 'rgba(255,60,40,.9)'); g.addColorStop(1, 'rgba(255,40,20,0)');
-      ctx.fillStyle = g; ctx.fillRect(lx - tw * 0.4, ly - tw * 0.4, tw * 0.8, tw * 0.8);
-      ctx.fillStyle = '#ff5a3c'; ctx.fillRect(lx - tw * 0.05, ly - 2, tw * 0.1, 3);
-    }
-    // our own headlights on the road
-    const hl = ctx.createRadialGradient(bx + bw / 2, H * 1.1, 0, bx + bw / 2, H * 1.1, H * 0.7);
-    hl.addColorStop(0, 'rgba(255,225,170,.22)'); hl.addColorStop(1, 'rgba(255,200,120,0)');
-    ctx.fillStyle = hl; ctx.fillRect(0, hz, W, H - hz);
+// ---- the cover, alive: routes run across the map, lights glow on the truck, sparks rise ----
+// coordinates are pixels of the 1920x350 cover; the overlay uses the same box, so they stay on target when it is cropped
+const MAPDOTS = [[1689, 111], [1829, 139], [1622, 136], [1758, 156], [1650, 108], [1814, 76], [1872, 103], [1734, 67], [1664, 164], [1772, 65], [1867, 183], [1703, 171], [1739, 126], [1846, 54]];
+const ROUTES = [[2, 0], [0, 12], [12, 3], [3, 1], [7, 9], [9, 5], [5, 6], [6, 1], [4, 8], [8, 11], [11, 3], [1, 10], [13, 5]];
+const ROOF = [[549, 157], [572, 161], [596, 164], [619, 167]], HEADS = [[521, 287], [651, 299]];
+function coverHero() {
+  const g = (cx, cy, r, cls, i) => svg('circle', { cx, cy, r, class: cls, style: { '--i': i } });
+  const routes = ROUTES.map(([a, b], i) => {
+    const [x1, y1] = MAPDOTS[a], [x2, y2] = MAPDOTS[b], mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - Math.hypot(x2 - x1, y2 - y1) * 0.35;
+    return svg('path', { d: `M${x1} ${y1}Q${mx} ${my} ${x2} ${y2}`, class: 'run', pathLength: 100, style: { '--i': i } });
+  });
+  const over = svg('svg', { class: 'cover-fx', viewBox: '0 0 1920 350', preserveAspectRatio: 'none', 'aria-hidden': 'true' },
+    svg('defs', null, svg('radialGradient', { id: 'gl' }, svg('stop', { offset: '0', 'stop-color': '#ffd59a', 'stop-opacity': '.95' }), svg('stop', { offset: '.35', 'stop-color': '#ff9a3c', 'stop-opacity': '.45' }), svg('stop', { offset: '1', 'stop-color': '#ff7a1a', 'stop-opacity': '0' })),
+      svg('radialGradient', { id: 'sun' }, svg('stop', { offset: '0', 'stop-color': '#ffcf8a', 'stop-opacity': '.8' }), svg('stop', { offset: '1', 'stop-color': '#ff7a1a', 'stop-opacity': '0' }))),
+    svg('ellipse', { cx: 1431, cy: 345, rx: 260, ry: 120, fill: 'url(#sun)', class: 'sun' }),
+    routes, MAPDOTS.map(([x, y], i) => [g(x, y, 16, 'halo', i), g(x, y, 3.2, 'node', i)]),
+    ROOF.map(([x, y], i) => svg('circle', { cx: x, cy: y, r: 22, fill: 'url(#gl)', class: 'roof', style: { '--i': i } })),
+    HEADS.map(([x, y], i) => svg('circle', { cx: x, cy: y, r: 46, fill: 'url(#gl)', class: 'head', style: { '--i': i } })));
+  const sparks = h('canvas', { class: 'sparks', 'aria-hidden': 'true' });
+  const band = h('div', { class: 'band', 'aria-hidden': 'true' },
+    h('div', { class: 'pan' }, h('div', { class: 'frame' }, h('img', { class: 'cover', src: '/img/cover.webp', alt: '', fetchpriority: 'high' }), over)),
+    sparks, h('div', { class: 'leak' }), h('div', { class: 'grain' }));
+  setTimeout(() => embers(sparks), 0);
+  // the picture leans a little toward the pointer
+  if (!REDUCED && matchMedia('(pointer: fine)').matches) {
+    let tx = 0, ty = 0, x = 0, y = 0, raf = 0, on = true;
+    const pm = (e) => { tx = e.clientX / innerWidth - 0.5; ty = e.clientY / innerHeight - 0.5; };
+    const loop = () => { if (!on) return; x += (tx - x) * 0.04; y += (ty - y) * 0.04; band.style.setProperty('--px', `${(-x * 30).toFixed(1)}px`); band.style.setProperty('--py', `${(-y * 18).toFixed(1)}px`); raf = requestAnimationFrame(loop); };
+    addEventListener('pointermove', pm, { passive: true }); raf = requestAnimationFrame(loop);
+    cleanups.push(() => { on = false; cancelAnimationFrame(raf); removeEventListener('pointermove', pm); });
   }
-  function loop(now) { if (!run) return; draw(now); raf = requestAnimationFrame(loop); }
-  const set = (v) => { if (v && !run && !REDUCED) { run = true; raf = requestAnimationFrame(loop); } else if (!v) { run = false; cancelAnimationFrame(raf); } };
-  const io = new IntersectionObserver(([e]) => set(e.isIntersecting && !document.hidden)); io.observe(cv);
-  const vis = () => set(!document.hidden); document.addEventListener('visibilitychange', vis);
-  const pm = (e) => { tmx = e.clientX / innerWidth - 0.5; }; addEventListener('pointermove', pm, { passive: true });
+  return band;
+}
+function embers(cv) {
+  if (REDUCED) return;
+  const ctx = cv.getContext('2d'); let W = 0, H = 0, run = false, last = 0;
+  const parts = Array.from({ length: 46 }, () => spawn(true));
+  function spawn(any) { return { x: Math.random(), y: any ? Math.random() : 1.05, v: 0.03 + Math.random() * 0.07, s: 0.6 + Math.random() * 1.8, w: Math.random() * 6.28, a: 0.3 + Math.random() * 0.6 }; }
+  const size = () => { const d = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * d; cv.height = H * d; ctx.setTransform(d, 0, 0, d, 0, 0); };
+  function frame(t) {
+    if (!run) return; const dt = Math.min(0.05, (t - last) / 1000); last = t;
+    ctx.clearRect(0, 0, W, H);
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i]; p.y -= p.v * dt; p.w += dt * 1.6; p.x += Math.sin(p.w) * 0.0004;
+      if (p.y < -0.05) parts[i] = spawn(false);
+      const x = p.x * W, y = p.y * H, gr = ctx.createRadialGradient(x, y, 0, x, y, p.s * 4);
+      gr.addColorStop(0, `rgba(255,200,130,${p.a})`); gr.addColorStop(1, 'rgba(255,120,40,0)');
+      ctx.fillStyle = gr; ctx.fillRect(x - p.s * 4, y - p.s * 4, p.s * 8, p.s * 8);
+    }
+    requestAnimationFrame(frame);
+  }
+  const set = (v) => { if (v && !run) { run = true; last = performance.now(); requestAnimationFrame(frame); } else if (!v) run = false; };
   const ro = new ResizeObserver(size); ro.observe(cv);
-  cleanups.push(() => { set(false); io.disconnect(); ro.disconnect(); document.removeEventListener('visibilitychange', vis); removeEventListener('pointermove', pm); });
+  const io = new IntersectionObserver(([e]) => set(e.isIntersecting && !document.hidden)); io.observe(cv);
+  cleanups.push(() => { set(false); ro.disconnect(); io.disconnect(); });
+}
+// the hero sinks a little as the page scrolls
+function scrollFx() {
+  const f = () => document.documentElement.style.setProperty('--sc', Math.min(1, scrollY / 600).toFixed(3));
+  addEventListener('scroll', f, { passive: true }); f(); cleanups.push(() => removeEventListener('scroll', f));
+}
+function medallion(big) {
+  return h('div', { class: `medal${big ? ' big' : ''}`, 'aria-hidden': 'true' }, h('span', { class: 'ring' }), h('img', { src: '/img/logo-512.webp', alt: '', width: 512, height: 512 }), h('span', { class: 'shine' }));
 }
 
 // a mechanical counter: each digit is a reel that rolls into place
@@ -182,76 +174,131 @@ function bill(j) {
     h('div', { class: 'way' }, h('div', { class: 'r' }, h('span', { text: j.from || '?' }), icon('arrow', 16), h('span', { text: j.to || '?' })),
       h('div', { class: 'c', text: [j.cargo, j.mass ? `${(j.mass / 1000).toFixed(1)} t` : null, j.truck].filter(Boolean).join(' · ') })),
     h('div', { class: 'k num' }, n0(j.km), h('small', { text: 'km' })),
-    h('div', { class: 'm num' }, cash(j.income, j.game), h('small', { text: `avarii ${j.dmg}%` })));
+    h('div', { class: 'm num' }, cash(j.income, j.game), h('small', { text: `damage ${j.dmg}%` })));
 }
 function convoyCard(c, full) {
   const d = new Date(c.start), soon = c.start - Date.now();
   const card = h('article', { class: `convoy panel rv${c.image ? ' has-img' : ''}`, style: c.image ? { '--img': `url("${String(c.image).replace(/["\\\n]/g, '')}")` } : null },
-    h('div', { class: 'date' }, h('b', { text: d.getDate() }), h('span', { text: d.toLocaleDateString('ro-RO', { month: 'short' }).replace('.', '') }), h('small', { text: timeL(c.start) })),
+    h('div', { class: 'date' }, h('b', { text: d.getDate() }), h('span', { text: d.toLocaleDateString('en-GB', { month: 'short' }).replace('.', '') }), h('small', { text: timeL(c.start) })),
     h('div', null,
-      h('h3', null, c.title, c.tmp ? h('span', { class: 'badge-tmp', text: c.kind === 'host' ? 'TruckersMP' : 'Participăm' }) : null),
+      h('h3', null, c.title, c.tmp ? h('span', { class: 'badge-tmp', text: c.kind === 'host' ? 'TruckersMP' : 'Attending' }) : null),
       (c.from || c.to) ? h('div', { class: 'route' }, h('span', { text: c.from || '?' }), h('i'), h('span', { text: c.to || '?' })) : null,
       h('div', { class: 'facts' },
-        soon > 0 ? h('span', null, icon('clock', 16), 'Pornim în ', h('span', { class: 'count', 'data-until': c.start, text: until(c.start) })) : h('span', null, icon('clock', 16), soon > -3 * 3600_000 ? 'E pe drum acum' : 'S-a încheiat'),
+        soon > 0 ? h('span', null, icon('clock', 16), 'Departs in ', h('span', { class: 'count', 'data-until': c.start, text: until(c.start) })) : h('span', null, icon('clock', 16), soon > -3 * 3600_000 ? 'On the road now' : 'Finished'),
         c.server ? h('span', null, icon('server', 16), c.server) : null, c.meet ? h('span', null, icon('pin', 16), c.meet) : null, h('span', { class: `game ${c.game}`, text: c.game })),
       full && c.dlc ? h('p', { class: 'desc', text: `DLC: ${c.dlc}` }) : null,
       full && c.desc ? h('p', { class: 'desc', text: c.desc }) : null),
     h('div', { class: 'rsvp' },
-      c.tmp ? h('a', { class: 'btn ghost small', href: c.link, target: '_blank', rel: 'noopener' }, 'Vezi pe TruckersMP', icon('out', 16))
-        : [faces(c), soon > -3 * 3600_000 ? rsvpButtons(c) : null, S.role && full ? h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Ștergi convoiul „${c.title}”?`)) act('/api/convoys/remove', { id: c.id }, render); } }, 'Șterge') : null]));
+      c.tmp ? h('a', { class: 'btn ghost small', href: c.link, target: '_blank', rel: 'noopener' }, 'View on TruckersMP', icon('out', 16))
+        : [faces(c), soon > -3 * 3600_000 ? rsvpButtons(c) : null, S.role && full ? h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Delete the convoy "${c.title}"?`)) act('/api/convoys/remove', { id: c.id }, render); } }, 'Delete') : null]));
   return card;
 }
 function faces(c) {
-  if (!c.yes?.length && !c.maybe) return h('span', { class: 'muted small', text: 'Nimeni confirmat încă' });
-  return h('div', { class: 'faces' }, c.yes.slice(0, 6).map((p) => av(p.avatar, p.name)), h('span', { class: 'more', text: `${c.yes.length} vin${c.maybe ? `, ${c.maybe} poate` : ''}` }));
+  if (!c.yes?.length && !c.maybe) return h('span', { class: 'muted small', text: 'Nobody has confirmed yet' });
+  return h('div', { class: 'faces' }, c.yes.slice(0, 6).map((p) => av(p.avatar, p.name)), h('span', { class: 'more', text: `${c.yes.length} going${c.maybe ? `, ${c.maybe} maybe` : ''}` }));
 }
 function rsvpButtons(c) {
-  if (!S.user) return S.login ? h('a', { class: 'btn small', href: '/auth/login' }, 'Intră ca să confirmi') : null;
-  const opts = [['yes', 'Vin'], ['maybe', 'Poate'], ['no', 'Nu vin']];
-  return h('div', { class: 'seg', role: 'group', 'aria-label': 'Vii la convoi?' }, opts.map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(c.mine === k), onclick: () => act('/api/rsvp', { id: c.id, status: k }, render) }, l)));
+  if (!S.user) return S.login ? h('a', { class: 'btn small', href: '/auth/login' }, 'Log in to RSVP') : null;
+  const opts = [['yes', 'Going'], ['maybe', 'Maybe'], ['no', 'Not going']];
+  return h('div', { class: 'seg', role: 'group', 'aria-label': 'Are you coming?' }, opts.map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(c.mine === k), onclick: () => act('/api/rsvp', { id: c.id, status: k }, render) }, l)));
 }
 
 // ---- pages ----
+const VALUES = [
+  ['flag', 'Weekly convoys', 'We drive together on TruckersMP, with the route posted in advance, a meeting point and someone leading the column.'],
+  ['truck', 'Jobs log themselves', 'With Trucky running, every delivery goes straight into the company logbook. Nothing to fill in by hand.'],
+  ['trophy', 'Ranks you earn', 'Every kilometre you deliver moves you up. Leaderboards reset every week and every month.'],
+  ['users', 'People you can count on', 'On voice during convoys, and around to help when your trailer breaks down or you lose the road.'],
+];
+const STEPS = [
+  ['Apply on the site', 'Log in with Discord and fill in the form. It takes two minutes.'],
+  ['Staff gets back to you', 'You get a Discord message, usually the same day.'],
+  ['Join the company on Trucky', 'Install Trucky and join Diesel Union so your jobs are counted.'],
+  ['Drive your first convoy', 'We introduce you to the crew and hit the road together.'],
+];
+const FAQ = [
+  ['Do I have to play on TruckersMP?', 'Convoys are on TruckersMP. Jobs can be single player too: Trucky counts both.'],
+  ['Which DLCs do I need?', 'None are required. When a convoy needs a map DLC, the announcement says so in advance.'],
+  ['ETS2 or ATS?', 'Both. Every job is logged under its own game.'],
+  ['Is there a minimum distance?', 'It is not a race. What matters is staying active and joining convoys when you can.'],
+  ['How are ranks worked out?', 'From the total kilometres you deliver with Trucky since joining. The thresholds are shown above.'],
+];
+
 async function pageHome() {
   const r = await api('/api/home');
-  if (!r.ok) return [empty('Nu se încarcă', 'Portalul nu răspunde acum. Reîncarcă pagina peste un minut.')];
-  const d = r.data, cv = h('canvas', { 'aria-hidden': 'true' });
-  const hero = h('section', { class: 'hero' }, cv,
-    h('div', { class: 'hero-in' },
-      h('span', { class: 'kick' }, h('i'), `VTC pe TruckersMP${S.cfg.tag ? ` · [${S.cfg.tag}]` : ''}`),
-      h('h1', { 'aria-label': S.cfg.name }, ...splitName(S.cfg.name)),
+  const d = r.ok ? r.data : { tot: { month: {}, week: {}, all: {} }, next: [], drivers: 0 };
+  const scrollTo_ = () => $('#despre')?.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+  const [w1, ...rest] = String(S.cfg.name || '').trim().split(/\s+/);
+  const hero = h('section', { class: 'hero' }, coverHero(),
+    h('div', { class: 'hero-in' }, medallion(true),
+      h('h1', { 'aria-label': S.cfg.name }, h('span', { class: 'a', text: w1 || '' }), rest.length ? h('span', { class: 'b', text: rest.join(' ') }) : null),
       h('p', { class: 'tagline', text: S.cfg.tagline }),
-      h('div', { class: 'cta' }, S.cfg.recruitOpen ? h('a', { class: 'btn', href: '#/aplica' }, 'Aplică în VTC', icon('arrow', 18)) : null, h('a', { class: 'btn ghost', href: '#/convoaie' }, 'Vezi convoaiele'))));
-  setTimeout(() => highway(cv), 0);
-  const m = d.tot.month;
-  const odo = h('section', { class: 'odo', 'aria-label': 'Luna asta' },
-    h('div', null, h('div', { class: 'lbl', text: 'Kilometri luna asta' }), h('div', { style: { display: 'flex' } }, odometer(m.km, 6), h('span', { class: 'unit', text: 'km' })), h('div', { class: 'sub', text: `${kmS(d.tot.all.km)} de la început` })),
-    h('div', null, h('div', { class: 'lbl', text: 'Curse livrate' }), odometer(m.jobs, 3), h('div', { class: 'sub', text: `${n0(d.tot.week.jobs)} săptămâna asta` })),
-    h('div', null, h('div', { class: 'lbl', text: 'Tone transportate' }), odometer(m.mass / 1000, 4), h('div', { class: 'sub', text: 'luna asta' })),
-    h('div', null, h('div', { class: 'lbl', text: 'Șoferi activi' }), odometer(m.drivers, 2), h('div', { class: 'sub', text: `din ${d.drivers} în VTC` })));
+      h('p', { class: 'lead', text: `A virtual trucking company on TruckersMP${S.cfg.tag ? `, tag [${S.cfg.tag}]` : ''}. Euro Truck Simulator 2 and American Truck Simulator.` }),
+      h('div', { class: 'cta' }, S.cfg.recruitOpen && !S.member ? h('a', { class: 'btn', href: '#/aplica' }, 'Apply to join', icon('arrow', 18)) : S.member ? h('a', { class: 'btn', href: '#/curse' }, 'Company jobs', icon('arrow', 18)) : null,
+        h('button', { class: 'btn ghost', type: 'button', onclick: scrollTo_ }, 'Learn more'))),
+    h('button', { class: 'cue', type: 'button', 'aria-label': 'Scroll down', onclick: scrollTo_ }, h('span')));
+  scrollFx();
+  const m = d.tot.month || {};
+  const odo = h('section', { class: 'odo', 'aria-label': 'This month' },
+    h('div', null, h('div', { class: 'lbl', text: 'Kilometres this month' }), h('div', { style: { display: 'flex' } }, odometer(m.km, 6), h('span', { class: 'unit', text: 'km' })), h('div', { class: 'sub', text: `${kmS(d.tot.all?.km)} since day one` })),
+    h('div', null, h('div', { class: 'lbl', text: 'Jobs delivered' }), odometer(m.jobs, 3), h('div', { class: 'sub', text: `${n0(d.tot.week?.jobs)} this week` })),
+    h('div', null, h('div', { class: 'lbl', text: 'Tonnes hauled' }), odometer((m.mass || 0) / 1000, 4), h('div', { class: 'sub', text: 'this month' })),
+    h('div', null, h('div', { class: 'lbl', text: 'Drivers' }), odometer(d.drivers, 2), h('div', { class: 'sub', text: `${n0(m.drivers)} active this month` })));
   const out = [hero, odo];
-  if (d.next.length) out.push(h('section', { class: 'sec' }, head('Următorul convoi', null, '#/convoaie', 'Toate convoaiele'), h('div', { class: 'convoys' }, d.next.slice(0, 1).map((c) => convoyCard(c, false)))));
-  if (d.top.length) out.push(h('section', { class: 'sec' }, head('Topul lunii', 'După kilometri parcurși.', '#/clasament', 'Clasamentul complet'), podium(d.top, 'km')));
-  out.push(h('section', { class: 'sec livefeed' }, head('Ultimele livrări', null, '#/curse', 'Toate cursele'),
-    d.recent.length ? h('div', { class: 'bills' }, d.recent.map(bill)) : empty('Nicio cursă încă', 'Cursele apar aici imediat ce un șofer livrează cu Trucky pornit.'),
-    h('p', { class: 'small muted', style: { marginTop: '12px' } }, h('span', { class: 'dot' }), d.synced ? `Sincronizat cu Trucky ${ago(d.synced)}` : 'Așteptăm prima sincronizare cu Trucky.')));
+
+  // members get their corner first
+  if (S.member && (d.top?.length || d.recent?.length)) out.push(h('section', { class: 'sec' }, head('Driver corner', 'Only members can see this part.', '#/clasament', 'Full leaderboard'),
+    d.top?.length ? podium(d.top, 'km') : null, d.recent?.length ? h('div', { class: 'bills', style: { marginTop: '22px' } }, d.recent.slice(0, 5).map(bill)) : null));
+
+  out.push(h('section', { class: 'sec about', id: 'despre' },
+    h('div', { class: 'about-copy rv' }, h('span', { class: 'eyebrow', text: 'About us' }), h('h2', { text: 'United by the road.' }), h('p', { text: S.cfg.about }),
+      h('div', { class: 'links' }, S.cfg.discordInvite ? h('a', { class: 'btn ghost small', href: S.cfg.discordInvite, target: '_blank', rel: 'noopener' }, icon('discord', 16), 'Discord server') : null,
+        S.cfg.tmpUrl ? h('a', { class: 'btn ghost small', href: S.cfg.tmpUrl, target: '_blank', rel: 'noopener' }, 'TruckersMP page', icon('out', 14)) : null)),
+    h('div', { class: 'values' }, VALUES.map(([ic, t, x]) => h('article', { class: 'value rv' }, h('span', { class: 'vi' }, icon(ic, 22)), h('h3', { text: t }), h('p', { text: x }))))));
+
+  if (d.next.length) out.push(h('section', { class: 'sec' }, head('Next convoy', 'Convoys are open to anyone who wants to get to know us.', '#/convoaie', 'All convoys'), h('div', { class: 'convoys' }, d.next.slice(0, 1).map((c) => convoyCard(c, false)))));
+
+  if (S.cfg.ranks?.length) {
+    const top = S.cfg.ranks[S.cfg.ranks.length - 1].km || 1;
+    out.push(h('section', { class: 'sec' }, head('Ranks', 'Earned with delivered kilometres, not handed out.'),
+      h('div', { class: 'ladder rv' }, h('i', { class: 'lane' }), S.cfg.ranks.map((rk, i) => h('div', { class: 'rung', style: { '--x': `${(Math.sqrt(rk.km / top) * 92 + 4).toFixed(1)}%`, '--i': i } },
+        h('span', { class: 'pin' }, chevrons({ index: i })), h('b', { text: rk.name }), h('small', { class: 'num', text: i ? `${n0(rk.km)} km` : 'start' }))))));
+  }
+
+  out.push(h('section', { class: 'sec' }, head('How to join', 'Four steps, from the form to your first convoy.'),
+    h('ol', { class: 'steps' }, STEPS.map(([t, x], i) => h('li', { class: 'step rv', style: { '--i': i } }, h('span', { class: 'no', text: String(i + 1).padStart(2, '0') }), h('h3', { text: t }), h('p', { text: x }))))));
+
+  out.push(h('section', { class: 'sec reqs' },
+    h('div', { class: 'rv' }, h('span', { class: 'eyebrow', text: 'What we ask' }), h('h2', { text: 'Not much, but we mean it.' }),
+      h('ul', { class: 'checks' }, (S.cfg.requirements || []).map((x) => h('li', null, h('span', { class: 'ck' }, icon('check', 16)), x)))),
+    h('div', { class: 'join rv' }, medallion(false), h('h3', { text: S.cfg.recruitOpen ? 'Ready to roll?' : 'Recruitment is closed' }),
+      h('p', { text: S.cfg.recruitOpen ? 'Fill in the form and we will see you at the next convoy.' : 'Follow us on Discord: we announce it there when we reopen.' }),
+      S.member ? h('a', { class: 'btn', href: '#/soferi' }, 'See the drivers') : S.cfg.recruitOpen ? h('a', { class: 'btn', href: '#/aplica' }, 'Apply now', icon('arrow', 18)) : S.cfg.discordInvite ? h('a', { class: 'btn', href: S.cfg.discordInvite, target: '_blank', rel: 'noopener' }, 'Join our Discord') : null)));
+
+  out.push(h('section', { class: 'sec' }, head('FAQ'), h('div', { class: 'faq' }, FAQ.map(([q, a]) => h('details', { class: 'rv' }, h('summary', null, q, icon('chev', 18)), h('p', { text: a }))))));
   return out;
 }
-function splitName(name) {
-  const w = String(name || '').trim().split(/\s+/);
-  if (w.length < 2) return [h('span', { class: 'a', text: name })];
-  return [h('span', { class: 'a', text: w.slice(0, Math.ceil(w.length / 2)).join(' ') }), h('span', { class: 'b', text: w.slice(Math.ceil(w.length / 2)).join(' ') })];
+
+// private pages: only drivers of the VTC (linked to Trucky, with the member role, or staff)
+function gate(title) {
+  const head_ = h('div', { class: 'pagehead' }, h('h1', { text: title }));
+  let body;
+  if (!S.user) body = empty('Drivers only', 'Log in with Discord. If you drive for Diesel Union, you will see everything.', loginBtn());
+  else body = empty('Drivers only', 'Your Discord account is not linked to a Trucky driver.', h('div', { class: 'actions', style: { justifyContent: 'center' } }, h('a', { class: 'btn', href: '#/cont' }, icon('link', 18), 'Link your account'), S.cfg.recruitOpen ? h('a', { class: 'btn ghost', href: '#/aplica' }, 'Apply to join') : null));
+  return [head_, h('div', { class: 'sec locked' }, h('span', { class: 'lockico' }, icon('lock', 28)), body)];
 }
+
 function podium(rows, metric) {
-  const fmt = (r) => (metric === 'km' ? kmS(r.v) : metric === 'jobs' ? plural(r.v, 'cursă', 'curse') : n0(r.v));
+  const fmt = (r) => (metric === 'km' ? kmS(r.v) : metric === 'jobs' ? plural(r.v, 'job', 'jobs') : n0(r.v));
   return h('div', { class: 'podium' }, rows.slice(0, 3).map((r, i) => h('button', { class: `place p${i + 1}`, type: 'button', onclick: () => openDriver(r.id) },
     av(r.avatar, r.name), h('span', { class: 'nm', text: r.name }), h('span', { class: 'val num', text: fmt(r) }), h('span', { class: 'rk' }, chevrons(r.rank), ' ', r.rank?.name || ''), h('span', { class: 'plinth', text: i + 1 }))));
 }
 
 async function pageDrivers() {
+  if (!S.member) return gate('Drivers');
   const r = await api('/api/drivers'), list = r.ok ? r.data.drivers : [];
   const grid = h('div', { class: 'drivers' });
-  const q = h('input', { class: 'field', type: 'search', placeholder: 'Caută un șofer', 'aria-label': 'Caută un șofer' });
+  const q = h('input', { class: 'field', type: 'search', placeholder: 'Search drivers', 'aria-label': 'Search drivers' });
   let sort = 'km';
   const paint = () => {
     const t = q.value.trim().toLowerCase();
@@ -260,18 +307,18 @@ async function pageDrivers() {
       const next = d.rank.next, k = next ? (d.km - d.rank.from) / (next.km - d.rank.from) : 1;
       return h('button', { class: 'driver rv', type: 'button', onclick: () => openDriver(d.id) },
         av(d.avatar, d.name), h('div', null, h('b', { text: d.name }), h('span', { class: 'rk' }, chevrons(d.rank), d.rank.name, d.role ? ` · ${d.role}` : '')),
-        h('div', { class: 'kms' }, h('span', null, h('b', { class: 'num', text: n0(d.km) }), ' km'), h('span', { text: d.monthKm ? `+${n0(d.monthKm)} luna asta` : d.joined ? `din ${new Date(d.joined).toLocaleDateString('ro-RO', { month: 'short', year: 'numeric' })}` : '' })),
-        h('span', { class: 'prog', title: next ? `${kmS(next.km - d.km)} până la ${next.name}` : 'Rangul maxim' }, h('i', { style: { width: `${Math.round(Math.min(1, Math.max(0.02, k)) * 100)}%` } })));
+        h('div', { class: 'kms' }, h('span', null, h('b', { class: 'num', text: n0(d.km) }), ' km'), h('span', { text: d.monthKm ? `+${n0(d.monthKm)} this month` : d.joined ? `since ${new Date(d.joined).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}` : '' })),
+        h('span', { class: 'prog', title: next ? `${kmS(next.km - d.km)} to ${next.name}` : 'Top rank' }, h('i', { style: { width: `${Math.round(Math.min(1, Math.max(0.02, k)) * 100)}%` } })));
     }));
-    if (!rows.length) grid.replaceChildren(empty(list.length ? 'Niciun șofer cu numele ăsta' : 'Niciun șofer încă', list.length ? 'Încearcă alt nume.' : 'Lista se umple singură din Trucky.'));
+    if (!rows.length) grid.replaceChildren(empty(list.length ? 'No driver by that name' : 'No drivers yet', list.length ? 'Try another name.' : 'The list fills itself from Trucky.'));
     reveal(grid);
   };
   q.addEventListener('input', paint);
-  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Ordonează' }, [['km', 'Kilometri'], ['monthKm', 'Luna asta'], ['joined', 'Vechime'], ['name', 'Nume']].map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(sort === k), onclick: (e) => { sort = k; for (const b of e.currentTarget.parentNode.children) b.setAttribute('aria-pressed', String(b === e.currentTarget)); paint(); } }, l)));
+  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Sort' }, [['km', 'Kilometres'], ['monthKm', 'This month'], ['joined', 'Seniority'], ['name', 'Name']].map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(sort === k), onclick: (e) => { sort = k; for (const b of e.currentTarget.parentNode.children) b.setAttribute('aria-pressed', String(b === e.currentTarget)); paint(); } }, l)));
   paint();
-  return [h('div', { class: 'pagehead' }, h('h1', { text: 'Șoferi' }), h('p', { text: `${plural(list.length, 'șofer', 'șoferi')} în ${S.cfg.name}. Rangul crește cu fiecare kilometru livrat cu Trucky.` })),
+  return [h('div', { class: 'pagehead' }, h('h1', { text: 'Drivers' }), h('p', { text: `${plural(list.length, 'driver', 'drivers')} at ${S.cfg.name}. Your rank grows with every kilometre delivered with Trucky.` })),
     h('div', { class: 'toolbar' }, q, seg), grid,
-    h('section', { class: 'sec' }, head('Rangurile', 'Se urcă automat după kilometrii totali.'), h('div', { class: 'ranks' }, S.cfg.ranks.map((rk, i) => h('div', { class: 'rrow', style: { cursor: 'default', gridTemplateColumns: '40px minmax(0,1fr) auto' } }, h('span', { class: 'pos' }, chevrons({ index: i })), h('span', { class: 'nm', text: rk.name }), h('span', { class: 'v num', text: i ? `${n0(rk.km)} km` : 'start' })))))];
+    h('section', { class: 'sec' }, head('Ranks', 'You move up automatically with your total kilometres.'), h('div', { class: 'ranks' }, S.cfg.ranks.map((rk, i) => h('div', { class: 'rrow', style: { cursor: 'default', gridTemplateColumns: '40px minmax(0,1fr) auto' } }, h('span', { class: 'pos' }, chevrons({ index: i })), h('span', { class: 'nm', text: rk.name }), h('span', { class: 'v num', text: i ? `${n0(rk.km)} km` : 'start' })))))];
 }
 
 async function openDriver(id) {
@@ -280,34 +327,35 @@ async function openDriver(id) {
   if (location.hash !== `#/soferi/${id}`) history.replaceState(null, '', `#/soferi/${id}`);
   const r = await api(`/api/driver?id=${encodeURIComponent(id)}`);
   if (dr.hidden) return;
-  if (!r.ok) { dr.replaceChildren(h('button', { class: 'x', type: 'button', 'aria-label': 'Închide', onclick: closeDrawer }, icon('x', 18)), h('div', { class: 'in' }, empty('Șoferul nu există', 'Poate a plecat din VTC.'))); return; }
+  if (!r.ok) { dr.replaceChildren(h('button', { class: 'x', type: 'button', 'aria-label': 'Close', onclick: closeDrawer }, icon('x', 18)), h('div', { class: 'in' }, empty('Driver not found', 'They may have left the company.'))); return; }
   const p = r.data, next = p.rank.next, k = next ? (p.km - p.rank.from) / (next.km - p.rank.from) : 1;
   const max = Math.max(1, ...p.months.map((m) => m.km)), W = 460, H = 150, bw = W / p.months.length;
-  const chart = svg('svg', { class: 'chart', viewBox: `0 0 ${W} ${H + 24}`, role: 'img', 'aria-label': 'Kilometri în ultimele șase luni' },
+  const chart = svg('svg', { class: 'chart', viewBox: `0 0 ${W} ${H + 24}`, role: 'img', 'aria-label': 'Kilometres over the last six months' },
     p.months.map((m, i) => { const hh = Math.max(2, (m.km / max) * H); return [svg('rect', { x: i * bw + 10, y: H - hh, width: bw - 20, height: hh, rx: 5, fill: i === p.months.length - 1 ? '#f2a03d' : '#8a5a2b', style: { '--i': i } }), svg('text', { x: i * bw + bw / 2, y: H + 18, 'text-anchor': 'middle', text: m.label }), m.km ? svg('text', { x: i * bw + bw / 2, y: H - hh - 6, 'text-anchor': 'middle', text: n0(m.km) }) : null]; }));
   dr.replaceChildren(
-    h('button', { class: 'x', type: 'button', 'aria-label': 'Închide', onclick: closeDrawer }, icon('x', 18)),
+    h('button', { class: 'x', type: 'button', 'aria-label': 'Close', onclick: closeDrawer }, icon('x', 18)),
     h('div', { class: 'in' },
       h('div', { class: 'prof' }, av(p.avatar, p.name), h('div', null, h('h2', { text: p.name }), h('div', { class: 'rk' }, chevrons(p.rank), p.rank.name, p.role ? h('span', { class: 'muted', text: `· ${p.role}` }) : null))),
-      h('p', { class: 'muted small', text: [p.joined ? `În VTC din ${dateL(p.joined)}` : null, p.last ? `ultima cursă ${ago(p.last)}` : null].filter(Boolean).join(', ') }),
+      h('p', { class: 'muted small', text: [p.joined ? `Driving for us since ${dateL(p.joined)}` : null, p.last ? `last job ${ago(p.last)}` : null].filter(Boolean).join(', ') }),
       h('div', { class: 'tiles' },
-        h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.km) }), h('span', { text: 'km în total' })),
-        h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.jobs) }), h('span', { text: 'curse livrate' })),
-        h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.month?.km || 0) }), h('span', { text: 'km luna asta' })),
-        h('div', { class: 'tile' }, h('b', { class: 'num', text: `${p.avgDmg}%` }), h('span', { text: 'avarii medii' })),
-        h('div', { class: 'tile' }, h('b', { class: 'num', text: p.longest ? n0(p.longest.km) : '0' }), h('span', { text: 'cea mai lungă cursă' })),
-        h('div', { class: 'tile' }, h('b', { text: p.games.ATS > p.games.ETS2 ? 'ATS' : 'ETS2' }), h('span', { text: 'jocul preferat' }))),
-      h('div', { class: 'next' }, next ? [h('b', { text: `${kmS(next.km - p.km)} până la ${next.name}` }), h('span', { class: 'prog' }, h('i', { style: { width: `${Math.round(Math.max(0.02, k) * 100)}%` } }))] : h('b', { text: 'A ajuns la cel mai mare rang.' })),
-      h('h3', { text: 'Ultimele șase luni' }), chart,
-      p.fav ? h('p', { class: 'muted small', text: `Livrează cel mai des în ${p.fav}.` }) : null,
-      h('h3', { text: 'Ultimele curse' }),
-      p.recent.length ? h('div', { class: 'mini' }, p.recent.map((j) => h('div', { class: 'bill' }, h('div', { class: 'way' }, h('div', { class: 'r' }, h('span', { text: j.from }), icon('arrow', 14), h('span', { text: j.to })), h('div', { class: 'c', text: `${j.cargo} · ${ago(j.end)}` })), h('div', { class: 'k num' }, n0(j.km), h('small', { text: 'km' }))))) : h('p', { class: 'muted', text: 'Nicio cursă încă.' })));
+        h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.km) }), h('span', { text: 'km in total' })),
+        h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.jobs) }), h('span', { text: 'jobs delivered' })),
+        h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.month?.km || 0) }), h('span', { text: 'km this month' })),
+        h('div', { class: 'tile' }, h('b', { class: 'num', text: `${p.avgDmg}%` }), h('span', { text: 'average damage' })),
+        h('div', { class: 'tile' }, h('b', { class: 'num', text: p.longest ? n0(p.longest.km) : '0' }), h('span', { text: 'longest job (km)' })),
+        h('div', { class: 'tile' }, h('b', { text: p.games.ATS > p.games.ETS2 ? 'ATS' : 'ETS2' }), h('span', { text: 'favourite game' }))),
+      h('div', { class: 'next' }, next ? [h('b', { text: `${kmS(next.km - p.km)} to ${next.name}` }), h('span', { class: 'prog' }, h('i', { style: { width: `${Math.round(Math.max(0.02, k) * 100)}%` } }))] : h('b', { text: 'Reached the top rank.' })),
+      h('h3', { text: 'Last six months' }), chart,
+      p.fav ? h('p', { class: 'muted small', text: `Delivers most often to ${p.fav}.` }) : null,
+      h('h3', { text: 'Recent jobs' }),
+      p.recent.length ? h('div', { class: 'mini' }, p.recent.map((j) => h('div', { class: 'bill' }, h('div', { class: 'way' }, h('div', { class: 'r' }, h('span', { text: j.from }), icon('arrow', 14), h('span', { text: j.to })), h('div', { class: 'c', text: `${j.cargo} · ${ago(j.end)}` })), h('div', { class: 'k num' }, n0(j.km), h('small', { text: 'km' }))))) : h('p', { class: 'muted', text: 'No jobs yet.' })));
 }
 function closeDrawer() { $('#drawer').hidden = true; $('#scrim').hidden = true; document.body.classList.remove('lock'); if (/^#\/soferi\/./.test(location.hash)) history.replaceState(null, '', '#/soferi'); }
 
 async function pageJobs() {
+  if (!S.member) return gate('Jobs');
   const F = { period: 'month', game: '', q: '', page: 0 };
-  const list = h('div', { class: 'bills' }), summary = h('p', { class: 'muted' }), more = h('button', { class: 'btn ghost', type: 'button', hidden: true, onclick: () => load(false) }, 'Mai multe curse');
+  const list = h('div', { class: 'bills' }), summary = h('p', { class: 'muted' }), more = h('button', { class: 'btn ghost', type: 'button', hidden: true, onclick: () => load(false) }, 'More jobs');
   let tok = 0;
   async function load(reset) {
     if (reset) { F.page = 0; list.replaceChildren(...skel(5, 64)); }
@@ -316,46 +364,47 @@ async function pageJobs() {
     if (reset) list.replaceChildren();
     const d = r.ok ? r.data : { jobs: [], total: 0, km: 0, pages: 0 };
     list.append(...d.jobs.map(bill)); reveal(list);
-    summary.textContent = d.total ? `${plural(d.total, 'cursă', 'curse')}, ${kmS(d.km)} în total.` : '';
-    if (!d.total) list.replaceChildren(empty('Nicio cursă', 'Nu e nicio cursă livrată cu filtrele astea.'));
+    summary.textContent = d.total ? `${plural(d.total, 'job', 'jobs')}, ${kmS(d.km)} in total.` : '';
+    if (!d.total) list.replaceChildren(empty('No jobs', 'No delivered jobs match these filters.'));
     F.page++; more.hidden = F.page >= d.pages;
   }
   const seg = (key, opts) => h('div', { class: 'seg', role: 'group' }, opts.map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(F[key] === v), onclick: (e) => { F[key] = v; for (const b of e.currentTarget.parentNode.children) b.setAttribute('aria-pressed', String(b === e.currentTarget)); load(true); } }, l)));
-  let t; const q = h('input', { class: 'field', type: 'search', placeholder: 'Oraș, marfă sau șofer', 'aria-label': 'Caută în curse', oninput: () => { clearTimeout(t); t = setTimeout(() => { F.q = q.value.trim(); load(true); }, 300); } });
+  let t; const q = h('input', { class: 'field', type: 'search', placeholder: 'City, cargo or driver', 'aria-label': 'Search jobs', oninput: () => { clearTimeout(t); t = setTimeout(() => { F.q = q.value.trim(); load(true); }, 300); } });
   load(true);
-  return [h('div', { class: 'pagehead' }, h('h1', { text: 'Curse' }), h('p', { text: 'Fiecare livrare a VTC-ului, cum a venit din Trucky.' })),
-    h('div', { class: 'toolbar' }, q, seg('period', [['week', 'Săptămâna asta'], ['month', 'Luna asta'], ['all', 'Toate']]), seg('game', [['', 'Ambele jocuri'], ['ETS2', 'ETS2'], ['ATS', 'ATS']])),
+  return [h('div', { class: 'pagehead' }, h('h1', { text: 'Jobs' }), h('p', { text: 'Every delivery the company made, straight from Trucky.' })),
+    h('div', { class: 'toolbar' }, q, seg('period', [['week', 'This week'], ['month', 'This month'], ['all', 'All time']]), seg('game', [['', 'Both games'], ['ETS2', 'ETS2'], ['ATS', 'ATS']])),
     summary, list, h('p', { style: { textAlign: 'center', marginTop: '18px' } }, more)];
 }
 
 async function pageBoard() {
+  if (!S.member) return gate('Leaderboard');
   const F = { period: 'month', metric: 'km' };
   const body = h('div');
   async function load() {
     body.replaceChildren(...skel(2, 160));
     const r = await api(`/api/board?period=${F.period}&metric=${F.metric}`), rows = r.ok ? r.data.rows : [];
-    if (!rows.length) return body.replaceChildren(h('div', { class: 'sec' }, empty('Nicio cursă încă', 'Clasamentul se umple cu prima livrare din perioada asta.')));
+    if (!rows.length) return body.replaceChildren(h('div', { class: 'sec' }, empty('No jobs yet', 'The leaderboard fills up with the first delivery of this period.')));
     const max = rows[0].v, fmt = (v) => (F.metric === 'km' ? kmS(v) : F.metric === 'jobs' ? n0(v) : n0(v));
     body.replaceChildren(h('div', { class: 'sec anim' }, podium(rows, F.metric)),
       h('div', { class: 'ranks' }, rows.slice(3).map((r, i) => h('button', { class: 'rrow rv', type: 'button', onclick: () => openDriver(r.id) },
-        h('span', { class: 'pos num', text: i + 4 }), av(r.avatar, r.name), h('span', { class: 'nm' }, r.name, h('small', { text: `${r.rank?.name || ''} · ${plural(r.jobsP, 'cursă', 'curse')}` })),
+        h('span', { class: 'pos num', text: i + 4 }), av(r.avatar, r.name), h('span', { class: 'nm' }, r.name, h('small', { text: `${r.rank?.name || ''} · ${plural(r.jobsP, 'job', 'jobs')}` })),
         h('span', { class: 'bar' }, h('i', { style: { width: `${Math.max(2, (r.v / max) * 100)}%` } })), h('span', { class: 'v num', text: fmt(r.v) })))));
     reveal(body);
   }
   const seg = (key, opts) => h('div', { class: 'seg', role: 'group' }, opts.map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(F[key] === v), onclick: (e) => { F[key] = v; for (const b of e.currentTarget.parentNode.children) b.setAttribute('aria-pressed', String(b === e.currentTarget)); load(); } }, l)));
   load();
-  return [h('div', { class: 'pagehead' }, h('h1', { text: 'Clasament' }), h('p', { text: 'Săptămâna începe luni, luna pe 1, după ora României.' })),
-    h('div', { class: 'toolbar' }, seg('period', [['week', 'Săptămâna asta'], ['month', 'Luna asta'], ['all', 'Total']]), seg('metric', [['km', 'Kilometri'], ['income', 'Venit'], ['jobs', 'Curse']])), body];
+  return [h('div', { class: 'pagehead' }, h('h1', { text: 'Leaderboard' }), h('p', { text: 'Weeks start on Monday and months on the 1st, Romanian time.' })),
+    h('div', { class: 'toolbar' }, seg('period', [['week', 'This week'], ['month', 'This month'], ['all', 'All time']]), seg('metric', [['km', 'Kilometres'], ['income', 'Income'], ['jobs', 'Jobs']])), body];
 }
 
 async function pageConvoys() {
   const r = await api('/api/convoys'), d = r.ok ? r.data : { convoys: [], tmp: [] };
   const up = d.convoys.filter((c) => c.start > Date.now() - 3 * 3600_000), past = d.convoys.filter((c) => c.start <= Date.now() - 3 * 3600_000).reverse().slice(0, 6);
-  const out = [h('div', { class: 'pagehead' }, h('h1', { text: 'Convoaie' }), h('p', { text: 'Ieșim împreună pe drum. Confirmă dacă vii și botul îți amintește cu o oră înainte, pe Discord.' }))];
+  const out = [h('div', { class: 'pagehead' }, h('h1', { text: 'Convoys' }), h('p', { text: 'We hit the road together. RSVP and the bot reminds you on Discord an hour before.' }))];
   if (S.role) out.push(convoyForm());
-  out.push(h('section', { class: 'sec' }, head('Programate'), up.length ? h('div', { class: 'convoys' }, up.map((c) => convoyCard(c, true))) : empty('Niciun convoi programat', S.role ? 'Adaugă unul din formularul de mai sus.' : 'Staff-ul anunță următorul convoi aici și pe Discord.')));
-  if (d.tmp.length) out.push(h('section', { class: 'sec' }, head('Pe TruckersMP', 'Evenimente organizate sau la care participă VTC-ul.'), h('div', { class: 'convoys' }, d.tmp.map((c) => convoyCard(c, false)))));
-  if (past.length) out.push(h('section', { class: 'sec' }, head('Au fost'), h('div', { class: 'convoys' }, past.map((c) => convoyCard(c, false)))));
+  out.push(h('section', { class: 'sec' }, head('Upcoming'), up.length ? h('div', { class: 'convoys' }, up.map((c) => convoyCard(c, true))) : empty('No convoys planned', S.role ? 'Add one with the form above.' : 'Staff announce the next convoy here and on Discord.')));
+  if (d.tmp.length) out.push(h('section', { class: 'sec' }, head('On TruckersMP', 'Events the company hosts or attends.'), h('div', { class: 'convoys' }, d.tmp.map((c) => convoyCard(c, false)))));
+  if (past.length) out.push(h('section', { class: 'sec' }, head('Past convoys'), h('div', { class: 'convoys' }, past.map((c) => convoyCard(c, false)))));
   return out;
 }
 function convoyForm() {
@@ -363,128 +412,132 @@ function convoyForm() {
   const field = (k, label, attrs = {}) => { f[k] = h(attrs.tag || 'input', { class: 'field', id: `cv-${k}`, ...attrs, tag: undefined }); return h('div', null, h('label', { class: 'lab', for: `cv-${k}`, text: label }), f[k]); };
   const game = h('select', { class: 'field', id: 'cv-game' }, h('option', { value: 'ETS2' }, 'Euro Truck Simulator 2'), h('option', { value: 'ATS' }, 'American Truck Simulator'));
   const ann = h('input', { type: 'checkbox', checked: true });
-  const box = h('details', { class: 'panel card sec' }, h('summary', { style: { cursor: 'pointer', fontWeight: 700 } }, 'Adaugă un convoi'),
-    h('div', { class: 'two' }, field('title', 'Titlu', { type: 'text', maxlength: 80, placeholder: 'De exemplu: Convoiul de vineri' }), field('start', 'Data și ora', { type: 'datetime-local' }), h('div', null, h('label', { class: 'lab', for: 'cv-game', text: 'Joc' }), game), field('server', 'Server', { type: 'text', maxlength: 40, placeholder: 'Simulation 1' })),
-    h('div', { class: 'two' }, field('from', 'Plecare', { type: 'text', maxlength: 60, placeholder: 'Calais, Euroacres' }), field('to', 'Destinație', { type: 'text', maxlength: 60, placeholder: 'Duisburg, Posped' }), field('meet', 'Loc de întâlnire', { type: 'text', maxlength: 80 }), field('dlc', 'DLC necesar', { type: 'text', maxlength: 120, placeholder: 'Niciunul' })),
-    field('desc', 'Detalii', { tag: 'textarea', maxlength: 1500 }), field('image', 'Imagine (link), opțional', { type: 'url', placeholder: 'https://' }),
-    h('label', { class: 'check' }, ann, 'Anunță convoiul pe Discord'),
+  const box = h('details', { class: 'panel card sec' }, h('summary', { style: { cursor: 'pointer', fontWeight: 700 } }, 'Add a convoy'),
+    h('div', { class: 'two' }, field('title', 'Title', { type: 'text', maxlength: 80, placeholder: 'For example: Friday night convoy' }), field('start', 'Date and time', { type: 'datetime-local' }), h('div', null, h('label', { class: 'lab', for: 'cv-game', text: 'Game' }), game), field('server', 'Server', { type: 'text', maxlength: 40, placeholder: 'Simulation 1' })),
+    h('div', { class: 'two' }, field('from', 'Departure', { type: 'text', maxlength: 60, placeholder: 'Calais, Euroacres' }), field('to', 'Destination', { type: 'text', maxlength: 60, placeholder: 'Duisburg, Posped' }), field('meet', 'Meeting point', { type: 'text', maxlength: 80 }), field('dlc', 'Required DLC', { type: 'text', maxlength: 120, placeholder: 'None' })),
+    field('desc', 'Details', { tag: 'textarea', maxlength: 1500 }), field('image', 'Image link, optional', { type: 'url', placeholder: 'https://' }),
+    h('label', { class: 'check' }, ann, 'Announce it on Discord'),
     h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: async () => {
       const start = f.start.value ? new Date(f.start.value).getTime() : 0;
       await act('/api/convoys', { title: f.title.value, start, game: game.value, server: f.server.value, from: f.from.value, to: f.to.value, meet: f.meet.value, dlc: f.dlc.value, desc: f.desc.value, image: f.image.value, announce: ann.checked }, render);
-    } }, icon('flag', 18), 'Adaugă convoiul')));
+    } }, icon('flag', 18), 'Add convoy')));
   return box;
 }
 
 async function pageApply() {
-  const head_ = h('div', { class: 'pagehead' }, h('h1', { text: 'Aplică' }), h('p', { text: `Vrei să conduci cu ${S.cfg.name}? Completează formularul și staff-ul îți răspunde pe Discord.` }));
-  if (!S.user) return [head_, h('div', { class: 'sec' }, empty('Intră cu Discord', 'Ca să știm cui să răspundem.', loginBtn()))];
-  if (S.driver) return [head_, h('div', { class: 'sec' }, empty('Ești deja în VTC', `Contul tău e legat de ${S.driver.name}.`, h('a', { class: 'btn ghost', href: `#/soferi/${S.driver.id}` }, 'Vezi profilul tău')))];
+  const head_ = h('div', { class: 'pagehead' }, h('h1', { text: 'Apply' }), h('p', { text: `Want to drive with ${S.cfg.name}? Fill in the form and staff will reply on Discord.` }));
+  if (!S.user) return [head_, h('div', { class: 'sec' }, empty('Log in with Discord', 'So we know who to reply to.', loginBtn()))];
+  if (S.driver) return [head_, h('div', { class: 'sec' }, empty('You already drive for us', `Your account is linked to ${S.driver.name}.`, h('a', { class: 'btn ghost', href: `#/soferi/${S.driver.id}` }, 'See your profile')))];
   const r = await api('/api/apply'), mine = r.data.app;
-  if (mine?.status === 'pending') return [head_, h('div', { class: 'sec' }, empty('Aplicarea ta e în așteptare', `Trimisă ${ago(mine.at)}. Primești răspuns pe Discord.`))];
-  if (!r.data.open) return [head_, h('div', { class: 'sec' }, empty('Recrutările sunt închise', 'Revino mai târziu sau urmărește anunțurile de pe Discord.'))];
+  if (mine?.status === 'pending') return [head_, h('div', { class: 'sec' }, empty('Your application is pending', `Sent ${ago(mine.at)}. You will get an answer on Discord.`))];
+  if (!r.data.open) return [head_, h('div', { class: 'sec' }, empty('Recruitment is closed', 'Check back later or follow the announcements on Discord.'))];
   const steam = h('input', { class: 'field', id: 'ap-steam', type: 'text', placeholder: 'https://steamcommunity.com/profiles/7656119…' });
-  const tmp = h('input', { class: 'field', id: 'ap-tmp', type: 'text', placeholder: 'Link sau ID TruckersMP' });
+  const tmp = h('input', { class: 'field', id: 'ap-tmp', type: 'text', placeholder: 'TruckersMP link or ID' });
   const age = h('input', { class: 'field', id: 'ap-age', type: 'number', min: 13, max: 99 });
-  const from = h('input', { class: 'field', id: 'ap-from', type: 'text', maxlength: 80, placeholder: 'Oraș sau țară' });
-  const hours = h('input', { class: 'field', id: 'ap-hours', type: 'text', maxlength: 40, placeholder: 'De exemplu: 10 ore pe săptămână' });
-  const why = h('textarea', { class: 'field', id: 'ap-why', maxlength: 1200, placeholder: 'De când joci, ce-ți place să transporți, de ce Diesel Union.' });
+  const from = h('input', { class: 'field', id: 'ap-from', type: 'text', maxlength: 80, placeholder: 'City or country' });
+  const hours = h('input', { class: 'field', id: 'ap-hours', type: 'text', maxlength: 40, placeholder: 'For example: 10 hours a week' });
+  const why = h('textarea', { class: 'field', id: 'ap-why', maxlength: 1200, placeholder: 'How long you have played, what you like to haul, why Diesel Union.' });
   const ets = h('input', { type: 'checkbox', checked: true }), ats = h('input', { type: 'checkbox' }), rules = h('input', { type: 'checkbox' });
   return [head_,
-    mine?.status === 'rejected' ? h('p', { class: 'muted sec', text: `Ultima aplicare a fost respinsă ${ago(mine.decided)}.${mine.note ? ` Motiv: ${mine.note}` : ''}` }) : null,
+    mine?.status === 'rejected' ? h('p', { class: 'muted sec', text: `Your last application was declined ${ago(mine.decided)}.${mine.note ? ` Reason: ${mine.note}` : ''}` }) : null,
     h('section', { class: 'panel card sec' },
-      h('div', { class: 'two' }, h('div', null, h('label', { class: 'lab', for: 'ap-steam', text: 'Profilul de Steam' }), steam), h('div', null, h('label', { class: 'lab', for: 'ap-tmp', text: 'Profilul TruckersMP, opțional' }), tmp)),
-      h('div', { class: 'two' }, h('div', null, h('label', { class: 'lab', for: 'ap-age', text: 'Vârsta' }), age), h('div', null, h('label', { class: 'lab', for: 'ap-from', text: 'De unde ești' }), from), h('div', null, h('label', { class: 'lab', for: 'ap-hours', text: 'Cât joci' }), hours)),
-      h('p', { class: 'lab', style: { marginBottom: 0 }, text: 'Ce joci' }), h('div', { style: { display: 'flex', gap: '20px' } }, h('label', { class: 'check' }, ets, 'Euro Truck Simulator 2'), h('label', { class: 'check' }, ats, 'American Truck Simulator')),
-      h('label', { class: 'lab', for: 'ap-why', text: 'Despre tine' }), why,
-      h('label', { class: 'check' }, rules, 'Sunt de acord să folosesc Trucky la curse și să respect regulile VTC-ului și ale TruckersMP.'),
-      h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => act('/api/apply', { steam: steam.value, tmp: tmp.value, age: age.value, from: from.value, hours: hours.value, why: why.value, games: [ets.checked && 'ETS2', ats.checked && 'ATS'].filter(Boolean), rules: rules.checked }, render) }, icon('pen', 18), 'Trimite aplicarea')))];
+      h('div', { class: 'two' }, h('div', null, h('label', { class: 'lab', for: 'ap-steam', text: 'Steam profile' }), steam), h('div', null, h('label', { class: 'lab', for: 'ap-tmp', text: 'TruckersMP profile, optional' }), tmp)),
+      h('div', { class: 'two' }, h('div', null, h('label', { class: 'lab', for: 'ap-age', text: 'Age' }), age), h('div', null, h('label', { class: 'lab', for: 'ap-from', text: 'Where you are from' }), from), h('div', null, h('label', { class: 'lab', for: 'ap-hours', text: 'How much you play' }), hours)),
+      h('p', { class: 'lab', style: { marginBottom: 0 }, text: 'What you play' }), h('div', { style: { display: 'flex', gap: '20px' } }, h('label', { class: 'check' }, ets, 'Euro Truck Simulator 2'), h('label', { class: 'check' }, ats, 'American Truck Simulator')),
+      h('label', { class: 'lab', for: 'ap-why', text: 'About you' }), why,
+      h('label', { class: 'check' }, rules, 'I agree to run Trucky on my jobs and to follow the company and TruckersMP rules.'),
+      h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => act('/api/apply', { steam: steam.value, tmp: tmp.value, age: age.value, from: from.value, hours: hours.value, why: why.value, games: [ets.checked && 'ETS2', ats.checked && 'ATS'].filter(Boolean), rules: rules.checked }, render) }, icon('pen', 18), 'Send application')))];
 }
 
 async function pageAccount() {
-  const head_ = h('div', { class: 'pagehead' }, h('h1', { text: 'Contul meu' }), h('p', { text: 'Leagă-ți contul de Discord de șoferul tău din Trucky, ca să apară profilul la /profil și să știm cine ești la convoaie.' }));
-  if (!S.user) return [head_, h('div', { class: 'sec' }, empty('Intră cu Discord', 'Ca să-ți legi contul.', loginBtn()))];
-  if (S.driver) return [head_, h('section', { class: 'panel card sec' }, h('h2', { text: S.driver.name }), h('p', { class: 'muted', text: `Contul tău de Discord e legat de șoferul ${S.driver.name} din Trucky.` }),
-    h('div', { class: 'actions' }, h('a', { class: 'btn', href: `#/soferi/${S.driver.id}` }, 'Vezi profilul'), h('button', { class: 'btn ghost', type: 'button', onclick: () => act('/api/unlink', {}, boot) }, 'Dezleagă')))];
-  const r = await api('/api/drivers'), list = (r.ok ? r.data.drivers : []).sort((a, b) => a.name.localeCompare(b.name));
-  const sel = h('select', { class: 'field', id: 'lk-drv' }, h('option', { value: '' }, 'Alege-ți numele'), list.map((d) => h('option', { value: d.id }, d.name)));
+  const head_ = h('div', { class: 'pagehead' }, h('h1', { text: 'My account' }), h('p', { text: 'Link your Discord account to your Trucky driver, so you can see the members area and use /profile on Discord.' }));
+  if (!S.user) return [head_, h('div', { class: 'sec' }, empty('Log in with Discord', 'To link your account.', loginBtn()))];
+  if (S.driver) return [head_, h('section', { class: 'panel card sec' }, h('h2', { text: S.driver.name }), h('p', { class: 'muted', text: `Your Discord account is linked to the Trucky driver ${S.driver.name}.` }),
+    h('div', { class: 'actions' }, h('a', { class: 'btn', href: `#/soferi/${S.driver.id}` }, 'See profile'), h('button', { class: 'btn ghost', type: 'button', onclick: () => act('/api/unlink', {}, boot) }, 'Unlink')))];
   const steam = h('input', { class: 'field', id: 'lk-steam', type: 'text', placeholder: 'https://steamcommunity.com/profiles/7656119…' });
-  return [head_, h('section', { class: 'panel card sec' }, h('div', { class: 'two' }, h('div', null, h('label', { class: 'lab', for: 'lk-drv', text: 'Numele tău în Trucky' }), sel), h('div', null, h('label', { class: 'lab', for: 'lk-steam', text: 'Profilul de Steam (pentru verificare)' }), steam)),
-    h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => act('/api/link', { driver: sel.value, steam: steam.value }, boot) }, icon('link', 18), 'Leagă contul')),
-    !list.length ? h('p', { class: 'muted small', text: 'Lista e goală până la prima sincronizare cu Trucky.' }) : null)];
+  return [head_, h('section', { class: 'panel card sec' }, h('label', { class: 'lab', for: 'lk-steam', text: 'Your Steam profile, the same one you use in Trucky' }), steam,
+    h('p', { class: 'muted small', text: 'In Steam, open your profile, right-click and choose "Copy Page URL". It must contain the number starting with 7656119.' }),
+    h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => act('/api/link', { steam: steam.value }, boot) }, icon('link', 18), 'Link account')))];
 }
 
 async function pageStaff() {
-  if (!S.role) return [empty('Doar pentru staff', 'Pagina asta e pentru cei care conduc VTC-ul.')];
-  const r = await api('/api/staff'); if (!r.ok) return [empty('Nu se încarcă', r.data.error || 'Încearcă din nou.')];
+  if (!S.role) return [empty('Staff only', 'This page is for the people who run the company.')];
+  const r = await api('/api/staff'); if (!r.ok) return [empty('Could not load', r.data.error || 'Try again.')];
   const d = r.data, tab = S.staffTab || 'apps';
-  const tabs = h('div', { class: 'tabsline' }, [['apps', `Aplicări${d.apps.filter((a) => a.status === 'pending').length ? ` (${d.apps.filter((a) => a.status === 'pending').length})` : ''}`], ['trucky', 'Trucky'], ...(d.role === 'admin' ? [['cfg', 'Setări']] : [])].map(([k, l]) => h('button', { class: `btn small ${tab === k ? '' : 'ghost'}`, type: 'button', onclick: () => { S.staffTab = k; render(); } }, l)));
+  const tabs = h('div', { class: 'tabsline' }, [['apps', `Applications${d.apps.filter((a) => a.status === 'pending').length ? ` (${d.apps.filter((a) => a.status === 'pending').length})` : ''}`], ['trucky', 'Trucky'], ...(d.role === 'admin' ? [['cfg', 'Settings']] : [])].map(([k, l]) => h('button', { class: `btn small ${tab === k ? '' : 'ghost'}`, type: 'button', onclick: () => { S.staffTab = k; render(); } }, l)));
   const out = [h('div', { class: 'pagehead' }, h('h1', { text: 'Staff' })), tabs];
-  if (tab === 'apps') out.push(h('section', { class: 'sec apps' }, d.apps.length ? d.apps.map(appCard) : empty('Nicio aplicare', 'Când cineva aplică, apare aici și pe canalul de staff.')));
+  if (tab === 'apps') out.push(h('section', { class: 'sec apps' }, d.apps.length ? d.apps.map(appCard) : empty('No applications', 'When someone applies, it shows up here and in the staff channel.')));
   if (tab === 'trucky') {
     const s = d.sync, line = (ok, a, b) => h('div', null, h('b', { class: ok ? 'ok' : 'bad', text: a }), h('span', { class: 'muted small', text: b }));
     out.push(h('section', { class: 'sec' }, h('div', { class: 'status' },
-      line(!!S.cfg.trucky, S.cfg.trucky ? 'ID companie setat' : 'Lipsește ID-ul companiei', 'Trucky, Company Settings, API.'),
-      line(s.token, s.token ? 'Token setat' : 'Fără token', 'Variabila TRUCKY_TOKEN în Railway.'),
-      line(s.secret, s.secret ? 'Webhook semnat' : 'Webhook fără secret', 'Variabila TRUCKY_WEBHOOK_SECRET (recomandat).'),
-      line(!!s.lastHook, s.lastHook ? `Ultimul webhook ${ago(s.lastHook.at)}` : 'Niciun webhook primit', s.lastHook?.event || 'Adaugă adresa de mai jos în Trucky.'),
-      line(s.jobs?.ok, s.jobs?.at ? `Citit din API ${ago(s.jobs.at)}` : 'API necitit încă', s.jobs?.error || `${n0(s.stored)} curse salvate`),
-      line(s.members?.ok, s.members?.ok ? `${s.members.count} membri din Trucky` : 'Membrii nu s-au citit', s.members?.error || 'Se recitesc la jumătate de oră.')),
-    h('div', { class: 'panel card sec' }, h('h2', { text: 'Webhook' }), h('p', { class: 'muted', text: 'În Trucky, Company Settings, API, adaugă adresa asta și bifează evenimentele de curse (Job Completed, Canceled, Deleted) și de membri.' }), h('code', { class: 'copy', text: s.webhook }),
-      h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: (e) => { e.currentTarget.disabled = true; act('/api/sync', {}, render); } }, icon('refresh', 18), 'Sincronizează acum'))),
-    h('div', { class: 'panel card sec' }, h('h2', { text: 'Conturi legate' }), d.links.length ? h('div', { class: 'ranks' }, d.links.map((l) => h('div', { class: 'rrow', style: { gridTemplateColumns: 'minmax(0,1fr) auto', cursor: 'default' } }, h('span', { class: 'nm', text: `${l.name} · Discord ${l.discord}` }), h('button', { class: 'btn danger small', type: 'button', onclick: () => act('/api/staff/unlink', { discord: l.discord }, render) }, 'Dezleagă')))) : h('p', { class: 'muted', text: 'Nimeni nu și-a legat încă contul.' }))));
+      line(!!S.cfg.trucky, S.cfg.trucky ? 'Company ID set' : 'Company ID missing', 'Trucky, Company Settings, API.'),
+      line(s.token, s.token ? 'Token set' : 'No token', 'The TRUCKY_TOKEN variable on Railway.'),
+      line(s.secret, s.secret ? 'Webhook signed' : 'Webhook without a secret', 'The TRUCKY_WEBHOOK_SECRET variable (recommended).'),
+      line(!!s.lastHook, s.lastHook ? `Last webhook ${ago(s.lastHook.at)}` : 'No webhook received', s.lastHook?.event || 'Add the address below in Trucky.'),
+      line(s.jobs?.ok, s.jobs?.at ? `Read from the API ${ago(s.jobs.at)}` : 'API not read yet', s.jobs?.error || `${n0(s.stored)} jobs stored`),
+      line(s.members?.ok, s.members?.ok ? `${s.members.count} members from Trucky` : 'Members not read', s.members?.error || 'Re-read every half hour.')),
+    h('div', { class: 'panel card sec' }, h('h2', { text: 'Webhook' }), h('p', { class: 'muted', text: 'In Trucky, Company Settings, API, add this address and tick the job events (Job Completed, Canceled, Deleted) and the member events.' }), h('code', { class: 'copy', text: s.webhook }),
+      h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: (e) => { e.currentTarget.disabled = true; act('/api/sync', {}, render); } }, icon('refresh', 18), 'Sync now'))),
+    h('div', { class: 'panel card sec' }, h('h2', { text: 'Linked accounts' }), d.links.length ? h('div', { class: 'ranks' }, d.links.map((l) => h('div', { class: 'rrow', style: { gridTemplateColumns: 'minmax(0,1fr) auto', cursor: 'default' } }, h('span', { class: 'nm', text: `${l.name} · Discord ${l.discord}` }), h('button', { class: 'btn danger small', type: 'button', onclick: () => act('/api/staff/unlink', { discord: l.discord }, render) }, 'Unlink')))) : h('p', { class: 'muted', text: 'Nobody has linked an account yet.' }))));
   }
   if (tab === 'cfg' && d.cfg) out.push(...configForm(d.cfg, d.channels || []));
   return out;
 }
 function appCard(a) {
-  const note = h('input', { class: 'field', type: 'text', maxlength: 500, placeholder: 'Mesaj pentru el, opțional' }), tr = h('input', { type: 'checkbox', checked: true });
+  const note = h('input', { class: 'field', type: 'text', maxlength: 500, placeholder: 'Message to the applicant, optional' }), tr = h('input', { type: 'checkbox', checked: true });
   return h('article', { class: 'app panel rv' },
-    h('header', null, av(a.avatar, a.name), h('b', { text: a.name }), h('span', { class: `pill ${a.status}`, text: { pending: 'În așteptare', accepted: 'Acceptat', rejected: 'Respins' }[a.status] }), h('span', { class: 'muted small', text: ago(a.at) })),
+    h('header', null, av(a.avatar, a.name), h('b', { text: a.name }), h('span', { class: `pill ${a.status}`, text: { pending: 'Pending', accepted: 'Accepted', rejected: 'Declined' }[a.status] }), h('span', { class: 'muted small', text: ago(a.at) })),
     h('dl', null, h('dt', { text: 'Discord' }), h('dd', { text: a.discord }), h('dt', { text: 'Steam' }), h('dd', null, h('a', { href: `https://steamcommunity.com/profiles/${a.steam}`, target: '_blank', rel: 'noopener', text: a.steam })),
-      a.tmp ? [h('dt', { text: 'TruckersMP' }), h('dd', { text: a.tmp })] : null, h('dt', { text: 'Vârsta' }), h('dd', { text: a.age }), a.from ? [h('dt', { text: 'De unde' }), h('dd', { text: a.from })] : null,
-      h('dt', { text: 'Joacă' }), h('dd', { text: `${a.games.join(', ')}${a.hours ? ` · ${a.hours}` : ''}` }), a.by ? [h('dt', { text: 'Decis de' }), h('dd', { text: `${a.by}${a.note ? `: ${a.note}` : ''}` })] : null),
+      a.tmp ? [h('dt', { text: 'TruckersMP' }), h('dd', { text: a.tmp })] : null, h('dt', { text: 'Age' }), h('dd', { text: a.age }), a.from ? [h('dt', { text: 'From' }), h('dd', { text: a.from })] : null,
+      h('dt', { text: 'Plays' }), h('dd', { text: `${a.games.join(', ')}${a.hours ? ` · ${a.hours}` : ''}` }), a.by ? [h('dt', { text: 'Decided by' }), h('dd', { text: `${a.by}${a.note ? `: ${a.note}` : ''}` })] : null),
     h('div', { class: 'why', text: a.why }),
-    a.status === 'pending' ? [h('div', { class: 'two', style: { marginTop: '12px' } }, note), h('label', { class: 'check' }, tr, 'Adaugă-l și în compania din Trucky'),
-      h('div', { class: 'actions' }, h('button', { class: 'btn ok', type: 'button', onclick: () => act('/api/apply/decide', { id: a.id, accept: true, note: note.value, trucky: tr.checked }, render) }, 'Acceptă'), h('button', { class: 'btn danger', type: 'button', onclick: () => act('/api/apply/decide', { id: a.id, accept: false, note: note.value }, render) }, 'Respinge'))] : null);
+    a.status === 'pending' ? [h('div', { class: 'two', style: { marginTop: '12px' } }, note), h('label', { class: 'check' }, tr, 'Also add them to the company on Trucky'),
+      h('div', { class: 'actions' }, h('button', { class: 'btn ok', type: 'button', onclick: () => act('/api/apply/decide', { id: a.id, accept: true, note: note.value, trucky: tr.checked }, render) }, 'Accept'), h('button', { class: 'btn danger', type: 'button', onclick: () => act('/api/apply/decide', { id: a.id, accept: false, note: note.value }, render) }, 'Decline'))] : null);
 }
 function configForm(c, chans) {
-  const pick = (id, cur) => { const g = new Map(); for (const x of chans) { if (!g.has(x.group)) g.set(x.group, []); g.get(x.group).push(x); } return h('select', { class: 'field', id }, h('option', { value: '' }, 'Niciunul'), [...g].map(([n, xs]) => { const o = xs.map((x) => h('option', { value: x.id, selected: x.id === cur }, `# ${x.name}`)); return n ? h('optgroup', { label: n }, o) : o; })); };
+  const pick = (id, cur) => { const g = new Map(); for (const x of chans) { if (!g.has(x.group)) g.set(x.group, []); g.get(x.group).push(x); } return h('select', { class: 'field', id }, h('option', { value: '' }, 'None'), [...g].map(([n, xs]) => { const o = xs.map((x) => h('option', { value: x.id, selected: x.id === cur }, `# ${x.name}`)); return n ? h('optgroup', { label: n }, o) : o; })); };
   const inp = (id, v, a = {}) => h('input', { class: 'field', id, value: v ?? '', ...a });
-  const F = { name: inp('c-name', c.name, { maxlength: 40 }), tag: inp('c-tag', c.tag, { maxlength: 8 }), tagline: inp('c-tl', c.tagline, { maxlength: 90 }), truckyId: inp('c-tr', c.truckyId, { inputmode: 'numeric' }), tmpId: inp('c-tmp', c.tmpId, { placeholder: 'ID sau link truckersmp.com/vtc/…' }), minJobKm: inp('c-min', c.minJobKm, { type: 'number', min: 0, max: 2000 }),
+  const F = { name: inp('c-name', c.name, { maxlength: 40 }), tag: inp('c-tag', c.tag, { maxlength: 8 }), tagline: inp('c-tl', c.tagline, { maxlength: 90 }), truckyId: inp('c-tr', c.truckyId, { inputmode: 'numeric' }), tmpId: inp('c-tmp', c.tmpId, { placeholder: 'ID or truckersmp.com/vtc/… link' }), minJobKm: inp('c-min', c.minJobKm, { type: 'number', min: 0, max: 2000 }),
     jobsChannel: pick('c-jobs', c.jobsChannel), convoyChannel: pick('c-conv', c.convoyChannel), staffChannel: pick('c-staff', c.staffChannel) };
   const open = h('input', { type: 'checkbox', checked: c.recruitOpen });
+  const about = h('textarea', { class: 'field', id: 'c-about', maxlength: 1500 }); about.value = c.about || '';
+  const reqs = h('textarea', { class: 'field', id: 'c-reqs', maxlength: 1500 }); reqs.value = (c.requirements || []).join('\n');
+  const invite = inp('c-inv', c.discordInvite, { type: 'url', placeholder: 'https://discord.gg/…' });
   const rows = h('div', { class: 'rankrows' });
-  const addRow = (r = { name: '', km: '' }) => { const row = h('div', null, h('input', { class: 'field', value: r.name, placeholder: 'Nume rang', maxlength: 30, 'aria-label': 'Nume rang' }), h('input', { class: 'field', type: 'number', min: 0, value: r.km, 'aria-label': 'Kilometri' }), h('button', { class: 'btn danger small', type: 'button', 'aria-label': 'Șterge rangul', onclick: () => row.remove() }, icon('x', 16))); rows.append(row); };
+  const addRow = (r = { name: '', km: '' }) => { const row = h('div', null, h('input', { class: 'field', value: r.name, placeholder: 'Rank name', maxlength: 30, 'aria-label': 'Rank name' }), h('input', { class: 'field', type: 'number', min: 0, value: r.km, 'aria-label': 'Kilometres' }), h('button', { class: 'btn danger small', type: 'button', 'aria-label': 'Remove rank', onclick: () => row.remove() }, icon('x', 16))); rows.append(row); };
   c.ranks.forEach(addRow);
-  const save_ = () => act('/api/config', { ...Object.fromEntries(Object.entries(F).map(([k, el]) => [k, el.value])), recruitOpen: open.checked, ranks: [...rows.children].map((r) => ({ name: r.children[0].value, km: r.children[1].value })) }, boot);
+  const save_ = () => act('/api/config', { ...Object.fromEntries(Object.entries(F).map(([k, el]) => [k, el.value])), recruitOpen: open.checked, about: about.value, requirements: reqs.value.split('\n'), discordInvite: invite.value, ranks: [...rows.children].map((r) => ({ name: r.children[0].value, km: r.children[1].value })) }, boot);
   const lab = (el, t) => h('div', null, h('label', { class: 'lab', for: el.id, text: t }), el);
-  const test = (el) => h('button', { class: 'btn ghost small', type: 'button', style: { marginTop: '8px' }, onclick: () => (el.value ? act('/api/test', { channel: el.value }) : toast('Alege mai întâi canalul.', true)) }, 'Trimite un test');
+  const test = (el) => h('button', { class: 'btn ghost small', type: 'button', style: { marginTop: '8px' }, onclick: () => (el.value ? act('/api/test', { channel: el.value }) : toast('Pick a channel first.', true)) }, 'Send a test');
   return [
-    h('section', { class: 'panel card sec' }, h('h2', { text: 'VTC' }), h('div', { class: 'two' }, lab(F.name, 'Nume'), lab(F.tag, 'Tag'), lab(F.tagline, 'Motto')),
-      h('div', { class: 'two' }, lab(F.truckyId, 'ID companie Trucky'), lab(F.tmpId, 'VTC pe TruckersMP'), lab(F.minJobKm, 'Curse sub atâția km nu contează')), h('label', { class: 'check' }, open, 'Recrutări deschise')),
-    h('section', { class: 'panel card sec' }, h('h2', { text: 'Canale de Discord' }), chans.length ? null : h('p', { class: 'muted', text: 'Nu văd canale în care botul poate scrie (View Channel, Send Messages, Embed Links).' }),
-      h('div', { class: 'two' }, h('div', null, lab(F.jobsChannel, 'Livrări și ranguri noi'), test(F.jobsChannel)), h('div', null, lab(F.convoyChannel, 'Convoaie'), test(F.convoyChannel)), h('div', null, lab(F.staffChannel, 'Aplicări (staff)'), test(F.staffChannel)))),
-    h('section', { class: 'panel card sec' }, h('h2', { text: 'Ranguri' }), h('p', { class: 'muted', text: 'Kilometrii totali de la care se primește fiecare rang. Primul începe de la 0.' }), rows, h('div', { class: 'actions' }, h('button', { class: 'btn ghost small', type: 'button', onclick: () => addRow() }, 'Adaugă un rang'))),
-    h('p', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: save_ }, 'Salvează setările'))];
+    h('section', { class: 'panel card sec' }, h('h2', { text: 'Company' }), h('div', { class: 'two' }, lab(F.name, 'Name'), lab(F.tag, 'Tag'), lab(F.tagline, 'Tagline')),
+      h('div', { class: 'two' }, lab(F.truckyId, 'Trucky company ID'), lab(F.tmpId, 'TruckersMP VTC'), lab(F.minJobKm, 'Ignore jobs shorter than (km)')), h('label', { class: 'check' }, open, 'Recruitment open')),
+    h('section', { class: 'panel card sec' }, h('h2', { text: 'Front page' }), h('p', { class: 'muted', text: 'What newcomers see on the home page.' }), lab(about, 'About us'), lab(reqs, 'Requirements, one per line'), lab(invite, 'Discord server invite')),
+    h('section', { class: 'panel card sec' }, h('h2', { text: 'Discord channels' }), chans.length ? null : h('p', { class: 'muted', text: 'No channels the bot can post in (it needs View Channel, Send Messages, Embed Links).' }),
+      h('div', { class: 'two' }, h('div', null, lab(F.jobsChannel, 'Deliveries and rank-ups'), test(F.jobsChannel)), h('div', null, lab(F.convoyChannel, 'Convoys'), test(F.convoyChannel)), h('div', null, lab(F.staffChannel, 'Applications (staff)'), test(F.staffChannel)))),
+    h('section', { class: 'panel card sec' }, h('h2', { text: 'Ranks' }), h('p', { class: 'muted', text: 'Total kilometres needed for each rank. The first one starts at 0.' }), rows, h('div', { class: 'actions' }, h('button', { class: 'btn ghost small', type: 'button', onclick: () => addRow() }, 'Add a rank'))),
+    h('p', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: save_ }, 'Save settings'))];
 }
 
 // ---- shell ----
-const TABS = [['', 'Acasă', 'home'], ['soferi', 'Șoferi', 'users'], ['curse', 'Curse', 'truck'], ['clasament', 'Clasament', 'trophy'], ['convoaie', 'Convoaie', 'flag']];
+const TABS = [['', 'Home', 'home'], ['soferi', 'Drivers', 'users'], ['curse', 'Jobs', 'truck'], ['clasament', 'Leaderboard', 'trophy'], ['convoaie', 'Convoys', 'flag']];
 const PAGES = { '': pageHome, soferi: pageDrivers, curse: pageJobs, clasament: pageBoard, convoaie: pageConvoys, aplica: pageApply, cont: pageAccount, staff: pageStaff };
 const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/'); return { page: r[0] in PAGES ? r[0] : '', arg: r[1] || null }; };
 
 function shell() {
   const { page } = route();
-  const tabs = [...TABS, ...(S.cfg.recruitOpen && !S.driver ? [['aplica', 'Aplică', 'pen']] : [])];
+  const tabs = [['', 'Home', 'home'], ...(S.member ? [['soferi', 'Drivers', 'users'], ['curse', 'Jobs', 'truck'], ['clasament', 'Leaderboard', 'trophy']] : []), ['convoaie', 'Convoys', 'flag'], ...(S.cfg.recruitOpen && !S.member ? [['aplica', 'Apply', 'pen']] : [])];
   $('#nav').replaceChildren(...tabs.map(([k, l, ic]) => h('a', { href: `#/${k}`, 'aria-current': k === page ? 'page' : null }, icon(ic, 18), l)));
-  $('#tabbar').replaceChildren(...TABS.map(([k, l, ic]) => h('a', { href: `#/${k}`, 'aria-current': k === page ? 'page' : null }, icon(ic, 22), h('span', { text: l }))));
+  $('#tabbar').replaceChildren(...tabs.slice(0, 5).map(([k, l, ic]) => h('a', { href: `#/${k}`, 'aria-current': k === page ? 'page' : null }, icon(ic, 22), h('span', { text: l }))));
+  $('#tabbar').style.setProperty('--n', Math.min(5, tabs.length));
+  document.body.classList.toggle('on-home', page === '');
   const me = $('#me');
   if (S.user) {
-    const menu = h('div', { class: 'menu', hidden: true }, S.driver ? h('a', { href: `#/soferi/${S.driver.id}` }, icon('users', 18), 'Profilul meu') : null, h('a', { href: '#/cont' }, icon('link', 18), S.driver ? 'Contul meu' : 'Leagă-ți contul'),
-      !S.driver && S.cfg.recruitOpen ? h('a', { href: '#/aplica' }, icon('pen', 18), 'Aplică') : null, S.role ? h('a', { href: '#/staff' }, icon('gear', 18), 'Staff') : null, h('a', { href: '/auth/logout' }, icon('exit', 18), 'Ieși din cont'));
-    const btn = h('button', { class: 'who', type: 'button', 'aria-expanded': 'false', 'aria-label': `Cont: ${S.user.name}`, onclick: (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); } }, av(S.driver?.avatar || S.user.avatar, S.user.name), h('span', { text: S.driver?.name || S.user.name }));
+    const menu = h('div', { class: 'menu', hidden: true }, S.driver ? h('a', { href: `#/soferi/${S.driver.id}` }, icon('users', 18), 'My profile') : null, h('a', { href: '#/cont' }, icon('link', 18), S.driver ? 'My account' : 'Link your account'),
+      !S.member && S.cfg.recruitOpen ? h('a', { href: '#/aplica' }, icon('pen', 18), 'Apply') : null, S.role ? h('a', { href: '#/staff' }, icon('gear', 18), 'Staff') : null, h('a', { href: '/auth/logout' }, icon('exit', 18), 'Log out'));
+    const btn = h('button', { class: 'who', type: 'button', 'aria-expanded': 'false', 'aria-label': `Account: ${S.user.name}`, onclick: (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); } }, av(S.driver?.avatar || S.user.avatar, S.user.name), h('span', { text: S.driver?.name || S.user.name }));
     me.replaceChildren(btn, menu);
-  } else me.replaceChildren(S.login ? h('a', { class: 'btn small', href: '/auth/login' }, 'Intră cu Discord') : '');
+  } else me.replaceChildren(S.login ? h('a', { class: 'btn small', href: '/auth/login' }, 'Log in') : '');
 }
 document.addEventListener('click', () => { const m = $('#me .menu'); if (m) m.hidden = true; });
 
@@ -495,11 +548,11 @@ async function render() {
   for (const c of cleanups.splice(0)) c();
   shell();
   if (page !== lastPage) view.replaceChildren(...skel(3));
-  let nodes; try { nodes = await PAGES[page](); } catch (err) { console.error(err); nodes = [empty('Ceva nu a mers', 'Reîncarcă pagina peste un minut.')]; }
+  let nodes; try { nodes = await PAGES[page](); } catch (err) { console.error(err); nodes = [empty('Something went wrong', 'Reload the page in a minute.')]; }
   if (my !== tok) return;
   view.replaceChildren(...nodes.flat(Infinity).filter(Boolean));
   lastPage = page; reveal(view);
-  document.title = page ? `${(TABS.find((t) => t[0] === page) || [0, { aplica: 'Aplică', cont: 'Contul meu', staff: 'Staff' }[page]])[1]} · ${S.cfg.name}` : S.cfg.name;
+  document.title = page ? `${(TABS.find((t) => t[0] === page) || [0, { aplica: 'Apply', cont: 'My account', staff: 'Staff' }[page]])[1]} · ${S.cfg.name}` : S.cfg.name;
   if (page === 'soferi' && arg) openDriver(arg);
 }
 addEventListener('hashchange', () => { const { page, arg } = route(); if (!(page === 'soferi' && arg)) { closeDrawerOnly(); if (page !== lastPage) scrollTo(0, 0); } render(); });
@@ -516,9 +569,19 @@ setInterval(() => { for (const el of document.querySelectorAll('[data-until]')) 
 $('#scrim').addEventListener('click', closeDrawer);
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#drawer').hidden) closeDrawer(); });
 
+function intro() {
+  const el = $('#intro'); if (!el) return;
+  let seen = false; try { seen = sessionStorage.getItem('du-intro') === '1'; sessionStorage.setItem('du-intro', '1'); } catch { /* storage blocked */ }
+  if (seen || REDUCED) { el.remove(); return; }
+  document.body.classList.add('lock');
+  const go = () => { if (el.classList.contains('out')) return; el.classList.add('out'); document.body.classList.remove('lock'); setTimeout(() => el.remove(), 900); };
+  el.addEventListener('pointerdown', go); addEventListener('keydown', go, { once: true });
+  setTimeout(go, 2300);
+}
+intro();
 async function boot() {
   const r = await api('/api/me').catch(() => null);
-  if (r?.ok) Object.assign(S, { user: r.data.user, role: r.data.role, cfg: r.data.cfg, login: r.data.login, driver: r.data.driver });
+  if (r?.ok) Object.assign(S, { user: r.data.user, role: r.data.role, member: !!r.data.member, cfg: r.data.cfg, login: r.data.login, driver: r.data.driver });
   $('.brand-name').textContent = S.cfg.name;
   await render();
 }

@@ -32,7 +32,7 @@ function normJob(d) {
   const mass = num(d.cargo_mass) || num(d.cargo_unit_count) * num(d.cargo_unit_mass);
   return {
     id: String(d.id), status,
-    driver: String(driver.id ?? d.user_id ?? d.driver_id ?? ''), driverName: String(driver.name || d.driver_name || 'Șofer'), avatar: driver.avatar_url || driver.avatar || null,
+    driver: String(driver.id ?? d.user_id ?? d.driver_id ?? ''), driverName: String(driver.name || d.driver_name || 'Driver'), avatar: driver.avatar_url || driver.avatar || null,
     steam: String(driver.steam_profile?.steam_id || driver.steam_id || d.steam_id || ''),
     game: String(d.game?.code || d.game_code || d.game || 'ETS2').toUpperCase().includes('ATS') ? 'ATS' : 'ETS2',
     from: d.source_city_name || '', fromCo: d.source_company_name || '', to: d.destination_city_name || '', toCo: d.destination_company_name || '',
@@ -61,7 +61,7 @@ function normMember(m) {
   const u = m.user || m;
   const id = String(u.id ?? m.user_id ?? m.id ?? '');
   if (!id) return null;
-  return { id, name: String(u.name || m.name || 'Șofer'), avatar: u.avatar_url || m.avatar_url || null, steam: String(u.steam_profile?.steam_id || u.steam_id || m.steam_id || ''),
+  return { id, name: String(u.name || m.name || 'Driver'), avatar: u.avatar_url || m.avatar_url || null, steam: String(u.steam_profile?.steam_id || u.steam_id || m.steam_id || ''),
     role: String(m.role?.name || u.role?.name || m.role_name || ''), joined: when(m.joined_at || m.created_at || u.joined_at) || null };
 }
 function upsertMember(m, event) {
@@ -97,7 +97,7 @@ function webhook(body) {
 
 // ---- polling ----
 async function pollJobs(pages = 2) {
-  const id = cfg().truckyId; if (!id) return { ok: false, msg: 'Lipsește ID-ul companiei Trucky.' };
+  const id = cfg().truckyId; if (!id) return { ok: false, msg: 'The Trucky company ID is missing.' };
   let added = 0;
   for (let p = 1; p <= pages; p++) {
     const data = await getJson(`${API}/company/${encodeURIComponent(id)}/jobs?page=${p}&perPage=50&sortingField=updated_at&sortingDirection=desc`, { ttl: 60_000, headers: auth() });
@@ -129,9 +129,9 @@ async function company() {
 
 // add an accepted applicant to the company on Trucky (needs their Steam ID)
 async function addDriver(steamId, name) {
-  if (!token()) return { ok: false, msg: 'Fără token Trucky, adaugă-l manual în Trucky.' };
+  if (!token()) return { ok: false, msg: 'No Trucky token: add them in Trucky by hand.' };
   const r = await send('POST', `${API}/drivershub/members`, { steam_id: String(steamId), name: String(name || '').slice(0, 60) }, auth()).catch(() => ({ ok: false, data: null }));
-  return r.ok ? { ok: true, msg: 'Adăugat și în Trucky.' } : { ok: false, msg: `Trucky nu l-a adăugat${r.data?.message ? `: ${r.data.message}` : ''}. Poate e deja în alt VTC; trebuie să-l părăsească singur.` };
+  return r.ok ? { ok: true, msg: 'Also added on Trucky.' } : { ok: false, msg: `Trucky did not add them${r.data?.message ? `: ${r.data.message}` : ''}. They may still be in another company and have to leave it themselves.` };
 }
 
 module.exports = { normJob, upsertJob, normMember, verify, webhook, pollJobs, pollMembers, company, addDriver, on, rows };
