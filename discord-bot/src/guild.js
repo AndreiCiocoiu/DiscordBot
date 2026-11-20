@@ -59,7 +59,11 @@ const LAYOUT = [
 // which channel keys the rest of the bot posts to
 const FEEDS = { jobsChannel: 'deliveries', convoyChannel: 'convoys', staffChannel: 'applications' };
 
-const RANK_COLORS = [0xa1887f, 0xc08a5a, 0xd4a373, 0xb5651d, 0xe9a25b, 0xffc061, 0xffd98a, 0xfff0c4];
+// rank colours run from dusty brown (first rank) to bright gold (last)
+function rankColor(i, n) {
+  const a = [0x9e, 0x8a, 0x7c], z = [0xff, 0xd2, 0x6e], t = n > 1 ? i / (n - 1) : 1;
+  return a.reduce((c, v, k) => (c << 8) | Math.round(v + (z[k] - v) * Math.pow(t, 0.8)), 0);
+}
 const STAFF_PERMS = [P.ManageMessages, P.ModerateMembers, P.MuteMembers, P.MoveMembers, P.ManageThreads, P.ManageNicknames];
 // the leadership and team roles, top to bottom. staff: true = can review applications, sees the Staff category and the staff pages on the website
 const ROLE_DEFS = () => [
@@ -72,7 +76,7 @@ const ROLE_DEFS = () => [
   { key: 'staff', name: 'Staff', color: 0xa65f33, hoist: true, staff: true, perms: STAFF_PERMS },
   { key: 'dotm', name: 'Driver of the Month', color: 0xffd36b, hoist: true, perms: [] },
   // rank roles, highest first so they stack in the member list
-  ...[...cfg().ranks].sort((a, b) => b.km - a.km).map((r, i, all) => ({ key: `rank:${r.name}`, name: r.name, color: RANK_COLORS[Math.min(all.length - 1 - i, RANK_COLORS.length - 1)], hoist: true, perms: [] })),
+  ...tiers().slice().reverse().map((t, i, all) => ({ key: `rank:${t.name}`, name: t.name, color: rankColor(all.length - 1 - i, all.length), hoist: true, perms: [] })),
   { key: 'member', name: 'Union Member', color: 0, hoist: false, perms: [] },
   { key: 'approved', name: 'Approved', color: 0x8f8f8f, hoist: false, perms: [] },
 ];
@@ -92,6 +96,17 @@ function ping(kind) {
   // the panel calls this one "@everyone": it reaches every driver, without pinging people who are only visiting the server
   if ((kind === 'members' || kind === 'members-hidden') && role) return { content: kind === 'members' ? `<@&${role}>` : `||<@&${role}>||`, allowedMentions: { roles: [role] } };
   return { content: undefined, allowedMentions: { parse: [] } };
+}
+// ranks are grouped into tiers by name: "Driver III" belongs to the tier "Driver". Discord gets one role per tier.
+const tierOf = (name) => String(name || '').replace(/\s+(?:[IVX]+|\d+)$/, '').trim() || String(name || '');
+function tiers() {
+  const out = [];
+  for (const r of [...cfg().ranks].sort((a, b) => a.km - b.km)) {
+    const t = tierOf(r.name), last = out[out.length - 1];
+    if (last && last.name === t) { last.levels.push(r); continue; }
+    out.push({ name: t, from: r.km, levels: [r] });
+  }
+  return out;
 }
 const rankRoleIds = () => Object.entries(roles()).filter(([k]) => k.startsWith('rank:')).map(([, v]) => v);
 const ch = (k) => (db.config.channels || {})[k] || null;
@@ -130,7 +145,13 @@ async function setup(g, { hideOthers = false } = {}) {
     db.config.roles[d.key] = r.id; made.push(r);
   }
   // keep the rank list in step with the ranks set on the website
-  for (const k of Object.keys(db.config.roles)) if (k.startsWith('rank:') && !cfg().ranks.some((r) => `rank:${r.name}` === k)) delete db.config.roles[k];
+  const tierKeys = new Set(tiers().map((t) => `rank:${t.name}`));
+  for (const k of Object.keys(db.config.roles)) {
+    if (!k.startsWith('rank:') || tierKeys.has(k)) continue;
+    const old = g.roles.cache.get(db.config.roles[k]); // a rank role from an older ladder: remove it from the server
+    if (old && !old.managed && old.position < me.roles.highest.position) { await old.delete('Diesel Union: rank no longer used').catch(() => {}); log.push(`- removed old rank role ${old.name}`); }
+    delete db.config.roles[k];
+  }
   // order them under the bot's own role, in the order above
   const top = me.roles.highest.position;
   const order = made.filter((r) => r.position < top);
@@ -235,8 +256,8 @@ function linksPanel() {
 function ranksPanel() {
   const list = [...cfg().ranks].sort((a, b) => a.km - b.km);
   const e = new EmbedBuilder().setColor(AMBER).setTitle('Ranks')
-    .setDescription(['Your rank comes from the total kilometres you drive for Diesel Union on Trucky. The bot gives you the role by itself when you reach it.', '',
-      ...list.map((r) => `${roles()[`rank:${r.name}`] ? `<@&${roles()[`rank:${r.name}`]}>` : `**${r.name}**`}  ${r.km ? `from ${km(r.km)}` : 'when you join'}`)].join('\n'));
+    .setDescription(['Your rank comes from the total kilometres you drive for Diesel Union on Trucky. There are 9 tiers with 5 levels each. Your Discord role is your tier and changes by itself; your level (I to V) shows on the website and in /profile.', '',
+      ...tiers().map((t) => `${roles()[`rank:${t.name}`] ? `<@&${roles()[`rank:${t.name}`]}>` : `**${t.name}**`}  ${t.levels.length === 1 ? (t.from ? `from ${km(t.from)}` : 'when you join') : t.levels.map((l) => `${l.name.slice(t.name.length).trim() || l.name} ${l.km ? km(l.km) : 'start'}`).join(' · ')}`)].join('\n'));
   return { embeds: [e], allowedMentions: { parse: [] } };
 }
 function rulesPanel() {
@@ -314,11 +335,11 @@ function checklist(p, hasApproved) {
 async function syncRank(gm) {
   const tid = db.links[gm.id]; if (!tid) return null;
   const p = stats.profile(tid); if (!p) return null;
-  const want = roles()[`rank:${p.rank.name}`]; if (!want) return p.rank.name;
+  const want = roles()[`rank:${tierOf(p.rank.name)}`]; if (!want) return p.rank.name;
   const drop = rankRoleIds().filter((r) => r !== want && gm.roles.cache.has(r));
   if (drop.length) await gm.roles.remove(drop, 'Diesel Union rank').catch((err) => console.warn('rank remove:', err.message));
   if (!gm.roles.cache.has(want)) await gm.roles.add(want, 'Diesel Union rank').catch((err) => console.warn('rank add:', err.message));
   return p.rank.name;
 }
 
-module.exports = { teamsOf, MEDIA_KEYS, ping, LAYOUT, FEEDS, setup, refreshPanels, applyPanel, setupPanel, linksPanel, ranksPanel, setupSteps, links, linkRow, progress, checklist, syncRank, roleId, staffRoleIds, rankRoleIds, ch };
+module.exports = { tierOf, tiers, teamsOf, MEDIA_KEYS, ping, LAYOUT, FEEDS, setup, refreshPanels, applyPanel, setupPanel, linksPanel, ranksPanel, setupSteps, links, linkRow, progress, checklist, syncRank, roleId, staffRoleIds, rankRoleIds, ch };

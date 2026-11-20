@@ -339,3 +339,28 @@ body.on-home .top { background: rgba(16,13,10,.92); border-bottom-color: rgba(23
 .md .md-h { font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: 1.1em; margin: .4em 0 .4em; color: var(--cream); }
 .convoy .md.desc { margin-top: 12px; color: var(--sand); }
 .dc-prev .md p { margin: 0 0 .5em; } .dc-prev .md strong { color: #fff; } .dc-prev .md a { color: #00a8fc; } .dc-prev .md blockquote { border-color: #4e5058; color: #dbdee1; }
+
+/* the rank ladder: many ranks, so a quiet numbered grid; the bar gets warmer as the ranks go up */
+.rank-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.rank-grid li { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; row-gap: 2px; padding: 14px 16px 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); position: relative; }
+.rank-grid li::before { content: ''; position: absolute; left: 0; top: 0; height: 2px; width: 100%; background: #d4a078; opacity: calc(.15 + var(--k) * .85); }
+.rank-grid .rank-no { grid-row: span 2; color: var(--dust); font-size: 13px; padding-top: 3px; }
+.rank-grid b { color: var(--cream); font-size: 15px; }
+.rank-grid li > span:last-child { color: var(--sand); font-size: 13px; }
+.rank-more { margin-top: 16px; background: none; border: 0; padding: 0; cursor: pointer; }
+
+/* ranks: one row per tier, its five levels across */
+.tier-table { border-top: 1px solid var(--line); }
+.tier { display: grid; grid-template-columns: minmax(150px, 1.3fr) repeat(5, minmax(0, 1fr)); border-bottom: 1px solid var(--line); position: relative; }
+.tier::before { content: ''; position: absolute; left: 0; top: -1px; bottom: -1px; width: 3px; background: #d4a078; opacity: calc(.2 + var(--k) * .8); }
+.tier-name { display: flex; align-items: baseline; gap: 12px; padding: 16px 16px 16px 20px; }
+.tier-name span { color: var(--dust); font-size: 13px; }
+.tier-name b { font: 900 22px/1 var(--display); letter-spacing: .03em; text-transform: uppercase; color: var(--cream); }
+.tier-lvl { display: grid; gap: 2px; padding: 14px 14px; border-left: 1px solid var(--line); }
+.tier-lvl span { font-weight: 700; color: var(--cream); font-size: 14px; }
+.tier-lvl small { color: var(--sand); font-size: 13px; }
+@media (max-width: 760px) { .tier { grid-template-columns: repeat(5, minmax(0, 1fr)); } .tier-name { grid-column: 1 / -1; padding-bottom: 4px; } .tier-lvl { border-left: 0; padding: 8px 8px 14px; } .tier-lvl:first-of-type { padding-left: 20px; } }
+.tier-lvl small { white-space: nowrap; }
+.tier-lvl .short { display: none; }
+@media (max-width: 760px) { .tier-lvl .full { display: none; } .tier-lvl .short { display: inline; } .tier-lvl small { font-size: 12px; } }
+.tier-lvl small span { font-weight: 400; color: inherit; font-size: inherit; }

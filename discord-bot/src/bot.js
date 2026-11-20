@@ -230,8 +230,8 @@ function start() {
     const before = stats.rankFor(total - j.km), after = stats.rankFor(total);
     if (after.index > before.index) {
       const uid = Object.keys(db.links).find((d) => db.links[d] === j.driver);
-      const roleId = G.roleId(`rank:${after.name}`);
-      post(promoChannel(), { content: uid ? `<@${uid}>` : undefined, allowedMentions: { users: uid ? [uid] : [] }, embeds: [new EmbedBuilder().setColor(AMBER).setTitle(`🎉 ${j.driverName} is now ${after.name}`).setDescription(`Promoted to ${roleId ? `<@&${roleId}>` : `**${after.name}**`} with ${km(total)} driven for Diesel Union. Congratulations!${after.next ? `\nNext: **${after.next.name}** at ${km(after.next.km)}.` : ''}`)] });
+      const roleId = G.roleId(`rank:${G.tierOf(after.name)}`);
+      post(promoChannel(), { content: uid ? `<@${uid}>` : undefined, allowedMentions: { users: uid ? [uid] : [] }, embeds: [new EmbedBuilder().setColor(AMBER).setTitle(`🎉 ${j.driverName} is now ${after.name}`).setDescription(`Promoted to ${roleId && G.tierOf(after.name) === after.name ? `<@&${roleId}>` : `**${after.name}**`}${roleId && G.tierOf(after.name) !== after.name && G.tierOf(after.name) !== G.tierOf(before.name) ? `, new tier <@&${roleId}>` : ''} with ${km(total)} driven for Diesel Union. Congratulations!${after.next ? `\nNext: **${after.next.name}** at ${km(after.next.km)}.` : ''}`)] });
       if (uid) setTimeout(() => member(uid).then((gm) => gm && G.syncRank(gm)).catch(() => {}), 1500); // after the job is saved
     }
   });

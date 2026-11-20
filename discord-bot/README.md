@@ -38,7 +38,7 @@ Run `/setup` once (as an admin). The bot builds the whole server and can run it 
 | Support | ❓┃help, 📅┃leave-of-absence | Members |
 | Staff (CEO, Co-CEO, Management, HR Team, Staff) | 🗂┃applications, 💼┃staff-chat, 🧾┃bot-logs, 🔊 Staff Meeting | Staff |
 
-Roles: CEO, Co-CEO, Management, HR Team, Event Team, Media Team, Staff, one role per rank (Diesel Legend … Rookie), Union Member (access), Approved (finishing setup).
+Roles: CEO, Co-CEO, Management, HR Team, Event Team, Media Manager, Staff, Driver of the Month, one role per rank (50 ranks, from New Recruit at 0 km to Diesel Union Icon at 1,000,000 km), Union Member (access), Approved (finishing setup).
 
 How someone joins:
 1. In #apply they press **Apply**, answer 5 questions, accept the rules.

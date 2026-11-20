@@ -75,7 +75,8 @@ function av(src, name, cls = 'av') {
 }
 // rank shown as stripes, one per rank level
 function chevrons(rank) {
-  const n = Math.max(1, Math.min(6, (rank?.index ?? 0) + 1));
+  const total = rank?.of || S.cfg.ranks?.length || 6; // one to six chevrons, spread over however many ranks there are
+  const n = Math.max(1, Math.min(6, 1 + Math.floor(((rank?.index ?? 0) * 6) / total)));
   return h('span', { class: 'chev', title: rank?.name || '' }, svg('svg', { width: 12 + (n - 1) * 7, height: 14, viewBox: `0 0 ${12 + (n - 1) * 7} 14`, 'aria-hidden': 'true' },
     Array.from({ length: n }, (_, i) => svg('path', { d: `M${i * 7} 2 l6 5 -6 5`, fill: 'none', stroke: 'currentColor', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }))));
 }
@@ -340,9 +341,18 @@ async function pageHome() {
 
   if (S.cfg.ranks?.length) {
     const top = S.cfg.ranks[S.cfg.ranks.length - 1].km || 1;
-    out.push(h('section', { class: 'sec' }, head('Every mile counts', 'Earned on the road. Never handed out.'),
-      h('div', { class: 'ladder rv' }, h('i', { class: 'lane' }), S.cfg.ranks.map((rk, i) => h('div', { class: 'rung', style: { '--x': `${(Math.sqrt(rk.km / top) * 92 + 4).toFixed(1)}%`, '--i': i } },
-        h('span', { class: 'pin' }, chevrons({ index: i })), h('b', { text: rk.name }), h('small', { class: 'num', text: i ? `${n0(rk.km)} km` : 'start' }))))));
+    const R = [...S.cfg.ranks].sort((a, c) => a.km - c.km), tierOf = (n) => String(n).replace(/\s+(?:[IVX]+|\d+)$/, '').trim() || n, T = [];
+    for (const r of R) { const t = tierOf(r.name); if (T.length && T[T.length - 1].name === t) T[T.length - 1].levels.push(r); else T.push({ name: t, levels: [r] }); }
+    const tiered = T.some((t) => t.levels.length > 1);
+    const shown = S.ranksOpen ? R : R.filter((_, i) => i < 9 || i === R.length - 1);
+    const grid = tiered
+      ? h('div', { class: 'tier-table rv', role: 'table', 'aria-label': 'Ranks' }, T.map((t, i) => h('div', { class: 'tier', role: 'row', style: { '--k': (i / Math.max(1, T.length - 1)).toFixed(3) } },
+        h('div', { class: 'tier-name', role: 'rowheader' }, h('span', { class: 'num', text: String(i + 1).padStart(2, '0') }), h('b', { text: t.name })),
+        t.levels.map((l) => h('div', { class: 'tier-lvl', role: 'cell' }, h('span', { text: l.name.slice(t.name.length).trim() || l.name }), h('small', { class: 'num', text: l.km ? `${n0(l.km)} km` : 'Start' }))))))
+      : h('ol', { class: 'rank-grid rv' }, shown.map((rk) => { const i = R.indexOf(rk); return h('li', { style: { '--k': (i / Math.max(1, R.length - 1)).toFixed(3) } },
+        h('span', { class: 'rank-no num', text: String(i + 1).padStart(2, '0') }), h('b', { text: rk.name }), h('span', { class: 'num', text: i ? `${n0(rk.km)} km` : 'Start' })); }));
+    out.push(h('section', { class: 'sec' }, head('Every mile counts', `${R.length} ranks, from your first kilometre to ${n0(R[R.length - 1].km)} km. Each one is a role on Discord, given automatically.`), grid,
+      !tiered && R.length > 10 ? h('button', { class: 'du-text-link rank-more', type: 'button', onclick: () => { S.ranksOpen = !S.ranksOpen; render(); } }, S.ranksOpen ? 'Show fewer' : `Show all ${R.length} ranks`) : null));
   }
 
   out.push(h('section', { class: 'sec' }, head('Your journey starts here', 'Four steps from a first hello to your first convoy.'),

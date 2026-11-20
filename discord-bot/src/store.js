@@ -22,6 +22,23 @@ if ((db.version || 1) < 2) {
   if (typeof db.config.about === 'string') db.config.about = db.config.about.replace(' and American Truck Simulator', '');
   db.version = 2;
 }
+if (db.version < 3) { // the old six ranks become the new 45-step ladder (custom ranks are kept)
+  const old = ['Rookie', 'Driver', 'Long Hauler', 'Veteran', 'Road Master', 'Diesel Legend'];
+  if (Array.isArray(db.config.ranks) && db.config.ranks.map((r) => r.name).join() === old.join()) delete db.config.ranks;
+  db.version = 3;
+}
+if (db.version < 4) { // the first 45-rank names (Learner, Courier, ...) become tiers with levels
+  if (Array.isArray(db.config.ranks) && db.config.ranks[1]?.name === 'Learner' && db.config.ranks.length === 45) delete db.config.ranks;
+  db.version = 4;
+}
+if (db.version < 5) { // the tier names (Rookie I ... Legend V) become the named ladder
+  if (Array.isArray(db.config.ranks) && db.config.ranks[0]?.name === 'Rookie I' && db.config.ranks.length === 45) delete db.config.ranks;
+  db.version = 5;
+}
+if (db.version < 6) { // the 45 joke names become the 50 names Moft picked
+  if (Array.isArray(db.config.ranks) && db.config.ranks[0]?.name === 'Learner Plate') delete db.config.ranks;
+  db.version = 6;
+}
 
 let timer = null, rev = 0;
 function flush() {
@@ -34,9 +51,59 @@ function save() { rev++; if (!timer) timer = setTimeout(() => { timer = null; tr
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { try { flush(); } catch { /* ignore */ } process.exit(0); });
 
 // Driver ranks by total kilometres. Staff can change them on the site.
+// 50 ranks: three before 2,500 km, then a little further apart each time, up to 1,000,000 km. Each one is a Discord role.
+// (Names ending in I, II, III... are grouped into one role per name, if you ever want tiers instead.)
 const RANKS = [
-  { name: 'Rookie', km: 0 }, { name: 'Driver', km: 2500 }, { name: 'Long Hauler', km: 10000 },
-  { name: 'Veteran', km: 30000 }, { name: 'Road Master', km: 75000 }, { name: 'Diesel Legend', km: 150000 },
+  { name: "New Recruit", km: 0 },
+  { name: "Rookie Driver", km: 800 },
+  { name: "Junior Hauler", km: 1600 },
+  { name: "Road Apprentice", km: 2500 },
+  { name: "Cargo Rookie", km: 2750 },
+  { name: "Local Driver", km: 3250 },
+  { name: "Freight Runner", km: 3750 },
+  { name: "Road Explorer", km: 4250 },
+  { name: "Highway Driver", km: 4750 },
+  { name: "Certified Trucker", km: 5500 },
+  { name: "Long Haul Driver", km: 6250 },
+  { name: "Freight Specialist", km: 7000 },
+  { name: "Cargo Operator", km: 8000 },
+  { name: "Highway Specialist", km: 9250 },
+  { name: "Diesel Operator", km: 10500 },
+  { name: "Heavy Hauler", km: 12000 },
+  { name: "Logistics Driver", km: 13500 },
+  { name: "Route Specialist", km: 15500 },
+  { name: "Professional Trucker", km: 17500 },
+  { name: "Senior Hauler", km: 20000 },
+  { name: "Veteran Driver", km: 23000 },
+  { name: "Road Veteran", km: 26000 },
+  { name: "Freight Veteran", km: 30000 },
+  { name: "Highway Veteran", km: 34000 },
+  { name: "Elite Trucker", km: 39000 },
+  { name: "Master Hauler", km: 44000 },
+  { name: "Diesel Veteran", km: 50000 },
+  { name: "Convoy Specialist", km: 57000 },
+  { name: "Road Commander", km: 65000 },
+  { name: "Elite Roadmaster", km: 74000 },
+  { name: "Highway Elite", km: 84000 },
+  { name: "Diesel Elite", km: 96000 },
+  { name: "Freight Commander", km: 110000 },
+  { name: "Grand Hauler", km: 125000 },
+  { name: "Road Titan", km: 140000 },
+  { name: "Diesel Titan", km: 160000 },
+  { name: "Union Commander", km: 185000 },
+  { name: "Highway Warlord", km: 210000 },
+  { name: "Road Sovereign", km: 240000 },
+  { name: "Union Vanguard", km: 270000 },
+  { name: "Road Legend", km: 310000 },
+  { name: "Highway Legend", km: 350000 },
+  { name: "Diesel Legend", km: 400000 },
+  { name: "Freight Overlord", km: 460000 },
+  { name: "Union Overlord", km: 520000 },
+  { name: "Legendary Hauler", km: 590000 },
+  { name: "Diesel Royalty", km: 680000 },
+  { name: "Union Immortal", km: 770000 },
+  { name: "King of the Highway", km: 880000 },
+  { name: "Diesel Union Icon", km: 1000000 },
 ];
 const cfg = () => ({
   name: 'Diesel Union', tag: 'DU', tagline: 'United by the Road',
