@@ -13,6 +13,7 @@ const convoys = require('./convoys');
 const apply = require('./apply');
 const media = require('./media');
 const G = require('./guild');
+const X = require('./extras');
 const cleanT = (s, n) => String(s ?? '').replace(/\r/g, '').replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim().slice(0, n);
 
 const ROOT = path.join(__dirname, '..');
@@ -52,8 +53,8 @@ function limited(req, max = 240) {
 }
 async function raw(req, max = 2_000_000) { const c = []; let n = 0; for await (const x of req) { n += x.length; if (n > max) throw new Error('too big'); c.push(x); } return Buffer.concat(c); }
 const publicCfg = () => { const c = cfg(); return { name: c.name, tag: c.tag, tagline: c.tagline, recruitOpen: c.recruitOpen, ranks: c.ranks, about: c.about, requirements: c.requirements, discordInvite: c.discordInvite,
-  tmpUrl: c.tmpId ? `https://truckersmp.com/vtc/${c.tmpId}` : '', trucky: !!c.truckyId }; };
-const PANEL = new Set(['/api/upload', '/api/post', '/api/post/delete', '/api/convoys', '/api/convoys/publish', '/api/convoys/remove']);
+  tmpUrl: c.tmpId ? `https://truckersmp.com/vtc/${c.tmpId}` : '', truckyUrl: /^https:\/\//.test(c.truckyUrl || '') ? c.truckyUrl : '', trucky: !!c.truckyId }; };
+const PANEL = new Set(['/api/upload', '/api/post', '/api/post/delete', '/api/convoys', '/api/convoys/publish', '/api/convoys/remove', '/api/scheduled/cancel', '/api/panel/attendance', '/api/partners/save', '/api/partners/remove', '/api/partners/move', '/api/admin/grant', '/api/admin/revoke', '/api/admin/warn', '/api/admin/run']);
 const PRIVATE = new Set(['/api/drivers', '/api/driver', '/api/jobs', '/api/board']);
 const recent = (n) => stats.done().slice(-n).reverse();
 
@@ -73,7 +74,7 @@ function start() {
 
   // ---- the team panel: CEO / Co-CEO post anywhere, Media Manager in the media channels, Event Team plans convoys ----
   const access = async (s) => { if (!s || !bot?.access) return null; const a = await bot.access(s.id); return a.caps.post || a.caps.media || a.caps.events ? a : null; };
-  const pingsFor = (acc) => (acc.caps.post || acc.caps.events ? convoys.PINGS : ['none', 'members', 'members-hidden']);
+  const pingsFor = () => convoys.PINGS;
   async function panel(route, b, s, acc) {
     const by = { id: s.id, name: s.name };
     if (route === '/api/upload') return media.store(b.data);
@@ -81,11 +82,12 @@ function start() {
       if (!acc.caps.media) return null;
       const allowed = acc.caps.post ? new Set(bot.channels().map((c) => c.id)) : new Set(bot.mediaChannels());
       if (!allowed.has(String(b.channel))) return { ok: false, msg: 'Pick a channel you can post in.' };
-      const ping = pingsFor(acc).includes(b.ping) ? b.ping : 'none';
+      const ping = convoys.pingOf(b.ping);
       const color = /^#[0-9a-f]{6}$/i.test(b.color || '') ? parseInt(b.color.slice(1), 16) : undefined;
       const link = /^https?:\/\/\S+$/.test(String(b.link || '').trim()) ? String(b.link).trim().slice(0, 400) : '';
       const p = { channel: String(b.channel), title: cleanT(b.title, 250), text: String(b.text ?? '').replace(/\r/g, '').slice(0, 4000), color, image: media.image(b.image), link, linkLabel: cleanT(b.linkLabel, 80) || 'Open link', ping, plain: !!b.plain };
       if (!p.title && !p.text.trim() && !p.image) return { ok: false, msg: 'Write a title or a message, or add a picture.' };
+      if (b.at) return X.schedule(p, by, Number(b.at));
       const out = await bot.publish(p); if (!out.ok) return out;
       db.posts.push({ id: crypto.randomBytes(5).toString('hex'), ref: out.ref, channel: out.channelName, title: p.title || p.text.slice(0, 60), image: p.image, ping, by, at: Date.now() });
       if (db.posts.length > 300) db.posts.splice(0, db.posts.length - 300);
@@ -98,16 +100,46 @@ function start() {
       await bot.unpost(db.posts[i].ref); db.posts.splice(i, 1); save();
       return { ok: true, msg: 'Deleted from Discord.' };
     }
+    if (route === '/api/scheduled/cancel') {
+      const x = (db.scheduled || []).find((q) => q.id === String(b.id)); if (!x) return { ok: false, msg: 'That post has already gone out.' };
+      if (!acc.caps.post && x.by.id !== s.id) return null;
+      X.unschedule(x.id); return { ok: true, msg: 'Scheduled post cancelled.' };
+    }
+    if (route.startsWith('/api/partners/')) {
+      if (!acc.caps.post) return null;
+      const r = route === '/api/partners/save' ? X.savePartner(b) : route === '/api/partners/remove' ? X.removePartner(b.id) : X.movePartner(b.id, Number(b.dir));
+      if (r.ok) bot.refreshPanels?.();
+      return r;
+    }
+    if (route.startsWith('/api/admin/')) {
+      if (!acc.caps.manage) return null;
+      const uid = String(b.uid || '');
+      if (route === '/api/admin/grant') return /^\d{5,25}$/.test(uid) ? bot.grant(uid) : { ok: false, msg: 'Missing member.' };
+      if (route === '/api/admin/revoke') return /^\d{5,25}$/.test(uid) ? bot.revoke(uid) : { ok: false, msg: 'Missing member.' };
+      if (route === '/api/admin/warn') return /^\d{5,25}$/.test(uid) ? bot.warn(uid) : { ok: false, msg: 'Missing member.' };
+      if (route === '/api/admin/run') {
+        if (!acc.caps.post) return null;
+        const w = String(b.what);
+        if (w === 'dotm') return bot.driverOfMonth(true);
+        if (w === 'potw') return bot.photoOfWeek(true);
+        if (w === 'weekly') { await bot.weekly(); return { ok: true, msg: 'Weekly top posted (if there were jobs last week).' }; }
+        if (w === 'inactivity') return bot.inactivity(true);
+        if (w === 'panels') { await bot.refreshPanels?.(); return { ok: true, msg: 'Discord panels refreshed.' }; }
+        if (w === 'repair') return acc.role === 'admin' ? bot.repair() : { ok: false, msg: 'Only server admins can repair the server.' };
+        if (w === 'sync') { const j = await trucky.pollJobs(5).catch((err) => ({ ok: false, msg: err.message })); await trucky.pollMembers().catch(() => {}); return j.ok ? { ok: true, msg: `Synced with Trucky: ${j.added} new jobs.` } : { ok: false, msg: j.msg }; }
+        return { ok: false, msg: 'Unknown action.' };
+      }
+    }
     if (!acc.caps.events) return null;
+    if (route === '/api/panel/attendance') return X.setAttendance(b.id, b.uids, by);
     if (route === '/api/convoys') {
-      if (!pingsFor(acc).includes(b.ping)) b.ping = 'none';
       const r = convoys.add(by, b); if (!r.ok) return r;
       if (!r.item.draft && (b.announce || r.item.post)) { const ref = await bot.convoyPost(r.item, b.ping); if (!ref) r.msg += ' (Could not post on Discord: check the convoys channel.)'; else if (!r.updated) r.msg = 'Convoy added and announced on Discord.'; else r.msg = 'Convoy saved and the Discord post updated.'; }
       return { ok: true, msg: r.msg, id: r.item.id };
     }
     if (route === '/api/convoys/publish') {
       const c = db.convoys.find((x) => x.id === String(b.id)); if (!c) return { ok: false, msg: 'That convoy no longer exists.' };
-      c.draft = false; if (pingsFor(acc).includes(b.ping)) c.ping = b.ping; save();
+      c.draft = false; if (b.ping !== undefined) c.ping = convoys.pingOf(b.ping); save();
       const ref = await bot.convoyPost(c, c.ping);
       return ref ? { ok: true, msg: 'Published and announced on Discord.' } : { ok: true, msg: 'Published on the website. The bot could not post on Discord.' };
     }
@@ -152,10 +184,10 @@ function start() {
       if (route === '/api/home') {
         const a = stats.all(), next = convoys.list(s?.id).filter((c) => c.start > Date.now() - 1800_000).slice(0, 2);
         const mem = await memberOf(s);
-        return json(res, 200, { tot: a.tot, drivers: stats.roster().length, next, recent: mem ? recent(8) : undefined, top: mem ? stats.board('month', 'km').slice(0, 3) : undefined, synced: db.sync.jobs?.at || db.sync.lastHook?.at || null });
+        return json(res, 200, { tot: a.tot, drivers: stats.roster().length, next, partners: X.partners(), dotm: mem ? X.dotm() : undefined, recent: mem ? recent(8) : undefined, top: mem ? stats.board('month', 'km').slice(0, 3) : undefined, synced: db.sync.jobs?.at || db.sync.lastHook?.at || null });
       }
       if (route === '/api/drivers') return json(res, 200, { drivers: stats.roster() });
-      if (route === '/api/driver') { const p = stats.profile(String(q.id || '')); return p ? json(res, 200, p) : json(res, 404, { error: 'Driver not found.' }); }
+      if (route === '/api/driver') { const p = stats.profile(String(q.id || '')); return p ? json(res, 200, { ...p, convoys: X.attended(X.uidOf(p.id)), dotm: X.dotmCount(p.id) }) : json(res, 404, { error: 'Driver not found.' }); }
       if (route === '/api/jobs') {
         let list = stats.done();
         if (q.driver) list = list.filter((j) => j.driver === String(q.driver));
@@ -167,12 +199,38 @@ function start() {
       }
       if (route === '/api/board') return json(res, 200, { rows: stats.board(q.period, q.metric), from: stats.startOf(['week', 'month', 'all'].includes(q.period) ? q.period : 'month') });
       if (route === '/api/convoys') return json(res, 200, { convoys: convoys.list(s?.id), tmp: await convoys.tmpEvents() });
+      if (route === '/api/partners') return json(res, 200, { partners: X.partners() });
+      if (route.startsWith('/api/panel/')) {
+        const acc = await access(s); if (!acc) return json(res, s ? 403 : 401, { error: 'This page is for the team.' });
+        if (route === '/api/panel/attendance') { if (!acc.caps.events) return json(res, 403, { error: 'Event Team only.' }); return json(res, 200, { people: X.attendanceList(q.id) }); }
+        if (!acc.caps.manage) return json(res, 403, { error: 'Staff only.' });
+        if (route === '/api/panel/overview') {
+          const waiting = db.applications.filter((a) => a.status === 'accepted' && !a.onboarded && Date.now() - a.decided < 60 * 86400_000).slice(-25);
+          const onboarding = [];
+          for (const a of waiting) { const p = await G.progress(a.discord); onboarding.push({ uid: a.discord, name: a.name, decided: a.decided, trucky: !!p.driver, tmp: p.tmp, web: p.web }); }
+          return json(res, 200, { pending: db.applications.filter((a) => a.status === 'pending').length, onboarding, inactive: X.inactive().slice(0, 50),
+            loa: Object.entries(db.loa || {}).filter(([, l]) => l.until > Date.now()).map(([uid, l]) => ({ uid, ...l })).sort((a, b) => a.until - b.until),
+            drivers: Object.keys(db.links).length, upcoming: db.convoys.filter((c) => !c.draft && c.start > Date.now()).length, drafts: db.convoys.filter((c) => c.draft).length,
+            scheduled: (db.scheduled || []).length, dotm: X.dotm(), lastMonth: (() => { const m = X.lastMonth(); return { label: m.label, top: m.rows.slice(0, 3) }; })(),
+            sync: { jobs: db.sync.jobs?.at || null, members: db.sync.members?.at || null, hook: db.sync.lastHook?.at || null } });
+        }
+        if (route === '/api/panel/drivers') {
+          const last = new Map(); for (const j of stats.done()) last.set(j.driver, j.end);
+          const uids = Object.keys(db.links), where = await bot.inGuild(uids);
+          const rows = uids.map((uid) => { const t = db.links[uid], c = stats.driverCard(t), m = db.members[t] || {};
+            return { uid, driver: t, name: c?.name || m.name || t, avatar: c?.avatar || m.avatar || null, rank: c?.rank?.name || '', km: c?.km || 0, lastJob: last.get(t) || null, convoys: X.attended(uid), dotm: X.dotmCount(t), loa: X.onLeave(uid), left: !!m.left, discord: where[uid] }; });
+          return json(res, 200, { rows: rows.sort((a, b) => b.km - a.km) });
+        }
+        return json(res, 404, { error: 'Not found.' });
+      }
       if (route === '/api/panel') {
         const acc = await access(s); if (!acc) return json(res, s ? 403 : 401, { error: 'This page is for the team.' });
         const all = bot.channels(), mediaIds = new Set(bot.mediaChannels());
         return json(res, 200, { caps: acc.caps, teams: acc.teams, channels: acc.caps.post ? all : all.filter((c) => mediaIds.has(c.id)), pings: pingsFor(acc), memberRole: !!G.roleId('member'),
           posts: db.posts.slice(-60).reverse().filter((p) => acc.caps.post || p.by.id === s.id || mediaIds.has(p.ref.c)),
-          convoys: acc.caps.events ? convoys.list(s.id, true) : [] });
+          convoys: acc.caps.events ? convoys.list(s.id, true) : [], slots: convoys.SLOTS,
+          scheduled: (db.scheduled || []).filter((x) => acc.caps.post || x.by.id === s.id).map((x) => ({ id: x.id, at: x.at, by: x.by, title: x.p.title || String(x.p.text || '').slice(0, 60), channel: bot.channels().find((c) => c.id === x.p.channel)?.name || '?', image: x.p.image, ping: x.p.ping })),
+          partners: acc.caps.post ? X.partners() : [] });
       }
       if (route === '/api/apply') return s ? json(res, 200, { app: apply.mine(s.id), open: cfg().recruitOpen }) : json(res, 401, { error: 'Log in with Discord.' });
       if (route === '/api/staff') {
@@ -191,7 +249,7 @@ function start() {
     if (!s) return json(res, 401, { error: 'Log in with Discord first.' });
     let b; try { b = JSON.parse((await raw(req, route === '/api/upload' ? 9_000_000 : 30_000)).toString() || '{}'); } catch { return json(res, 400, { error: 'Invalid request (a picture may be too big).' }); }
     let r;
-    if (route === '/api/rsvp') r = convoys.rsvp(b.id, s, b.status);
+    if (route === '/api/rsvp') { r = convoys.rsvp(b.id, s, b.status, b.slot); if (r.changed) { bot?.convoyRefresh?.(r.changed); delete r.changed; } }
     else if (route === '/api/apply') { b.steam = (await apply.resolveSteam(b.steam)) || b.steam; r = apply.submit(s, b); if (r.ok) { r.item.src = 'web'; save(); bot?.applied(r.item); } }
     else if (route === '/api/link') {
       const steam = await apply.resolveSteam(b.steam), m = steam && Object.values(db.members).find((x) => x.steam === steam && !x.left);

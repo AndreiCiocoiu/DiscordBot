@@ -51,17 +51,28 @@ Staff commands: `/verify member:@x` (check one person, `force:true` gives access
 
 The bot needs **Administrator** (or Manage Roles + Manage Channels) and its role must be at the **top** of the role list, above every Diesel Union role.
 
-## Discord panel (website → account menu → Discord panel)
+## Admin panel (website → account menu → Admin panel)
 
-| Who | What they can do |
-|---|---|
-| CEO, Co-CEO (and server admins) | Post anything in any channel, plan convoys, delete what the bot posted |
-| Media Manager | Post in #vtc-news, #convoy-photos and #screenshots |
-| Event Team (and staff) | Plan convoys: drafts, publish, edit (the Discord post is updated), delete |
+| Tab | Who | What |
+|---|---|---|
+| Overview | CEO, Co-CEO, staff | Applications waiting, people finishing setup (what each still has to do), inactive drivers, leave, Driver of the Month |
+| Post | CEO, Co-CEO (any channel), Media Manager (news, photos, screenshots) | Title, text, colour, uploaded picture, link button, ping, post now or later |
+| Convoys | Event Team, staff, CEO | Drafts, publish, edit (updates the Discord post), delete, mark attendance |
+| Posted | Post rights | Scheduled posts (cancel) and what was posted (delete from Discord) |
+| Drivers | CEO, Co-CEO, staff | Every linked driver: rank, km, last job, convoys, access; give or remove access, sync rank |
+| Partners | CEO, Co-CEO | Partner VTCs with logo: website page and #partners on Discord |
+| Tools | CEO, Co-CEO | Sync Trucky, refresh panels, weekly top, Driver of the Month, Photo of the Week, inactivity reminders, repair server |
 
-Posts: title, message, colour, picture (uploaded from your computer or a link), a link button and a ping:
-none, @everyone, @everyone hidden under a spoiler, the Union Member role, or that role hidden under a spoiler.
-Uploaded pictures are kept on the volume (`uploads/`) and sent to Discord as attachments.
+Ping choices: **No ping** or **@everyone**, which pings the Union Member role (every driver) hidden under a spoiler.
+
+## Automatic
+
+- **Driver of the Month**: 1st of the month, most km last month gets the role and an announcement.
+- **Convoy roles**: going drivers pick Lead (1), Tail (1), Road Guard (4) or Driver; the Discord post shows who.
+- **Photo of the Week**: Monday, the post with the most reactions in #convoy-photos.
+- **Attendance**: Event Team ticks who drove; it shows on profiles and in /profile.
+- **Leave of absence**: `/loa days reason` (0 days = back), posted in #leave-of-absence.
+- **Inactivity**: drivers with no delivery for 30 days, not on leave, get one friendly DM a month.
 
 ## Railway setup
 

@@ -8,6 +8,7 @@ const trucky = require('./trucky');
 const convoys = require('./convoys');
 const apply = require('./apply');
 const G = require('./guild');
+const X = require('./extras');
 
 const BROWN = 0x8a5a2b, AMBER = 0xf2a03d, GREEN = 0x6fae5a, RED = 0xc4553b;
 const km = (n) => `${Math.round(n).toLocaleString('en-GB')} km`;
@@ -25,6 +26,9 @@ const commands = [
     .addStringOption((o) => o.setName('by').setDescription('Ranked by').addChoices({ name: 'Kilometres', value: 'km' }, { name: 'Income', value: 'income' }, { name: 'Jobs', value: 'jobs' })),
   new SlashCommandBuilder().setName('convoy').setDescription('The next convoy'),
   new SlashCommandBuilder().setName('apply').setDescription('Apply to join Diesel Union'),
+  new SlashCommandBuilder().setName('loa').setDescription('Going away for a while? Tell the company (leave of absence)')
+    .addIntegerOption((o) => o.setName('days').setDescription('How many days (0 = I am back)').setRequired(true).setMinValue(0).setMaxValue(90))
+    .addStringOption((o) => o.setName('reason').setDescription('Optional').setMaxLength(300)),
   new SlashCommandBuilder().setName('setup').setDescription('Build or repair the Diesel Union channels, roles and panels').setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addBooleanOption((o) => o.setName('hide_others').setDescription('Also hide old channels that are not part of the layout from newcomers')),
   new SlashCommandBuilder().setName('verify').setDescription('Check a member\'s onboarding and give access when it is done').setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
@@ -41,9 +45,14 @@ function jobEmbed(j) {
   if (siteUrl()) e.setURL(`${siteUrl()}/#/curse`);
   return e;
 }
+const slotLine = (c) => {
+  const s = convoys.slotsOf(c), n = (k) => (s[k].length ? s[k].join(', ') : 'open');
+  const going = Object.values(s).reduce((a, x) => a + x.length, 0);
+  return `**Lead:** ${n('lead')} · **Tail:** ${n('tail')}\n**Road Guard:** ${n('guard')}\n**Going:** ${going}`;
+};
 function convoyEmbed(c, title) {
   const e = new EmbedBuilder().setColor(AMBER).setTitle(`${title ? `${title}: ` : ''}${c.title}`.slice(0, 250))
-    .setDescription([`${ts(c.start)} (${ts(c.start, 'R')})`, c.from || c.to ? `**Route:** ${c.from || '?'} → ${c.to || '?'}` : null, c.server ? `**Server:** ${c.server}` : null, c.meet ? `**Meeting point:** ${c.meet}` : null, c.dlc ? `**DLC:** ${c.dlc}` : null, c.desc ? `\n${c.desc.slice(0, 1200)}` : null].filter(Boolean).join('\n'))
+    .setDescription([`${ts(c.start)} (${ts(c.start, 'R')})`, c.from || c.to ? `**Route:** ${c.from || '?'} → ${c.to || '?'}` : null, c.server ? `**Server:** ${c.server}` : null, c.meet ? `**Meeting point:** ${c.meet}` : null, c.dlc ? `**DLC:** ${c.dlc}` : null, `\n${slotLine(c)}`, c.desc ? `\n${c.desc.slice(0, 1200)}` : null].filter(Boolean).join('\n'))
     .setFooter({ text: c.game });
   if (siteUrl()) e.setURL(`${siteUrl()}/#/convoaie`);
   return e;
@@ -75,6 +84,8 @@ async function onCommand(i) {
     const e = new EmbedBuilder().setColor(BROWN).setTitle(p.name).setThumbnail(web(p.avatar) || u.displayAvatarURL())
       .setDescription(`**${p.rank.name}**${p.role ? ` · ${p.role}` : ''}${p.rank.next ? `\n${km(p.rank.next.km - p.km)} to ${p.rank.next.name}` : ''}`)
       .addFields({ name: 'All time', value: `${km(p.km)}\n${p.jobs} jobs`, inline: true }, { name: 'This month', value: `${km(p.month?.km || 0)}\n${p.month?.jobs || 0} jobs`, inline: true }, { name: 'Average damage', value: `${p.avgDmg}%`, inline: true });
+    const conv = X.attended(u.id), crowns = X.dotmCount(tid);
+    e.addFields({ name: 'Convoys attended', value: String(conv), inline: true }, { name: 'Driver of the Month', value: crowns ? `🏆 × ${crowns}` : 'Not yet', inline: true });
     if (siteUrl()) e.setURL(`${siteUrl()}/#/soferi/${p.id}`);
     return i.reply({ embeds: [e] });
   }
@@ -271,7 +282,7 @@ function start() {
           for (const uid of Object.keys(db.links)) { const gm = await member(uid); if (gm && G.roleId('member') && gm.roles.cache.has(G.roleId('member'))) await G.syncRank(gm).catch(() => {}); }
         }
       }
-      if (client.isReady()) await weekly();
+      if (client.isReady()) { await weekly(); await driverOfMonth(); await photoOfWeek(); await inactivity(); }
       // convoy reminder an hour before: in the channel, and privately to everyone who said they come
       for (const c of db.convoys) {
         if (!c.reminded && !c.draft && c.start - Date.now() < 3600_000 && c.start > Date.now()) {
@@ -356,6 +367,12 @@ function start() {
         return i.editReply(`**Diesel Union is set up.** ${made ? `Created ${made} roles/channels, ` : ''}fixed permissions and posted the panels.\n${warn.length ? `\n${warn.join('\n')}\n` : ''}\nNext:\n• Give yourself **CEO**, and your team CEO, Co-CEO, Management, HR Team, Staff, Event Team or Media Team.\n• Give current drivers **Union Member** (or let them press Check my progress).\n• Put the Trucky join link in Website → Staff → Settings if the button goes to the wrong page.`.slice(0, 1990));
       } catch (err) { return i.editReply(`Setup stopped: ${err.message}`); }
     }
+    if (i.commandName === 'loa') {
+      const r = X.setLoa(i.user.id, i.member?.displayName || i.user.globalName || i.user.username, i.options.getInteger('days'), i.options.getString('reason'));
+      if (r.item) post(G.ch('leave'), { allowedMentions: { parse: [] }, embeds: [new EmbedBuilder().setColor(AMBER).setTitle('📅 Leave of absence').setDescription(`<@${i.user.id}> is away until ${ts(r.item.until, 'D')} (${ts(r.item.until, 'R')}).${r.item.reason ? `\n**Reason:** ${r.item.reason}` : ''}`)] });
+      else if (r.ended) post(G.ch('leave'), { allowedMentions: { parse: [] }, content: `✅ <@${i.user.id}> is back on the road.` });
+      return i.reply(eph(r.msg));
+    }
     if (i.commandName === 'verify') {
       if (!(await role(i.user.id))) return i.reply(eph('Only staff can use /verify.'));
       await i.deferReply({ flags: MessageFlags.Ephemeral });
@@ -386,11 +403,75 @@ function start() {
     }
   });
 
+  // ---- automations ----
+  async function runScheduled() {
+    if (!client.isReady()) return;
+    for (const x of X.due()) {
+      X.unschedule(x.id);
+      const out = await api.publish(x.p);
+      if (out.ok) { db.posts.push({ id: x.id, ref: out.ref, channel: out.channelName, title: x.p.title || String(x.p.text || '').slice(0, 60), image: x.p.image, ping: x.p.ping, by: x.by, at: Date.now() }); save(); }
+      else botlog(`⚠️ A scheduled post by ${x.by.name} could not be posted: ${out.msg}`);
+    }
+  }
+  // 1st of the month, after 10:00: Driver of the Month
+  async function driverOfMonth(force) {
+    const m = X.lastMonth(); const key = m.to;
+    if (!force && (db.sync.dotm === key || Date.now() < key + 10 * 3600_000)) return { ok: false, msg: 'Not due yet.' };
+    db.sync.dotm = key; save();
+    if (!m.winner) return { ok: false, msg: `Nobody drove in ${m.label}.` };
+    if (!force && X.dotm()?.from === m.from) return { ok: false, msg: 'Already crowned.' };
+    const prevUid = X.crown(m), uid = X.dotm().uid, rid = G.roleId('dotm');
+    if (rid && prevUid && prevUid !== uid) { const gm = await member(prevUid); if (gm) await gm.roles.remove(rid).catch(() => {}); }
+    if (rid && uid) { const gm = await member(uid); if (gm) await gm.roles.add(rid, 'Driver of the Month').catch(() => {}); }
+    const runner = m.rows.slice(1, 3).map((r, k) => `${['🥈', '🥉'][k]} ${r.name}, ${km(r.km)}`).join('\n');
+    await post(promoChannel(), { content: uid ? `<@${uid}>` : undefined, allowedMentions: { users: uid ? [uid] : [] }, embeds: [new EmbedBuilder().setColor(0xffd36b).setTitle(`🏆 Driver of the Month: ${m.winner.name}`)
+      .setDescription(`**${km(m.winner.km)}** in ${m.winner.jobs} jobs during ${m.label}. Congratulations!${runner ? `\n\n${runner}` : ''}`)] });
+    return { ok: true, msg: `${m.winner.name} is Driver of the Month for ${m.label}.` };
+  }
+  // Monday after 12:00: the photo with the most reactions in #convoy-photos last week
+  async function photoOfWeek(force) {
+    const ws = stats.startOf('week'), id = G.ch('convoyPhotos');
+    if (!id || (!force && (db.sync.potw === ws || Date.now() < ws + 12 * 3600_000))) return { ok: false, msg: 'Not due yet.' };
+    db.sync.potw = ws; save();
+    const ch = channel(id); if (!ch) return { ok: false, msg: 'No #convoy-photos channel.' };
+    const msgs = await ch.messages.fetch({ limit: 100 }).catch(() => null); if (!msgs) return { ok: false, msg: 'Could not read #convoy-photos.' };
+    const from = ws - 7 * 86400_000, to = ws;
+    const best = [...msgs.values()].filter((m) => !m.author.bot && m.createdTimestamp >= from && m.createdTimestamp < (force ? Date.now() : to))
+      .map((m) => ({ m, n: m.reactions.cache.reduce((a, r) => a + r.count, 0) })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n)[0];
+    if (!best) return { ok: false, msg: 'No photo got reactions last week.' };
+    const img = best.m.attachments.find((a) => /^image\//.test(a.contentType || ''));
+    const e = new EmbedBuilder().setColor(AMBER).setTitle('📸 Photo of the Week').setDescription(`By <@${best.m.author.id}>, with ${best.n} reactions. Well shot!`);
+    if (img) e.setImage(img.url);
+    await post(id, { embeds: [e], allowedMentions: { parse: [] }, components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(best.m.url).setLabel('See the photo'))] });
+    return { ok: true, msg: 'Photo of the Week posted.' };
+  }
+  // once a day: drivers with no delivery for 30 days get a friendly DM (once a month)
+  async function inactivity(force) {
+    const day = new Date().toISOString().slice(0, 10);
+    if (!force && (db.sync.inactive === day || new Date().getUTCHours() < 17)) return { ok: false, msg: 'Not due yet.' };
+    db.sync.inactive = day; save();
+    const list = X.toWarn(); let sent = 0;
+    for (const x of list) {
+      const gm = await member(x.uid); if (!gm || !G.roleId('member') || !gm.roles.cache.has(G.roleId('member'))) continue;
+      const ok = await dm(x.uid, { embeds: [new EmbedBuilder().setColor(AMBER).setTitle('We miss you on the road').setDescription(`Hey ${x.name}, you have not delivered anything for Diesel Union in ${x.days} days.\n\nAll good? If you are away for a while, use **/loa** on our server so we know. Otherwise, come drive with us at the next convoy!`)] });
+      X.markWarned(x.uid); if (ok) sent++;
+    }
+    if (list.length) botlog(`🟡 Inactivity check: ${list.length} driver(s) with no job for ${X.INACTIVE_DAYS}+ days, ${sent} DM(s) sent. See the admin panel.`);
+    return { ok: true, msg: `${list.length} inactive, ${sent} messaged.` };
+  }
+  // keep the convoy post in step with the RSVPs (slots), at most every 15 seconds per convoy
+  const pending = new Map();
+  function convoyRefresh(c) {
+    if (!c?.post || pending.has(c.id)) return;
+    pending.set(c.id, setTimeout(() => { pending.delete(c.id); api.convoyPost(c).catch(() => {}); }, 15_000));
+  }
+
   let n = 0;
   setTimeout(() => { tick(n++); setInterval(() => tick(n++), 5 * 60_000); }, 8000); // Trucky polling runs even if Discord is down
+  setInterval(() => runScheduled().catch((err) => console.warn('scheduled:', err.message)), 60_000);
 
-  return {
-    client, role, onboard, decided,
+  const api = {
+    client, role, onboard, decided, convoyRefresh, driverOfMonth, photoOfWeek, inactivity, weekly: () => { db.sync.weekly = null; return weekly(); },
     async isMember(uid) {
       const ids = [G.roleId('member'), ...G.staffRoleIds()].filter(Boolean); if (!ids.length) return false;
       const m = await member(uid); return !!m && ids.some((r) => m.roles.cache.has(r));
@@ -405,7 +486,7 @@ function start() {
     async access(uid) { // what this person may do in the panel
       const r = await role(uid), gm = await member(uid), teams = gm ? G.teamsOf(gm) : [];
       const post = r === 'admin' || teams.includes('ceo') || teams.includes('coceo');
-      return { role: r, teams, caps: { post, media: post || teams.includes('media'), events: post || !!r || teams.includes('events') } };
+      return { role: r, teams, caps: { post, media: post || teams.includes('media'), events: post || !!r || teams.includes('events'), manage: post || !!r } };
     },
     mediaChannels: () => G.MEDIA_KEYS.map(G.ch).filter(Boolean),
     async publish(p) { // { channel, title, text, color, image, link, linkLabel, ping, plain }
@@ -442,11 +523,29 @@ function start() {
       if (m) { c.post = { c: m.channelId, m: m.id }; save(); }
       return c.post || null;
     },
-    convoyAdded(c) { return this.convoyPost(c); },
+    convoyAdded(c) { return api.convoyPost(c); },
     applied: (a) => logApp(a),
     test: (id) => post(id, { embeds: [new EmbedBuilder().setColor(BROWN).setTitle('Diesel Union test').setDescription('The bot can post in this channel.')] }),
     login: () => client.login(process.env.DISCORD_TOKEN),
+    // admin panel actions on one member
+    async grant(uid) { const r = await onboard(uid, { force: true }); return { ok: r.done, msg: r.done ? (r.already ? 'They already had access. Rank role synced.' : 'Access given.') : r.text.replace(/[*⬜✅]/g, '') }; },
+    async revoke(uid) {
+      const gm = await member(uid); if (!gm) return { ok: false, msg: 'That person is not on the Discord server.' };
+      const drop = [G.roleId('member'), G.roleId('approved'), ...G.rankRoleIds()].filter((r) => r && gm.roles.cache.has(r));
+      await gm.roles.remove(drop, 'Access removed from the admin panel').catch(() => {});
+      botlog(`🔴 Access removed from <@${uid}> on the admin panel.`);
+      return { ok: true, msg: 'Access removed.' };
+    },
+    async warn(uid) {
+      const x = X.inactive().find((q) => q.uid === uid);
+      const ok = await dm(uid, { embeds: [new EmbedBuilder().setColor(AMBER).setTitle('A word from Diesel Union staff').setDescription(`We have not seen you on the road${x ? ` for ${x.days} days` : ' for a while'}. All good? If you are away, use **/loa** on our server. Hope to see you at the next convoy!`)] });
+      X.markWarned(uid);
+      return ok ? { ok: true, msg: 'Message sent.' } : { ok: false, msg: 'Their DMs are closed.' };
+    },
+    async inGuild(uids) { const out = {}; const mem = G.roleId('member'); for (const u of uids) { const gm = await member(u); out[u] = gm ? (mem && gm.roles.cache.has(mem) ? 'member' : 'guest') : 'gone'; } return out; },
+    async repair() { const g = guild(); if (!g) return { ok: false, msg: 'The bot is not on a server.' }; try { const log = await G.setup(g); return { ok: true, msg: `Discord server repaired. ${log.filter((l) => l.startsWith('+')).length} things created.`, log }; } catch (err) { return { ok: false, msg: err.message }; } },
   };
+  return api;
 }
 
 module.exports = { start, commands, _onCommand: onCommand, jobEmbed, convoyEmbed, convoyMsg, appEmbed, applyModal };

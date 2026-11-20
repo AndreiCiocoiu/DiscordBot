@@ -7,7 +7,9 @@ const media = require('./media');
 const clean = (s, n) => String(s ?? '').replace(/\r/g, '').replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim().slice(0, n);
 const okUrl = (u) => { try { const x = new URL(String(u)); return /^https?:$/.test(x.protocol) ? x.href.slice(0, 400) : ''; } catch { return ''; } };
 
-const PINGS = ['none', 'everyone', 'everyone-hidden', 'members', 'members-hidden'];
+// two choices on the panel: no ping, or "@everyone", which pings every driver (Union Member) hidden under a spoiler
+const PINGS = ['none', 'members-hidden'];
+const pingOf = (v) => (PINGS.includes(v) ? v : /everyone|members/.test(String(v || '')) ? 'members-hidden' : 'none');
 // create, or update when b.id is given. draft = only the planning team sees it, nothing is posted yet
 function add(by, b) {
   const title = clean(b.title, 80), start = Number(b.start);
@@ -15,7 +17,7 @@ function add(by, b) {
   if (!(start > Date.now() - 3600_000)) return { ok: false, msg: 'Pick the convoy date and time.' };
   const fields = { title, start, game: 'ETS2', server: clean(b.server, 40), from: clean(b.from, 60), to: clean(b.to, 60),
     meet: clean(b.meet, 80), dlc: clean(b.dlc, 120), desc: clean(b.desc, 1500), image: media.image(b.image), link: okUrl(b.link),
-    ping: PINGS.includes(b.ping) ? b.ping : 'none', draft: !!b.draft };
+    ping: pingOf(b.ping), draft: !!b.draft };
   if (b.id) {
     const c = db.convoys.find((x) => x.id === String(b.id)); if (!c) return { ok: false, msg: 'That convoy no longer exists.' };
     if (c.start !== start) c.reminded = false;
@@ -28,15 +30,28 @@ function add(by, b) {
   return { ok: true, msg: fields.draft ? 'Saved as a draft. Only the planning team sees it.' : 'Convoy added.', item: c };
 }
 function remove(id) { const i = db.convoys.findIndex((c) => c.id === String(id)); if (i < 0) return { ok: false, msg: 'That convoy no longer exists.' }; const [c] = db.convoys.splice(i, 1); save(); return { ok: true, msg: 'Convoy deleted.', item: c }; }
-function rsvp(id, user, status) {
+// convoy roles a driver can sign up for when going
+const SLOTS = { lead: { label: 'Lead', max: 1 }, tail: { label: 'Tail', max: 1 }, guard: { label: 'Road Guard', max: 4 }, driver: { label: 'Driver', max: 999 } };
+function rsvp(id, user, status, slot) {
   const c = db.convoys.find((x) => x.id === String(id)); if (!c || c.draft) return { ok: false, msg: 'That convoy no longer exists.' };
   if (!['yes', 'maybe', 'no'].includes(status)) return { ok: false, msg: 'Pick an answer.' };
-  c.rsvp[user.id] = { name: user.name, avatar: user.avatar || null, status, at: Date.now() }; save();
-  return { ok: true, msg: status === 'yes' ? 'You are on the list. See you on the road.' : status === 'maybe' ? 'Marked as maybe.' : 'Noted, you are not coming.' };
+  const prev = c.rsvp[user.id];
+  let s = status === 'yes' ? (SLOTS[slot] ? slot : prev?.slot || 'driver') : null;
+  if (s && s !== 'driver') {
+    const taken = Object.entries(c.rsvp).filter(([u, r]) => u !== user.id && r.status === 'yes' && r.slot === s).length;
+    if (taken >= SLOTS[s].max) return { ok: false, msg: `${SLOTS[s].label} is already taken. Pick another role.` };
+  }
+  c.rsvp[user.id] = { name: user.name, avatar: user.avatar || null, status, slot: s, at: Date.now() }; save();
+  return { ok: true, changed: c, msg: status === 'yes' ? `You are on the list as ${SLOTS[s].label}. See you on the road.` : status === 'maybe' ? 'Marked as maybe.' : 'Noted, you are not coming.' };
+}
+function slotsOf(c) {
+  const out = {}; for (const k of Object.keys(SLOTS)) out[k] = [];
+  for (const r of Object.values(c.rsvp || {})) if (r.status === 'yes') out[SLOTS[r.slot] ? r.slot : 'driver'].push(r.name);
+  return out;
 }
 const pub = (c, uid) => {
   const r = Object.values(c.rsvp || {});
-  return { ...c, rsvp: undefined, post: undefined, posted: !!c.post, yes: r.filter((x) => x.status === 'yes').map(({ name, avatar }) => ({ name, avatar })), maybe: r.filter((x) => x.status === 'maybe').length, mine: uid ? c.rsvp?.[uid]?.status || null : null };
+  return { ...c, rsvp: undefined, post: undefined, posted: !!c.post, attended: (c.attended || []).length, slots: slotsOf(c), mySlot: uid ? c.rsvp?.[uid]?.slot || null : null, yes: r.filter((x) => x.status === 'yes').map(({ name, avatar }) => ({ name, avatar })), maybe: r.filter((x) => x.status === 'maybe').length, mine: uid ? c.rsvp?.[uid]?.status || null : null };
 };
 const list = (uid, drafts = false) => db.convoys.filter((c) => drafts || !c.draft).sort((a, b) => a.start - b.start).map((c) => pub(c, uid));
 
@@ -58,4 +73,4 @@ async function tmpEvents() {
   return out.sort((a, b) => a.start - b.start).slice(0, 12);
 }
 
-module.exports = { add, remove, rsvp, list, pub, tmpEvents, PINGS };
+module.exports = { add, remove, rsvp, list, pub, tmpEvents, PINGS, pingOf, SLOTS, slotsOf };

@@ -1,9 +1,10 @@
 // The Discord server itself: the channel and role layout (/setup builds it), the panels the bot keeps
 // in #apply, #finish-setup, #links, #ranks and #rules, the onboarding check that grants access, and rank roles.
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits: P } = require('discord.js');
+const { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits: P } = require('discord.js');
 const { db, save, cfg } = require('./store');
 const stats = require('./stats');
 const { getJson } = require('./fetcher');
+const media = require('./media');
 
 const BROWN = 0x8a5a2b, AMBER = 0xf2a03d, GREEN = 0x6fae5a;
 const km = (n) => `${Math.round(n).toLocaleString('en-GB')} km`;
@@ -26,7 +27,8 @@ const LAYOUT = [
     { key: 'welcome', name: '👋┃welcome', ro: true },
     { key: 'rules', name: '📜┃discord-rules', ro: true },
     { key: 'ranks', name: '🏅┃ranks', ro: true, topic: 'Ranks are given automatically by total kilometres on Trucky.' },
-    { key: 'links', name: '🔗┃diesel-links', ro: true, topic: 'Trucky, TruckersMP and the website.' }] },
+    { key: 'links', name: '🔗┃diesel-links', ro: true, topic: 'Trucky, TruckersMP and the website.' },
+    { key: 'partners', name: '🤝┃partners', ro: true, topic: 'The VTCs we drive with.' }] },
   { cat: '🤎 Diesel Updates 🤎', access: 'member', channels: [
     { key: 'news', name: '📰┃vtc-news', ro: true, writers: ['media', 'events'] },
     { key: 'newDrivers', name: '🤎┃new-drivers-and-promotions', ro: true, topic: 'New drivers and rank promotions, posted by the bot.' }] },
@@ -47,7 +49,7 @@ const LAYOUT = [
     { key: 'lounge', name: '🔊 Lounge', voice: true }] },
   { cat: '🤎 Support 🤎', access: 'member', channels: [
     { key: 'help', name: '❓┃help' },
-    { key: 'leave', name: '📅┃leave-of-absence', topic: 'Going away for a while? Tell us here.' }] },
+    { key: 'leave', name: '📅┃leave-of-absence', ro: true, topic: 'Going away for a while? Use /loa and the bot posts it here.' }] },
   { cat: '🔒 Staff 🔒', access: 'staff', channels: [
     { key: 'applications', name: '🗂┃applications', topic: 'New applications. Accept or decline with the buttons.' },
     { key: 'staffChat', name: '💼┃staff-chat' },
@@ -68,6 +70,7 @@ const ROLE_DEFS = () => [
   { key: 'events', name: 'Event Team', color: 0xc77d3a, hoist: true, perms: [P.MuteMembers, P.MoveMembers] },
   { key: 'media', name: 'Media Manager', was: 'Media Team', color: 0xb86b3a, hoist: true, perms: [] },
   { key: 'staff', name: 'Staff', color: 0xa65f33, hoist: true, staff: true, perms: STAFF_PERMS },
+  { key: 'dotm', name: 'Driver of the Month', color: 0xffd36b, hoist: true, perms: [] },
   // rank roles, highest first so they stack in the member list
   ...[...cfg().ranks].sort((a, b) => b.km - a.km).map((r, i, all) => ({ key: `rank:${r.name}`, name: r.name, color: RANK_COLORS[Math.min(all.length - 1 - i, RANK_COLORS.length - 1)], hoist: true, perms: [] })),
   { key: 'member', name: 'Union Member', color: 0, hoist: false, perms: [] },
@@ -86,7 +89,7 @@ const MEDIA_KEYS = ['news', 'convoyPhotos', 'screenshots'];
 // the ping that goes in front of a post. hidden = inside a spoiler, so the grey bar covers it (it still pings)
 function ping(kind) {
   const role = roleId('member');
-  if (kind === 'everyone' || kind === 'everyone-hidden') return { content: kind === 'everyone' ? '@everyone' : '||@everyone||', allowedMentions: { parse: ['everyone'] } };
+  // the panel calls this one "@everyone": it reaches every driver, without pinging people who are only visiting the server
   if ((kind === 'members' || kind === 'members-hidden') && role) return { content: kind === 'members' ? `<@&${role}>` : `||<@&${role}>||`, allowedMentions: { roles: [role] } };
   return { content: undefined, allowedMentions: { parse: [] } };
 }
@@ -242,7 +245,7 @@ function rulesPanel() {
 }
 function welcomePanel() {
   const c = cfg(), C = (k) => (ch(k) ? `<#${ch(k)}>` : `#${k}`);
-  return { embeds: [new EmbedBuilder().setColor(BROWN).setTitle(`Welcome to ${c.name}`).setDescription([`${c.tagline}.`, '', `${C('rules')} the rules`, `${C('tagInfo')} ${C('truckInfo')} ${C('trailerInfo')} tag, truck and trailer`, `${C('ranks')} how ranks work`, `${C('links')} Trucky, TruckersMP and the website`, `${C('convoys')} upcoming convoys`, `${C('deliveries')} every delivery, live`, `${C('commands')} try /profile and /top`].join('\n'))] };
+  return { embeds: [new EmbedBuilder().setColor(BROWN).setTitle(`Welcome to ${c.name}`).setDescription([`${c.tagline}.`, '', `${C('rules')} the rules`, `${C('tagInfo')} ${C('truckInfo')} ${C('trailerInfo')} tag, truck and trailer`, `${C('ranks')} how ranks work`, `${C('links')} Trucky, TruckersMP and the website`, `${C('partners')} the VTCs we drive with`, `${C('leave')} going away? use /loa`, `${C('convoys')} upcoming convoys`, `${C('deliveries')} every delivery, live`, `${C('commands')} try /profile and /top`].join('\n'))] };
 }
 const STANDARDS = { tagInfo: ['tag', '🏷 Tag name and colour'], truckInfo: ['truck', '🚚 Truck colour'], trailerInfo: ['trailer', '🚛 Trailer colour and livery'] };
 function standardPanel(key) {
@@ -252,7 +255,20 @@ function standardPanel(key) {
   if (https(s.image)) e.setImage(s.image);
   return { embeds: [e] };
 }
-const PANELS = { tagInfo: () => standardPanel('tagInfo'), truckInfo: () => standardPanel('truckInfo'), trailerInfo: () => standardPanel('trailerInfo'), apply: applyPanel, setup: setupPanel, links: linksPanel, ranks: ranksPanel, rules: rulesPanel, welcome: welcomePanel };
+function partnersPanel() {
+  const list = (db.partners || []).slice(0, 10), files = [];
+  if (!list.length) return { embeds: [new EmbedBuilder().setColor(BROWN).setTitle('Our partners').setDescription('No partners yet.')], files: [] };
+  const embeds = list.map((p, i) => {
+    const e = new EmbedBuilder().setColor(BROWN).setTitle(p.name).setDescription([p.desc, p.url ? `🌐 ${p.url}` : null, p.tmp ? `🛣️ ${p.tmp}` : null].filter(Boolean).join('\n') || '\u200b');
+    if (https(p.url)) e.setURL(p.url);
+    const f = media.file(p.logo);
+    if (f) { const name = `partner${i}${require('path').extname(f)}`; files.push(new AttachmentBuilder(f, { name })); e.setThumbnail(`attachment://${name}`); }
+    else if (https(p.logo)) e.setThumbnail(p.logo);
+    return e;
+  });
+  return { embeds, files };
+}
+const PANELS = { partners: partnersPanel, tagInfo: () => standardPanel('tagInfo'), truckInfo: () => standardPanel('truckInfo'), trailerInfo: () => standardPanel('trailerInfo'), apply: applyPanel, setup: setupPanel, links: linksPanel, ranks: ranksPanel, rules: rulesPanel, welcome: welcomePanel };
 
 async function refreshPanels(g, only) {
   db.config.panels = { ...(db.config.panels || {}) };
@@ -261,7 +277,7 @@ async function refreshPanels(g, only) {
     const c = ch(k) && g.channels.cache.get(ch(k)); if (!c?.isTextBased?.()) continue;
     const payload = build();
     const old = db.config.panels[k] && await c.messages.fetch(db.config.panels[k]).catch(() => null);
-    if (old) await old.edit(payload).catch((err) => console.warn('panel edit:', err.message));
+    if (old) await old.edit(payload.files ? { ...payload, attachments: [] } : payload).catch((err) => console.warn('panel edit:', err.message));
     else { const m = await c.send(payload).catch((err) => { console.warn('panel:', err.message); return null; }); if (m) db.config.panels[k] = m.id; }
   }
   save();

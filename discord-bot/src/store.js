@@ -6,7 +6,7 @@ const DATA_DIR = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH |
 const FILE = path.join(DATA_DIR, 'diesel.json');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const DEFAULTS = { config: {}, members: {}, jobs: [], convoys: [], applications: [], links: {}, sync: {}, web: {}, posts: [], version: 1 };
+const DEFAULTS = { config: {}, members: {}, jobs: [], convoys: [], applications: [], links: {}, sync: {}, web: {}, posts: [], scheduled: [], partners: [], dotm: [], loa: {}, warned: {}, version: 1 };
 function load() {
   try { return { ...structuredClone(DEFAULTS), ...JSON.parse(fs.readFileSync(FILE, 'utf8')) }; }
   catch (err) {

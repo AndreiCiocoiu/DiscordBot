@@ -102,11 +102,9 @@ function coverHero() {
     routes, MAPDOTS.map(([x, y], i) => [g(x, y, 16, 'halo', i), g(x, y, 3.2, 'node', i)]),
     ROOF.map(([x, y], i) => svg('circle', { cx: x, cy: y, r: 22, fill: 'url(#gl)', class: 'roof', style: { '--i': i } })),
     HEADS.map(([x, y], i) => svg('circle', { cx: x, cy: y, r: 46, fill: 'url(#gl)', class: 'head', style: { '--i': i } })));
-  const sparks = h('canvas', { class: 'sparks', 'aria-hidden': 'true' });
   const band = h('div', { class: 'band', 'aria-hidden': 'true' },
     h('div', { class: 'pan' }, h('div', { class: 'frame' }, h('img', { class: 'cover', src: '/img/cover.webp', alt: '', fetchpriority: 'high' }), over)),
-    sparks, h('div', { class: 'leak' }), h('div', { class: 'grain' }));
-  setTimeout(() => embers(sparks), 0);
+    h('div', { class: 'grain' }));
   // the picture leans a little toward the pointer
   if (!REDUCED && matchMedia('(pointer: fine)').matches) {
     let tx = 0, ty = 0, x = 0, y = 0, raf = 0, on = true;
@@ -188,6 +186,7 @@ function convoyCard(c, full) {
       h('div', { class: 'facts' },
         soon > 0 ? h('span', null, icon('clock', 16), 'Departs in ', h('span', { class: 'count', 'data-until': c.start, text: until(c.start) })) : h('span', null, icon('clock', 16), soon > -3 * 3600_000 ? 'On the road now' : 'Finished'),
         c.server ? h('span', null, icon('server', 16), c.server) : null, c.meet ? h('span', null, icon('pin', 16), c.meet) : null, h('span', { class: `game ${c.game}`, text: c.game })),
+      full && c.slots && (c.slots.lead.length || c.slots.tail.length || c.slots.guard.length) ? h('p', { class: 'desc slots', text: [c.slots.lead.length ? `Lead: ${c.slots.lead.join(', ')}` : null, c.slots.tail.length ? `Tail: ${c.slots.tail.join(', ')}` : null, c.slots.guard.length ? `Road Guard: ${c.slots.guard.join(', ')}` : null].filter(Boolean).join(' · ') }) : null,
       full && c.dlc ? h('p', { class: 'desc', text: `DLC: ${c.dlc}` }) : null,
       full && c.desc ? h('p', { class: 'desc', text: c.desc }) : null),
     h('div', { class: 'rsvp' },
@@ -202,94 +201,96 @@ function faces(c) {
 function rsvpButtons(c) {
   if (!S.user) return S.login ? h('a', { class: 'btn small', href: '/auth/login' }, 'Log in to RSVP') : null;
   const opts = [['yes', 'Going'], ['maybe', 'Maybe'], ['no', 'Not going']];
-  return h('div', { class: 'seg', role: 'group', 'aria-label': 'Are you coming?' }, opts.map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(c.mine === k), onclick: () => act('/api/rsvp', { id: c.id, status: k }, render) }, l)));
+  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Are you coming?' }, opts.map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(c.mine === k), onclick: () => act('/api/rsvp', { id: c.id, status: k }, render) }, l)));
+  if (c.mine !== 'yes' || !c.slots) return seg;
+  // going: pick a role in the column
+  const SL = [['lead', 'Lead', 1], ['tail', 'Tail', 1], ['guard', 'Road Guard', 4], ['driver', 'Driver', 999]];
+  return h('div', { class: 'slotpick' }, seg, h('div', { class: 'seg small', role: 'group', 'aria-label': 'Your role in the convoy' }, SL.map(([k, l, max]) => {
+    const n = c.slots[k]?.length || 0, mine = c.mySlot === k;
+    return h('button', { type: 'button', 'aria-pressed': String(mine), disabled: !mine && n >= max, title: n ? c.slots[k].join(', ') : 'Open', onclick: () => act('/api/rsvp', { id: c.id, status: 'yes', slot: k }, render) }, l, max < 999 ? h('small', { text: ` ${n}/${max}` }) : null);
+  })));
 }
 
 // ---- pages ----
 const VALUES = [
-  ['flag', 'Weekly convoys', 'We drive together on TruckersMP, with the route posted in advance, a meeting point and someone leading the column.'],
-  ['truck', 'Jobs log themselves', 'With Trucky running, every delivery goes straight into the company logbook. Nothing to fill in by hand.'],
-  ['trophy', 'Ranks you earn', 'Every kilometre you deliver moves you up. Leaderboards reset every week and every month.'],
-  ['users', 'People you can count on', 'On voice during convoys, and around to help when your trailer breaks down or you lose the road.'],
+  ['Convoys every week', 'Routes are posted in advance, with a meeting point, a lead and a tail. Open to anyone who wants to get to know us.'],
+  ['Jobs that log themselves', 'Run Trucky while you drive and every delivery goes straight into the company logbook.'],
+  ['Ranks you earn', 'Rank roles follow the kilometres you deliver for the company, from Rookie to Diesel Legend.'],
+  ['A crew on voice', 'Someone is always around on Discord when the road gets long or the trailer gets stuck.'],
 ];
 const STEPS = [
-  ['Apply on the site', 'Log in with Discord and fill in the form. It takes two minutes.'],
-  ['Staff gets back to you', 'You get a Discord message, usually the same day.'],
-  ['Join the company on Trucky', 'Install Trucky and join Diesel Union so your jobs are counted.'],
-  ['Drive your first convoy', 'We introduce you to the crew and hit the road together.'],
+  ['Apply', 'Press Apply on our Discord or on this site and answer five short questions.'],
+  ['Get accepted', 'Staff read every application. The answer comes in a Discord DM, usually the same day.'],
+  ['Join on Trucky and TruckersMP', 'Join Diesel Union in both, with the Steam account you applied with.'],
+  ['Drive', 'The server opens for you. See you at the next convoy.'],
 ];
 const FAQ = [
-  ['Do I have to play on TruckersMP?', 'Convoys are on TruckersMP. Jobs can be single player too: Trucky counts both.'],
+  ['Do I have to play on TruckersMP?', 'Convoys are on TruckersMP. Your other jobs can be single player too: Trucky counts both.'],
   ['Which DLCs do I need?', 'None are required. When a convoy needs a map DLC, the announcement says so in advance.'],
   ['Do you play ATS?', 'No. Diesel Union drives Euro Truck Simulator 2 only, so only ETS2 jobs count.'],
-  ['Is there a minimum distance?', 'It is not a race. What matters is staying active and joining convoys when you can.'],
-  ['How are ranks worked out?', 'From the total kilometres you deliver with Trucky since joining. The thresholds are shown above.'],
+  ['Is there a minimum distance?', 'No. What matters is staying active and joining a convoy when you can. Going away for a while? Tell us with /loa.'],
+  ['How are ranks worked out?', 'From the total kilometres you deliver with Trucky since joining. The thresholds are listed above.'],
 ];
 
 async function pageHome() {
   const r = await api('/api/home');
-  const d = r.ok ? r.data : { tot: { month: {}, week: {}, all: {} }, next: [], drivers: 0 };
-  const scrollTo_ = () => $('#despre')?.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
-  const [w1, ...rest] = String(S.cfg.name || '').trim().split(/\s+/);
-  const hero = h('section', { class: 'hero' }, coverHero(),
-    h('div', { class: 'hero-in' }, medallion(true),
-      h('h1', { 'aria-label': S.cfg.name }, h('span', { class: 'a', text: w1 || '' }), rest.length ? h('span', { class: 'b', text: rest.join(' ') }) : null),
-      h('p', { class: 'tagline', text: S.cfg.tagline }),
-      h('p', { class: 'lead', text: `A virtual trucking company on TruckersMP${S.cfg.tag ? `, tag [${S.cfg.tag}]` : ''}. Euro Truck Simulator 2.` }),
-      h('div', { class: 'cta' }, S.cfg.recruitOpen && !S.member ? h('a', { class: 'btn', href: '#/aplica' }, 'Apply to join', icon('arrow', 18)) : S.member ? h('a', { class: 'btn', href: '#/curse' }, 'Company jobs', icon('arrow', 18)) : null,
-        h('button', { class: 'btn ghost', type: 'button', onclick: scrollTo_ }, 'Learn more'))),
-    h('button', { class: 'cue', type: 'button', 'aria-label': 'Scroll down', onclick: scrollTo_ }, h('span')));
+  const d = r.ok ? r.data : { tot: { month: {}, week: {}, all: {} }, next: [], drivers: 0, partners: [] };
+  const toAbout = () => $('#about')?.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+  const cta = () => S.member ? h('a', { class: 'btn', href: '#/curse' }, 'Company logbook') : S.cfg.recruitOpen ? h('a', { class: 'btn', href: '#/aplica' }, 'Apply to join') : S.cfg.discordInvite ? h('a', { class: 'btn', href: S.cfg.discordInvite, target: '_blank', rel: 'noopener' }, 'Join our Discord') : null;
+  const hero = h('section', { class: 'hero v-hero' }, coverHero(),
+    h('div', { class: 'v-hero-in' },
+      h('img', { class: 'v-logo', src: '/img/logo-160.webp', alt: '', width: 76, height: 76 }),
+      h('h1', { class: 'v-mark', text: S.cfg.name }),
+      h('p', { class: 'v-sub', text: S.cfg.tagline }),
+      h('p', { class: 'v-lead', text: 'A Euro Truck Simulator 2 company on TruckersMP. Weekly convoys, every job logged with Trucky, and a crew that drives together.' }),
+      h('div', { class: 'cta' }, cta(), h('button', { class: 'btn ghost', type: 'button', onclick: toAbout }, 'About the company'))));
   scrollFx();
-  const m = d.tot.month || {};
-  const odo = h('section', { class: 'odo', 'aria-label': 'This month' },
-    h('div', null, h('div', { class: 'lbl', text: 'Kilometres this month' }), h('div', { style: { display: 'flex' } }, odometer(m.km, 6), h('span', { class: 'unit', text: 'km' })), h('div', { class: 'sub', text: `${kmS(d.tot.all?.km)} since day one` })),
-    h('div', null, h('div', { class: 'lbl', text: 'Jobs delivered' }), odometer(m.jobs, 3), h('div', { class: 'sub', text: `${n0(d.tot.week?.jobs)} this week` })),
-    h('div', null, h('div', { class: 'lbl', text: 'Tonnes hauled' }), odometer((m.mass || 0) / 1000, 4), h('div', { class: 'sub', text: 'this month' })),
-    h('div', null, h('div', { class: 'lbl', text: 'Drivers' }), odometer(d.drivers, 2), h('div', { class: 'sub', text: `${n0(m.drivers)} active this month` })));
-  const out = [hero, odo];
+  const m = d.tot.month || {}, all = d.tot.all || {};
+  const fact = (n, l) => h('div', null, h('b', { class: 'num', text: n }), h('span', { text: l }));
+  const stats = h('section', { class: 'v-stats', 'aria-label': 'The company in numbers' },
+    fact(n0(all.km || 0), 'kilometres driven'), fact(n0(m.km || 0), 'kilometres this month'), fact(n0(all.jobs || 0), 'jobs delivered'), fact(n0(d.drivers || 0), 'drivers'));
+  const out = [hero, stats];
 
-  // members get their corner first
-  if (S.member && (d.top?.length || d.recent?.length)) out.push(h('section', { class: 'sec' }, head('Driver corner', 'Only members can see this part.', '#/clasament', 'Full leaderboard'),
+  if (S.member && (d.top?.length || d.recent?.length || d.dotm)) out.push(h('section', { class: 'sec' }, head('Driver corner', 'Only members see this part.', '#/clasament', 'Full leaderboard'),
+    d.dotm ? h('div', { class: 'v-dotm panel' }, h('span', { class: 'v-dotm-t', text: `Driver of the Month, ${d.dotm.month}` }), h('b', { text: d.dotm.name }), h('span', { class: 'muted', text: `${kmS(d.dotm.km)} in ${d.dotm.jobs} jobs` })) : null,
     d.top?.length ? podium(d.top, 'km') : null, d.recent?.length ? h('div', { class: 'bills', style: { marginTop: '22px' } }, d.recent.slice(0, 5).map(bill)) : null));
 
-  out.push(h('section', { class: 'sec about', id: 'despre' },
-    h('div', { class: 'about-copy rv' }, h('span', { class: 'eyebrow', text: 'About us' }), h('h2', { text: 'United by the road.' }), h('p', { text: S.cfg.about }),
-      h('div', { class: 'links' }, S.cfg.discordInvite ? h('a', { class: 'btn ghost small', href: S.cfg.discordInvite, target: '_blank', rel: 'noopener' }, icon('discord', 16), 'Discord server') : null,
-        S.cfg.tmpUrl ? h('a', { class: 'btn ghost small', href: S.cfg.tmpUrl, target: '_blank', rel: 'noopener' }, 'TruckersMP page', icon('out', 14)) : null)),
-    h('div', { class: 'values' }, VALUES.map(([ic, t, x]) => h('article', { class: 'value rv' }, h('span', { class: 'vi' }, icon(ic, 22)), h('h3', { text: t }), h('p', { text: x }))))));
+  out.push(h('section', { class: 'v-sec v-about', id: 'about' },
+    h('div', null, h('h2', { text: 'We drive together.' }), h('p', { class: 'v-body', text: S.cfg.about }),
+      h('div', { class: 'v-links' }, S.cfg.tmpUrl ? h('a', { href: S.cfg.tmpUrl, target: '_blank', rel: 'noopener' }, 'TruckersMP page', icon('out', 14)) : null,
+        S.cfg.discordInvite ? h('a', { href: S.cfg.discordInvite, target: '_blank', rel: 'noopener' }, 'Discord server', icon('out', 14)) : null)),
+    h('dl', { class: 'v-values' }, VALUES.map(([t, x]) => h('div', null, h('dt', { text: t }), h('dd', { text: x }))))));
 
-  if (d.next.length) out.push(h('section', { class: 'sec' }, head('Next convoy', 'Convoys are open to anyone who wants to get to know us.', '#/convoaie', 'All convoys'), h('div', { class: 'convoys' }, d.next.slice(0, 1).map((c) => convoyCard(c, false)))));
+  if (d.next.length) out.push(h('section', { class: 'v-sec' }, head('Next convoy', 'Open to anyone who wants to get to know us.', '#/convoaie', 'All convoys'), h('div', { class: 'convoys' }, d.next.slice(0, 1).map((c) => convoyCard(c, false)))));
 
   if (S.cfg.ranks?.length) {
-    const top = S.cfg.ranks[S.cfg.ranks.length - 1].km || 1;
-    out.push(h('section', { class: 'sec' }, head('Ranks', 'Earned with delivered kilometres, not handed out.'),
-      h('div', { class: 'ladder rv' }, h('i', { class: 'lane' }), S.cfg.ranks.map((rk, i) => h('div', { class: 'rung', style: { '--x': `${(Math.sqrt(rk.km / top) * 92 + 4).toFixed(1)}%`, '--i': i } },
-        h('span', { class: 'pin' }, chevrons({ index: i })), h('b', { text: rk.name }), h('small', { class: 'num', text: i ? `${n0(rk.km)} km` : 'start' }))))));
+    out.push(h('section', { class: 'v-sec' }, head('Ranks', 'Earned with delivered kilometres. The role is given on Discord automatically.'),
+      h('ol', { class: 'v-ranks', style: { '--n': S.cfg.ranks.length } }, S.cfg.ranks.map((rk, i) => h('li', null, h('i', { style: { '--k': (i + 1) / S.cfg.ranks.length } }), h('b', { text: rk.name }), h('span', { class: 'num', text: i ? `${n0(rk.km)} km` : 'On joining' }))))));
   }
 
-  out.push(h('section', { class: 'sec' }, head('How to join', 'Four steps, from the form to your first convoy.'),
-    h('ol', { class: 'steps' }, STEPS.map(([t, x], i) => h('li', { class: 'step rv', style: { '--i': i } }, h('span', { class: 'no', text: String(i + 1).padStart(2, '0') }), h('h3', { text: t }), h('p', { text: x }))))));
+  out.push(h('section', { class: 'v-sec' }, head('How to join', 'From the form to your first convoy.'),
+    h('ol', { class: 'v-steps' }, STEPS.map(([t, x], i) => h('li', null, h('span', { class: 'num', text: String(i + 1) }), h('h3', { text: t }), h('p', { text: x }))))));
 
-  out.push(h('section', { class: 'sec reqs' },
-    h('div', { class: 'rv' }, h('span', { class: 'eyebrow', text: 'What we ask' }), h('h2', { text: 'Not much, but we mean it.' }),
-      h('ul', { class: 'checks' }, (S.cfg.requirements || []).map((x) => h('li', null, h('span', { class: 'ck' }, icon('check', 16)), x)))),
-    h('div', { class: 'join rv' }, medallion(false), h('h3', { text: S.cfg.recruitOpen ? 'Ready to roll?' : 'Recruitment is closed' }),
-      h('p', { text: S.cfg.recruitOpen ? 'Fill in the form and we will see you at the next convoy.' : 'Follow us on Discord: we announce it there when we reopen.' }),
-      S.member ? h('a', { class: 'btn', href: '#/soferi' }, 'See the drivers') : S.cfg.recruitOpen ? h('a', { class: 'btn', href: '#/aplica' }, 'Apply now', icon('arrow', 18)) : S.cfg.discordInvite ? h('a', { class: 'btn', href: S.cfg.discordInvite, target: '_blank', rel: 'noopener' }, 'Join our Discord') : null)));
+  out.push(h('section', { class: 'v-sec v-join' },
+    h('div', null, h('h2', { text: 'What we ask' }), h('ul', { class: 'v-reqs' }, (S.cfg.requirements || []).map((x) => h('li', null, icon('check', 18), h('span', { text: x }))))),
+    h('div', { class: 'v-cta panel' }, h('h3', { text: S.member ? 'Good to have you on the road.' : S.cfg.recruitOpen ? 'Recruitment is open.' : 'Recruitment is closed for now.' }),
+      h('p', { text: S.member ? 'Check the logbook, the leaderboard and the next convoy.' : S.cfg.recruitOpen ? 'It takes five minutes. Staff answer on Discord, usually the same day.' : 'We announce it on Discord when we open again.' }),
+      S.member ? h('a', { class: 'btn', href: '#/clasament' }, 'Leaderboard') : cta())));
 
-  out.push(h('section', { class: 'sec' }, head('FAQ'), h('div', { class: 'faq' }, FAQ.map(([q, a]) => h('details', { class: 'rv' }, h('summary', null, q, icon('chev', 18)), h('p', { text: a }))))));
+  if (d.partners?.length) out.push(h('section', { class: 'v-sec' }, head('Partners', 'The companies we drive with.', '#/partners', 'All partners'), partnerRow(d.partners)));
+
+  out.push(h('section', { class: 'v-sec v-faq' }, h('h2', { text: 'Questions' }), h('div', null, FAQ.map(([q, a]) => h('details', null, h('summary', null, q, icon('chev', 18)), h('p', { text: a }))))));
   return out;
 }
-
-// private pages: only drivers of the VTC (linked to Trucky, with the member role, or staff)
-function gate(title) {
-  const head_ = h('div', { class: 'pagehead' }, h('h1', { text: title }));
-  let body;
-  if (!S.user) body = empty('Drivers only', 'Log in with Discord. If you drive for Diesel Union, you will see everything.', loginBtn());
-  else body = empty('Drivers only', 'Your Discord account is not linked to a Trucky driver.', h('div', { class: 'actions', style: { justifyContent: 'center' } }, h('a', { class: 'btn', href: '#/cont' }, icon('link', 18), 'Link your account'), S.cfg.recruitOpen ? h('a', { class: 'btn ghost', href: '#/aplica' }, 'Apply to join') : null));
-  return [head_, h('div', { class: 'sec locked' }, h('span', { class: 'lockico' }, icon('lock', 28)), body)];
+const partnerRow = (list) => h('div', { class: 'v-partners' }, list.map((p) => h(p.url || p.tmp ? 'a' : 'div', { class: 'v-partner', href: p.url || p.tmp || null, target: p.url || p.tmp ? '_blank' : null, rel: 'noopener' },
+  p.logo ? h('img', { src: p.logo, alt: '', loading: 'lazy' }) : h('span', { class: 'v-initial', text: p.name[0] }), h('span', { text: p.name }))));
+async function pagePartners() {
+  const r = await api('/api/partners'), list = r.ok ? r.data.partners : [];
+  return [h('div', { class: 'pagehead' }, h('h1', { text: 'Partners' }), h('p', { text: 'Virtual trucking companies we drive with and join for convoys.' })),
+    list.length ? h('div', { class: 'v-plist sec' }, list.map((p) => h('article', { class: 'panel v-pcard' }, p.logo ? h('img', { src: p.logo, alt: '' }) : h('span', { class: 'v-initial', text: p.name[0] }),
+      h('div', null, h('h2', { text: p.name }), p.desc ? h('p', { class: 'muted', text: p.desc }) : null,
+        h('div', { class: 'v-links' }, p.url ? h('a', { href: p.url, target: '_blank', rel: 'noopener' }, 'Website', icon('out', 14)) : null, p.tmp ? h('a', { href: p.tmp, target: '_blank', rel: 'noopener' }, 'TruckersMP', icon('out', 14)) : null))))) : h('div', { class: 'sec' }, empty('No partners yet', 'Partner companies will be listed here.'))];
 }
-
 function podium(rows, metric) {
   const fmt = (r) => (metric === 'km' ? kmS(r.v) : metric === 'jobs' ? plural(r.v, 'job', 'jobs') : n0(r.v));
   return h('div', { class: 'podium' }, rows.slice(0, 3).map((r, i) => h('button', { class: `place p${i + 1}`, type: 'button', onclick: () => openDriver(r.id) },
@@ -345,7 +346,8 @@ async function openDriver(id) {
         h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.month?.km || 0) }), h('span', { text: 'km this month' })),
         h('div', { class: 'tile' }, h('b', { class: 'num', text: `${p.avgDmg}%` }), h('span', { text: 'average damage' })),
         h('div', { class: 'tile' }, h('b', { class: 'num', text: p.longest ? n0(p.longest.km) : '0' }), h('span', { text: 'longest job (km)' })),
-        h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.month?.jobs || 0) }), h('span', { text: 'jobs this month' }))),
+        h('div', { class: 'tile' }, h('b', { class: 'num', text: n0(p.convoys || 0) }), h('span', { text: 'convoys driven' })),
+        p.dotm ? h('div', { class: 'tile' }, h('b', { class: 'num', text: `🏆 ${p.dotm}` }), h('span', { text: 'Driver of the Month' })) : null),
       h('div', { class: 'next' }, next ? [h('b', { text: `${kmS(next.km - p.km)} to ${next.name}` }), h('span', { class: 'prog' }, h('i', { style: { width: `${Math.round(Math.max(0.02, k) * 100)}%` } }))] : h('b', { text: 'Reached the top rank.' })),
       h('h3', { text: 'Last six months' }), chart,
       p.fav ? h('p', { class: 'muted small', text: `Delivers most often to ${p.fav}.` }) : null,
@@ -410,12 +412,11 @@ async function pageConvoys() {
   return out;
 }
 // ---- team panel: post on Discord (CEO, Co-CEO, Media Manager) and plan convoys (Event Team) ----
-const PING_LABEL = { none: 'No ping', 'everyone-hidden': '@everyone, hidden under a spoiler', everyone: '@everyone', 'members-hidden': 'All drivers (Union Member), hidden under a spoiler', members: 'All drivers (Union Member)' };
+const PING_LABEL = { none: 'No ping', 'members-hidden': '@everyone' };
 const pingPicker = (list, cur, id) => h('select', { class: 'field', id }, list.map((p) => h('option', { value: p, selected: p === (cur || 'none') }, PING_LABEL[p])));
 function pingPreview(kind) {
   if (!kind || kind === 'none') return null;
-  const t = kind.startsWith('everyone') ? '@everyone' : '@Union Member';
-  return h('div', null, kind.endsWith('hidden') ? h('span', { class: 'spoiler', title: 'Hidden under a spoiler: people still get the ping', text: t }) : h('span', { class: 'mention', text: t }));
+  return h('div', null, h('span', { class: 'spoiler', title: 'Pings every driver. It sits under a spoiler, so the chat only shows a grey bar.', text: '@Union Member' }));
 }
 // big photos are shrunk in the browser before upload (GIFs go as they are, to keep the animation)
 function shrink(file) {
@@ -474,6 +475,8 @@ function composer(d) {
   const color = h('input', { type: 'color', id: 'po-c', value: '#8a5a2b', class: 'swatch' });
   const link = h('input', { class: 'field', id: 'po-l', type: 'url', placeholder: 'https://…' }), linkLabel = h('input', { class: 'field', id: 'po-ll', maxlength: 80, placeholder: 'Open link' });
   const ping = pingPicker(d.pings, 'none', 'po-p'), plain = h('input', { type: 'checkbox' });
+  const later = h('input', { type: 'checkbox' }), when = h('input', { class: 'field', id: 'po-at', type: 'datetime-local', hidden: true });
+  later.addEventListener('change', () => { when.hidden = !later.checked; sendBtn.lastChild.textContent = later.checked ? 'Schedule post' : 'Post on Discord'; });
   const pv = h('div', { class: 'dc-prev', 'aria-label': 'Preview' });
   const img = imagePicker('', 'po-img', () => draw());
   function draw() {
@@ -485,15 +488,17 @@ function composer(d) {
   for (const el of [title, text, color, link, linkLabel, ping, plain]) el.addEventListener('input', draw);
   plain.addEventListener('change', draw);
   draw();
-  const send_ = (e) => { const b = e.currentTarget; b.disabled = true; act('/api/post', { channel: ch.value, title: title.value, text: text.value, color: color.value, image: img.value, link: link.value, linkLabel: linkLabel.value, ping: ping.value, plain: plain.checked }, () => { S.panelTab = 'history'; render(); }).finally(() => { b.disabled = false; }); };
+  const send_ = (e) => { const b = e.currentTarget; b.disabled = true; act('/api/post', { channel: ch.value, title: title.value, text: text.value, color: color.value, image: img.value, link: link.value, linkLabel: linkLabel.value, ping: ping.value, plain: plain.checked, at: later.checked && when.value ? new Date(when.value).getTime() : undefined }, () => { S.panelTab = 'history'; render(); }).finally(() => { b.disabled = false; }); };
+  const sendBtn = h('button', { class: 'btn', type: 'button', onclick: send_ }, icon('send', 18), 'Post on Discord');
   return h('section', { class: 'composer sec' },
     h('div', { class: 'panel card' },
-      h('div', { class: 'two' }, field_(ch, 'Channel'), field_(ping, 'Ping')),
+      h('div', { class: 'two' }, field_(ch, 'Channel'), h('div', null, field_(ping, 'Ping'), h('p', { class: 'muted small hint', text: '@everyone pings every driver, hidden under a grey spoiler.' }))),
       field_(title, 'Title'), field_(text, 'Message'),
       h('p', { class: 'lab', text: 'Picture' }), img.el,
       h('div', { class: 'two', style: { marginTop: '14px' } }, field_(link, 'Button link, optional'), field_(linkLabel, 'Button text')),
       h('div', { class: 'pick-row', style: { marginTop: '6px' } }, h('label', { class: 'lab', for: 'po-c', text: 'Colour', style: { margin: 0 } }), color, h('label', { class: 'check', style: { margin: 0 } }, plain, 'Plain message, without the box')),
-      h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: send_ }, icon('send', 18), 'Post on Discord'))),
+      h('div', { class: 'pick-row', style: { marginTop: '10px' } }, h('label', { class: 'check', style: { margin: 0 } }, later, 'Post later'), when),
+      h('div', { class: 'actions' }, sendBtn)),
     h('div', null, h('p', { class: 'lab', text: 'Preview' }), pv));
 }
 
@@ -523,36 +528,127 @@ function planner(d) {
     h('div', { class: 'actions' }, btns));
 }
 function convoyRows(d) {
-  const list = d.convoys.filter((c) => c.start > Date.now() - 3 * 3600_000 || c.draft);
+  const list = d.convoys.filter((c) => c.start > Date.now() - 7 * 864e5 || c.draft);
   if (!list.length) return empty('Nothing planned', 'Plan the next convoy with the form above.');
   return h('div', { class: 'plist' }, list.map((c) => h('div', { class: 'prow panel' },
     c.image ? h('img', { class: 'thumb', src: c.image, alt: '' }) : null,
-    h('div', { class: 'grow' }, h('b', { text: c.title }), h('span', { class: 'muted small', text: `${dateL(c.start)} ${timeL(c.start)}${c.from || c.to ? ` · ${c.from || '?'} → ${c.to || '?'}` : ''}${c.yes ? ` · ${c.yes.length} going` : ''}` })),
+    h('div', { class: 'grow' }, h('b', { text: c.title }), h('span', { class: 'muted small', text: `${dateL(c.start)} ${timeL(c.start)}${c.from || c.to ? ` · ${c.from || '?'} → ${c.to || '?'}` : ''}${c.yes ? ` · ${c.yes.length} going` : ''}${c.slots?.lead?.length ? ` · lead ${c.slots.lead[0]}` : ''}` })),
     h('span', { class: `pill ${c.draft ? 'pending' : 'accepted'}`, text: c.draft ? 'Draft' : c.posted ? 'On Discord' : 'Published' }),
     h('button', { class: 'btn ghost small', type: 'button', onclick: () => { S.editConvoy = c.id; render().then(() => $('#planner')?.scrollIntoView({ behavior: 'smooth' })); } }, 'Edit'),
     c.draft ? h('button', { class: 'btn small', type: 'button', onclick: () => act('/api/convoys/publish', { id: c.id, ping: c.ping }, render) }, 'Publish') : null,
+    !c.draft && c.start < Date.now() + 3600_000 ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => attendanceBox(c) }, c.attended ? `Attendance (${c.attended})` : 'Mark attendance') : null,
     h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Delete "${c.title}"? The Discord post goes too.`)) act('/api/convoys/remove', { id: c.id }, render); } }, 'Delete'))));
 }
 function history(d) {
   if (!d.posts.length) return empty('Nothing posted yet', 'What you post from here shows up in this list, so you can delete it later.');
   return h('div', { class: 'plist sec' }, d.posts.map((p) => h('div', { class: 'prow panel' },
     p.image ? h('img', { class: 'thumb', src: p.image, alt: '' }) : null,
-    h('div', { class: 'grow' }, h('b', { text: p.title || '(picture)' }), h('span', { class: 'muted small', text: `#${p.channel} · ${p.by.name} · ${ago(p.at)}${p.ping !== 'none' ? ` · ${PING_LABEL[p.ping]}` : ''}` })),
+    h('div', { class: 'grow' }, h('b', { text: p.title || '(picture)' }), h('span', { class: 'muted small', text: `#${p.channel} · ${p.by.name} · ${ago(p.at)}${p.ping && p.ping !== 'none' ? ' · @everyone' : ''}` })),
     h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm('Delete this post from Discord?')) act('/api/post/delete', { id: p.id }, render); } }, 'Delete'))));
 }
 const TEAM_NAME = { ceo: 'CEO', coceo: 'Co-CEO', management: 'Management', hr: 'HR Team', events: 'Event Team', media: 'Media Manager', staff: 'Staff' };
+const yesNo = (v, t) => h('span', { class: `tick ${v === true ? 'ok' : v === false ? 'no' : 'na'}`, title: v === null ? `${t}: cannot check` : t, text: `${v === true ? '✓' : v === false ? '✗' : '–'} ${t}` });
+const stat = (n, l, href) => h(href ? 'a' : 'div', { class: 'kpi panel', href }, h('b', { class: 'num', text: n0(n) }), h('span', { text: l }));
+async function tabOverview() {
+  const r = await api('/api/panel/overview'); if (!r.ok) return [empty('Could not load', r.data.error || 'Try again.')];
+  const d = r.data;
+  return [h('div', { class: 'kpis sec' }, stat(d.pending, 'applications waiting', '#/staff'), stat(d.onboarding.length, 'finishing setup'), stat(d.drivers, 'linked drivers'), stat(d.inactive.filter((x) => !x.loa).length, 'inactive 30+ days'), stat(d.loa.length, 'on leave'), stat(d.upcoming, 'convoys coming up'), stat(d.scheduled, 'scheduled posts')),
+    h('div', { class: 'cols2 sec' },
+      h('section', { class: 'panel card' }, h('h2', { text: 'Finishing setup' }), h('p', { class: 'muted', text: 'Accepted, but not in yet. What each one still has to do.' }),
+        d.onboarding.length ? h('div', { class: 'plist' }, d.onboarding.map((o) => h('div', { class: 'prow line' }, h('div', { class: 'grow' }, h('b', { text: o.name }), h('span', { class: 'ticks' }, yesNo(o.trucky, 'Trucky'), yesNo(o.tmp, 'TruckersMP'), yesNo(o.web, 'Website'))),
+          h('button', { class: 'btn ghost small', type: 'button', onclick: () => act('/api/admin/grant', { uid: o.uid }, render) }, 'Give access now')))) : h('p', { class: 'muted', text: 'Nobody is waiting.' })),
+      h('section', { class: 'panel card' }, h('h2', { text: 'Driver of the Month' }),
+        d.dotm ? h('p', { class: 'big-name' }, h('b', { text: d.dotm.name }), h('span', { class: 'muted', text: `${d.dotm.month} · ${kmS(d.dotm.km)}` })) : h('p', { class: 'muted', text: 'Picked automatically on the 1st of each month.' }),
+        d.lastMonth.top.length ? [h('p', { class: 'lab', text: `Top of ${d.lastMonth.label}` }), h('ol', { class: 'mini' }, d.lastMonth.top.map((t) => h('li', null, h('span', { text: t.name }), h('span', { class: 'num muted', text: kmS(t.km) }))))] : null)),
+    h('div', { class: 'cols2 sec' },
+      h('section', { class: 'panel card' }, h('h2', { text: 'Inactive drivers' }), h('p', { class: 'muted', text: 'No delivery for 30 days or more. The bot sends them one friendly DM a month.' }),
+        d.inactive.length ? h('div', { class: 'plist' }, d.inactive.map((x) => h('div', { class: 'prow line' }, h('div', { class: 'grow' }, h('b', { text: x.name }), h('span', { class: 'muted small', text: `${x.days} days${x.lastJob ? `, last job ${dateL(x.lastJob)}` : ', no jobs yet'}${x.loa ? ' · on leave' : ''}${x.warned ? ` · messaged ${ago(x.warned)}` : ''}` })),
+          x.loa ? null : h('button', { class: 'btn ghost small', type: 'button', onclick: () => act('/api/admin/warn', { uid: x.uid }, render) }, 'Send a reminder')))) : h('p', { class: 'muted', text: 'Everyone is driving. 🤎' })),
+      h('section', { class: 'panel card' }, h('h2', { text: 'On leave' }), h('p', { class: 'muted', text: 'Set by the drivers themselves with /loa on Discord.' }),
+        d.loa.length ? h('div', { class: 'plist' }, d.loa.map((l) => h('div', { class: 'prow line' }, h('div', { class: 'grow' }, h('b', { text: l.name }), h('span', { class: 'muted small', text: `until ${dateL(l.until)}${l.reason ? ` · ${l.reason}` : ''}` }))))) : h('p', { class: 'muted', text: 'Nobody is on leave.' }))),
+    h('p', { class: 'muted small sec', text: `Trucky: jobs read ${ago(d.sync.jobs) || 'never'}, members read ${ago(d.sync.members) || 'never'}, last webhook ${ago(d.sync.hook) || 'never'}.` })];
+}
+async function tabDrivers() {
+  const r = await api('/api/panel/drivers'); if (!r.ok) return [empty('Could not load', r.data.error || 'Try again.')];
+  const rows = r.data.rows;
+  if (!rows.length) return [h('div', { class: 'sec' }, empty('No linked drivers yet', 'Drivers show up here once their Discord is linked to Trucky.'))];
+  const q = h('input', { class: 'field', type: 'search', placeholder: 'Search a driver', 'aria-label': 'Search a driver' });
+  const status = { member: ['Has access', 'accepted'], guest: ['No access', 'pending'], gone: ['Not on Discord', 'rejected'] };
+  const list = h('div', { class: 'dtable' }, h('div', { class: 'dhead' }, h('span', { text: 'Driver' }), h('span', { text: 'Rank' }), h('span', { text: 'Kilometres' }), h('span', { text: 'Last job' }), h('span', { text: 'Convoys' }), h('span', { text: 'Discord' }), h('span')),
+    rows.map((x) => h('div', { class: 'drow', 'data-n': x.name.toLowerCase() },
+      h('span', { class: 'who2' }, av(x.avatar, x.name), h('a', { href: `#/soferi/${x.driver}`, text: x.name }), x.dotm ? h('span', { class: 'crown', title: `Driver of the Month × ${x.dotm}`, text: `🏆${x.dotm > 1 ? x.dotm : ''}` }) : null),
+      h('span', { text: x.rank }), h('span', { class: 'num', text: n0(x.km) }),
+      h('span', { class: x.lastJob && Date.now() - x.lastJob < 30 * 864e5 ? '' : 'warn', text: x.lastJob ? ago(x.lastJob) : 'never' }),
+      h('span', { class: 'num', text: x.convoys }),
+      h('span', null, h('span', { class: `pill ${status[x.discord][1]}`, text: x.left ? 'Left Trucky' : x.loa ? 'On leave' : status[x.discord][0] })),
+      h('span', { class: 'acts' }, x.discord === 'guest' ? h('button', { class: 'btn small', type: 'button', onclick: () => act('/api/admin/grant', { uid: x.uid }, render) }, 'Give access') : null,
+        x.discord === 'member' ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => act('/api/admin/grant', { uid: x.uid }, render) }, 'Sync rank') : null,
+        x.discord === 'member' ? h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Remove ${x.name}'s access on Discord?`)) act('/api/admin/revoke', { uid: x.uid }, render); } }, 'Remove access') : null))));
+  q.addEventListener('input', () => { const t = q.value.toLowerCase().trim(); for (const row of list.querySelectorAll('.drow')) row.hidden = !!t && !row.dataset.n.includes(t); });
+  return [h('div', { class: 'toolbar sec' }, q, h('span', { class: 'muted small', text: `${rows.length} drivers` })), list];
+}
+function tabPartners(d) {
+  const ed = d.partners.find((p) => p.id === S.editPartner) || null;
+  const f = { name: h('input', { class: 'field', id: 'pa-n', maxlength: 60, value: ed?.name || '' }), url: h('input', { class: 'field', id: 'pa-u', type: 'url', placeholder: 'https://', value: ed?.url || '' }),
+    tmp: h('input', { class: 'field', id: 'pa-t', type: 'url', placeholder: 'https://truckersmp.com/vtc/…', value: ed?.tmp || '' }), desc: h('textarea', { class: 'field', id: 'pa-d', maxlength: 400, rows: 3 }) };
+  f.desc.value = ed?.desc || '';
+  const logo = imagePicker(ed?.logo || '', 'pa-logo');
+  const done = () => { S.editPartner = null; render(); };
+  return [h('section', { class: 'panel card sec' }, h('h2', { text: ed ? `Edit ${ed.name}` : 'Add a partner' }), h('p', { class: 'muted', text: 'Partners show on the website and in the #partners channel on Discord. Ten at most.' }),
+      h('div', { class: 'two' }, field_(f.name, 'Name'), field_(f.url, 'Website or Discord link'), field_(f.tmp, 'TruckersMP VTC page')), field_(f.desc, 'One or two lines about them'),
+      h('p', { class: 'lab', text: 'Logo' }), logo.el,
+      h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => act('/api/partners/save', { id: ed?.id, name: f.name.value, url: f.url.value, tmp: f.tmp.value, desc: f.desc.value, logo: logo.value }, done) }, ed ? 'Save partner' : 'Add partner'),
+        ed ? h('button', { class: 'btn ghost', type: 'button', onclick: done }, 'Cancel') : null)),
+    d.partners.length ? h('div', { class: 'plist sec' }, d.partners.map((p, i) => h('div', { class: 'prow panel' }, p.logo ? h('img', { class: 'thumb sq', src: p.logo, alt: '' }) : null,
+      h('div', { class: 'grow' }, h('b', { text: p.name }), h('span', { class: 'muted small', text: p.desc || p.url || '' })),
+      h('button', { class: 'btn ghost small', type: 'button', disabled: i === 0, 'aria-label': 'Move up', onclick: () => act('/api/partners/move', { id: p.id, dir: -1 }, render) }, '↑'),
+      h('button', { class: 'btn ghost small', type: 'button', disabled: i === d.partners.length - 1, 'aria-label': 'Move down', onclick: () => act('/api/partners/move', { id: p.id, dir: 1 }, render) }, '↓'),
+      h('button', { class: 'btn ghost small', type: 'button', onclick: () => { S.editPartner = p.id; render(); } }, 'Edit'),
+      h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Remove ${p.name}?`)) act('/api/partners/remove', { id: p.id }, render); } }, 'Remove')))) : null];
+}
+function tabTools() {
+  const tool = (what, title, text, label) => h('div', { class: 'tool panel' }, h('div', null, h('b', { text: title }), h('p', { class: 'muted small', text })),
+    h('button', { class: 'btn ghost small', type: 'button', onclick: (e) => { const b = e.currentTarget; b.disabled = true; act('/api/admin/run', { what }).finally(() => { b.disabled = false; }); } }, label));
+  return [h('div', { class: 'tools sec' },
+    tool('sync', 'Sync with Trucky', 'Read the latest jobs and members now, instead of waiting for the next automatic sync.', 'Sync now'),
+    tool('panels', 'Refresh Discord panels', 'Rebuild the apply, links, ranks, rules, truck details and partners messages.', 'Refresh'),
+    tool('weekly', 'Post the weekly top', 'Normally every Monday morning in #weekly-top.', 'Post now'),
+    tool('dotm', 'Pick the Driver of the Month', 'Normally on the 1st. Gives the role and announces last month\'s winner.', 'Pick now'),
+    tool('potw', 'Photo of the Week', 'Normally on Monday: the photo with the most reactions in #convoy-photos.', 'Post now'),
+    tool('inactivity', 'Remind inactive drivers', 'DMs drivers with no delivery for 30 days who are not on leave. Once a month each.', 'Send now'),
+    S.role === 'admin' ? tool('repair', 'Repair the Discord server', 'The same as /setup: recreates missing channels and roles and fixes permissions.', 'Repair') : null)];
+}
+function tabPosted(d) {
+  return [d.scheduled.length ? h('section', { class: 'sec' }, head('Scheduled', 'These go out by themselves at the time shown.'), h('div', { class: 'plist' }, d.scheduled.sort((a, b) => a.at - b.at).map((p) => h('div', { class: 'prow panel' },
+    p.image ? h('img', { class: 'thumb', src: p.image, alt: '' }) : null, h('div', { class: 'grow' }, h('b', { text: p.title || '(picture)' }), h('span', { class: 'muted small', text: `#${p.channel} · ${dateL(p.at)} ${timeL(p.at)} · ${p.by.name}${p.ping && p.ping !== 'none' ? ' · @everyone' : ''}` })),
+    h('button', { class: 'btn danger small', type: 'button', onclick: () => act('/api/scheduled/cancel', { id: p.id }, render) }, 'Cancel'))))) : null,
+    h('section', { class: 'sec' }, head('Posted'), history(d))];
+}
+async function attendanceBox(c) {
+  const r = await api(`/api/panel/attendance?id=${encodeURIComponent(c.id)}`); if (!r.ok) return toast(r.data.error, true);
+  const boxes = r.data.people.map((p) => ({ p, el: h('input', { type: 'checkbox', checked: p.here }) }));
+  const dlg = h('dialog', { class: 'dlg panel' }, h('h2', { text: `Who drove: ${c.title}` }), h('p', { class: 'muted', text: 'People who said they were coming are listed first.' }),
+    h('div', { class: 'attlist' }, boxes.map(({ p, el }) => h('label', { class: 'check' }, el, p.name, p.rsvp ? h('span', { class: 'muted small', text: ` · ${p.rsvp === 'yes' ? (p.slot && p.slot !== 'driver' ? p.slot : 'going') : 'maybe'}` }) : null))),
+    h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => act('/api/panel/attendance', { id: c.id, uids: boxes.filter((b) => b.el.checked).map((b) => b.p.uid) }, () => { dlg.close(); dlg.remove(); render(); }) }, 'Save attendance'),
+      h('button', { class: 'btn ghost', type: 'button', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close')));
+  document.body.append(dlg); dlg.showModal();
+}
 async function pagePanel() {
-  if (!S.user) return [empty('Log in with Discord', 'The panel is for the team.', loginBtn())];
+  if (!S.user) return [empty('Log in with Discord', 'The admin panel is for the team.', loginBtn())];
   const r = await api('/api/panel'); if (!r.ok) return [empty('Team only', r.data.error || 'Try again.')];
   const d = r.data, c = d.caps;
-  const tabs = [...(c.media ? [['post', 'Post on Discord']] : []), ...(c.events ? [['convoys', 'Convoys and events']] : []), ...(c.media ? [['history', 'Posted']] : [])];
+  const tabs = [...(c.manage ? [['overview', 'Overview']] : []), ...(c.media ? [['post', 'Post']] : []), ...(c.events ? [['convoys', 'Convoys']] : []), ...(c.media ? [['history', 'Posted']] : []),
+    ...(c.manage ? [['drivers', 'Drivers']] : []), ...(c.post ? [['partners', 'Partners'], ['tools', 'Tools']] : [])];
   const tab = tabs.some((t) => t[0] === S.panelTab) ? S.panelTab : tabs[0][0];
-  const what = c.post ? 'Post in any channel, plan convoys and manage what the bot posted.' : [c.media ? 'Post in the news, convoy photos and screenshots channels.' : null, c.events ? 'Plan convoys and announce them.' : null].filter(Boolean).join(' ');
-  const out = [h('div', { class: 'pagehead' }, h('h1', { text: 'Discord panel' }), h('p', { text: what }), d.teams.length ? h('div', { class: 'chips' }, d.teams.map((t) => h('span', { class: 'pill pending', text: TEAM_NAME[t] || t }))) : null),
-    h('div', { class: 'tabsline' }, tabs.map(([k, l]) => h('button', { class: `btn small ${tab === k ? '' : 'ghost'}`, type: 'button', onclick: () => { S.panelTab = k; render(); } }, l)))];
+  const out = [h('div', { class: 'pagehead' }, h('h1', { text: 'Admin panel' }), d.teams.length ? h('div', { class: 'chips' }, d.teams.map((t) => h('span', { class: 'pill pending', text: TEAM_NAME[t] || t }))) : null),
+    h('div', { class: 'tabsline', role: 'tablist' }, tabs.map(([k, l]) => h('button', { class: `btn small ${tab === k ? '' : 'ghost'}`, type: 'button', role: 'tab', 'aria-selected': String(tab === k), onclick: () => { S.panelTab = k; render(); } }, l)))];
+  if (tab === 'overview') out.push(...await tabOverview());
   if (tab === 'post') out.push(composer(d));
-  if (tab === 'convoys') out.push(planner(d), h('section', { class: 'sec' }, head('Planned', 'Drafts and upcoming convoys.'), convoyRows(d)));
-  if (tab === 'history') out.push(history(d));
+  if (tab === 'convoys') out.push(planner(d), h('section', { class: 'sec' }, head('Planned', 'Drafts, upcoming convoys and the last ones (to mark who came).'), convoyRows(d)));
+  if (tab === 'history') out.push(...tabPosted(d));
+  if (tab === 'drivers') out.push(...await tabDrivers());
+  if (tab === 'partners') out.push(...tabPartners(d));
+  if (tab === 'tools') out.push(...tabTools());
   return out;
 }
 
@@ -665,7 +761,7 @@ function configForm(c, chans) {
 
 // ---- shell ----
 const TABS = [['', 'Home', 'home'], ['soferi', 'Drivers', 'users'], ['curse', 'Jobs', 'truck'], ['clasament', 'Leaderboard', 'trophy'], ['convoaie', 'Convoys', 'flag']];
-const PAGES = { '': pageHome, soferi: pageDrivers, curse: pageJobs, clasament: pageBoard, convoaie: pageConvoys, aplica: pageApply, cont: pageAccount, staff: pageStaff, panel: pagePanel };
+const PAGES = { '': pageHome, soferi: pageDrivers, curse: pageJobs, clasament: pageBoard, convoaie: pageConvoys, aplica: pageApply, cont: pageAccount, staff: pageStaff, panel: pagePanel, partners: pagePartners };
 const route = () => { const r = location.hash.replace(/^#\/?/, '').split('/'); return { page: r[0] in PAGES ? r[0] : '', arg: r[1] || null }; };
 
 function shell() {
@@ -678,7 +774,7 @@ function shell() {
   const me = $('#me');
   if (S.user) {
     const menu = h('div', { class: 'menu', hidden: true }, S.driver ? h('a', { href: `#/soferi/${S.driver.id}` }, icon('users', 18), 'My profile') : null, h('a', { href: '#/cont' }, icon('link', 18), S.driver ? 'My account' : 'Link your account'),
-      !S.member && S.cfg.recruitOpen ? h('a', { href: '#/aplica' }, icon('pen', 18), 'Apply') : null, S.caps.media || S.caps.events ? h('a', { href: '#/panel' }, icon('send', 18), 'Discord panel') : null, S.role ? h('a', { href: '#/staff' }, icon('gear', 18), 'Staff') : null, h('a', { href: '/auth/logout' }, icon('exit', 18), 'Log out'));
+      !S.member && S.cfg.recruitOpen ? h('a', { href: '#/aplica' }, icon('pen', 18), 'Apply') : null, S.caps.media || S.caps.events || S.caps.manage ? h('a', { href: '#/panel' }, icon('gear', 18), 'Admin panel') : null, S.role ? h('a', { href: '#/staff' }, icon('gear', 18), 'Staff') : null, h('a', { href: '/auth/logout' }, icon('exit', 18), 'Log out'));
     const btn = h('button', { class: 'who', type: 'button', 'aria-expanded': 'false', 'aria-label': `Account: ${S.user.name}`, onclick: (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); } }, av(S.driver?.avatar || S.user.avatar, S.user.name), h('span', { text: S.driver?.name || S.user.name }));
     me.replaceChildren(btn, menu);
   } else me.replaceChildren(S.login ? h('a', { class: 'btn small', href: '/auth/login' }, 'Log in') : '');
@@ -696,7 +792,7 @@ async function render() {
   if (my !== tok) return;
   view.replaceChildren(...nodes.flat(Infinity).filter(Boolean));
   lastPage = page; reveal(view);
-  document.title = page ? `${(TABS.find((t) => t[0] === page) || [0, { aplica: 'Apply', cont: 'My account', staff: 'Staff', panel: 'Discord panel' }[page]])[1]} · ${S.cfg.name}` : S.cfg.name;
+  document.title = page ? `${(TABS.find((t) => t[0] === page) || [0, { aplica: 'Apply', cont: 'My account', staff: 'Staff', panel: 'Admin panel', partners: 'Partners' }[page]])[1]} · ${S.cfg.name}` : S.cfg.name;
   if (page === 'soferi' && arg) openDriver(arg);
 }
 addEventListener('hashchange', () => { const { page, arg } = route(); if (!(page === 'soferi' && arg)) { closeDrawerOnly(); if (page !== lastPage) scrollTo(0, 0); } render(); });
@@ -722,11 +818,13 @@ function intro() {
   el.addEventListener('pointerdown', go); addEventListener('keydown', go, { once: true });
   setTimeout(go, 2300);
 }
-intro();
 async function boot() {
   const r = await api('/api/me').catch(() => null);
   if (r?.ok) Object.assign(S, { user: r.data.user, role: r.data.role, caps: r.data.caps || {}, teams: r.data.teams || [], member: !!r.data.member, cfg: r.data.cfg, login: r.data.login, driver: r.data.driver });
   $('.brand-name').textContent = S.cfg.name;
+  const ext = (href, t) => (href ? h('a', { href, target: '_blank', rel: 'noopener' }, t) : null);
+  $('#foot-links').replaceChildren(...[h('a', { href: '#/convoaie' }, 'Convoys'), h('a', { href: '#/partners' }, 'Partners'), S.cfg.recruitOpen && !S.member ? h('a', { href: '#/aplica' }, 'Apply') : null,
+    ext(S.cfg.tmpUrl, 'TruckersMP'), ext(S.cfg.truckyUrl, 'Trucky'), ext(S.cfg.discordInvite, 'Discord')].filter(Boolean));
   await render();
 }
 boot();

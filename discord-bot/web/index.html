@@ -9,14 +9,10 @@
   <title>{{NAME}}</title>
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <link rel="preload" as="image" href="/img/cover.webp" type="image/webp">
-  <link rel="preload" as="font" type="font/woff2" href="/fonts/big-shoulders-display-latin-900-normal.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/archivo-latin-800-normal.woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div id="intro" class="intro" aria-hidden="true">
-    <div class="intro-coin"><span class="ring"></span><img src="/img/logo-512.webp" alt=""></div>
-    <p class="intro-line">United by the Road</p>
-  </div>
   <a class="skip" href="#view">Skip to content</a>
   <header class="top">
     <a class="brand" href="#/" aria-label="{{NAME}}, home">
@@ -27,7 +23,11 @@
     <div id="me" class="me"></div>
   </header>
   <main id="view" class="page" tabindex="-1"></main>
-  <footer class="foot"><p>Jobs and distances come from Trucky. Diesel Union drives Euro Truck Simulator 2 only. Income is in-game money, in euros.</p></footer>
+  <footer class="foot">
+    <div class="foot-brand"><img src="/img/logo-160.webp" alt="" width="40" height="40"><div><b>{{NAME}}</b><span>A Euro Truck Simulator 2 company on TruckersMP.</span></div></div>
+    <nav class="foot-links" id="foot-links" aria-label="Elsewhere"></nav>
+    <p class="foot-note">Jobs and distances come from Trucky. Income is in-game money, in euros. Not affiliated with SCS Software, TruckersMP or Trucky.</p>
+  </footer>
   <nav id="tabbar" class="tabbar" aria-label="Sections"></nav>
   <aside id="drawer" class="drawer" hidden aria-label="Driver profile"></aside>
   <div id="scrim" class="scrim" hidden></div>
