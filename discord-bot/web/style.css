@@ -548,3 +548,4 @@ a.v-partner:hover { border-color: var(--line2); background: rgba(243,230,208,.03
 .chip { font-size: 12px; padding: 2px 8px; border: 1px solid var(--line2); color: var(--sand); }
 .mhist { margin: 0; padding-left: 18px; color: var(--sand); font-size: 14px; display: grid; gap: 4px; }
 .mcard .actions { margin-top: 0; }
+.linkrow { display: flex; gap: 8px; flex: 1 1 280px; max-width: 380px; } .linkrow .field { flex: 1; min-width: 0; }

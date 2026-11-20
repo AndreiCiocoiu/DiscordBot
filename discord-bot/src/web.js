@@ -54,7 +54,7 @@ function limited(req, max = 240) {
 async function raw(req, max = 2_000_000) { const c = []; let n = 0; for await (const x of req) { n += x.length; if (n > max) throw new Error('too big'); c.push(x); } return Buffer.concat(c); }
 const publicCfg = () => { const c = cfg(); return { name: c.name, tag: c.tag, tagline: c.tagline, recruitOpen: c.recruitOpen, ranks: c.ranks, about: c.about, requirements: c.requirements, discordInvite: c.discordInvite,
   tmpUrl: c.tmpId ? `https://truckersmp.com/vtc/${c.tmpId}` : '', truckyUrl: /^https:\/\//.test(c.truckyUrl || '') ? c.truckyUrl : '', trucky: !!c.truckyId }; };
-const PANEL = new Set(['/api/admin/mod', '/api/upload', '/api/post', '/api/post/delete', '/api/convoys', '/api/convoys/publish', '/api/convoys/remove', '/api/scheduled/cancel', '/api/panel/attendance', '/api/partners/save', '/api/partners/remove', '/api/partners/move', '/api/admin/grant', '/api/admin/revoke', '/api/admin/warn', '/api/admin/run']);
+const PANEL = new Set(['/api/admin/link', '/api/admin/unlink', '/api/admin/mod', '/api/upload', '/api/post', '/api/post/delete', '/api/convoys', '/api/convoys/publish', '/api/convoys/remove', '/api/scheduled/cancel', '/api/panel/attendance', '/api/partners/save', '/api/partners/remove', '/api/partners/move', '/api/admin/grant', '/api/admin/revoke', '/api/admin/warn', '/api/admin/run']);
 const PRIVATE = new Set(['/api/drivers', '/api/driver', '/api/jobs', '/api/board']);
 const recent = (n) => stats.done().slice(-n).reverse();
 
@@ -116,6 +116,12 @@ function start() {
       const uid = String(b.uid || '');
       if (route === '/api/admin/grant') return /^\d{5,25}$/.test(uid) ? bot.grant(uid) : { ok: false, msg: 'Missing member.' };
       if (route === '/api/admin/revoke') return /^\d{5,25}$/.test(uid) ? bot.revoke(uid) : { ok: false, msg: 'Missing member.' };
+      if (route === '/api/admin/link') {
+        let who = String(b.who || '').trim().replace(/^<@!?(\d+)>$/, '$1');
+        if (!/^\d{15,25}$/.test(who)) { const found = await bot.findMembers(who); const exact = found.filter((m) => m.tag.toLowerCase() === who.toLowerCase().replace(/^@/, '') || m.name.toLowerCase() === who.toLowerCase()); const pick = exact.length === 1 ? exact[0] : found.length === 1 ? found[0] : null; if (!pick) return { ok: false, msg: found.length ? 'More than one member matches. Use their Discord user ID.' : 'Nobody on the Discord server matches that.' }; who = pick.uid; }
+        return bot.link(who, String(b.driver || ''), s.name);
+      }
+      if (route === '/api/admin/unlink') return /^\d{5,25}$/.test(uid) ? bot.unlink(uid, s.name) : { ok: false, msg: 'Missing member.' };
       if (route === '/api/admin/mod') {
         const action = String(b.action);
         if ((action === 'ban' || action === 'unban') && !acc.caps.ban) return { ok: false, msg: 'Only CEO, Co-CEO and Management can ban.' };
@@ -227,7 +233,9 @@ function start() {
           const uids = Object.keys(db.links), where = await bot.inGuild(uids);
           const rows = uids.map((uid) => { const t = db.links[uid], c = stats.driverCard(t), m = db.members[t] || {};
             return { uid, driver: t, name: c?.name || m.name || t, avatar: c?.avatar || m.avatar || null, rank: c?.rank?.name || '', km: c?.km || 0, lastJob: last.get(t) || null, convoys: X.attended(uid), dotm: X.dotmCount(t), loa: X.onLeave(uid), left: !!m.left, discord: where[uid] }; });
-          return json(res, 200, { rows: rows.sort((a, b) => b.km - a.km) });
+          const linkedIds = new Set(Object.values(db.links));
+          const unlinked = Object.values(db.members).filter((m) => !m.left && !linkedIds.has(m.id)).map((m) => ({ driver: m.id, name: m.name, avatar: m.avatar || null, km: stats.driverCard(m.id)?.km || 0 })).sort((a, b) => b.km - a.km);
+          return json(res, 200, { rows: rows.sort((a, b) => b.km - a.km), unlinked });
         }
         return json(res, 404, { error: 'Not found.' });
       }

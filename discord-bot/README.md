@@ -47,6 +47,8 @@ How someone joins:
 4. When they are in the company on Trucky (same Steam account), in the VTC on TruckersMP (checked with the public TruckersMP API) and have logged in on the website, the bot gives **Union Member** and their rank role, removes Approved and welcomes them in #new-drivers-and-promotions. They can press **Check my progress** in #finish-setup; it also happens on its own.
 5. Rank roles follow their kilometres. Leaving the company on Trucky removes access (switch it off in Settings).
 
+Linking Discord to Trucky: drivers use `/link steam:<their Steam link>` (or link on the website); staff use `/linkdriver member:@x driver:<name>` (the driver list autocompletes) and `/unlinkdriver`, or the Drivers tab in the admin panel.
+
 Staff commands: `/verify member:@x` (check one person, `force:true` gives access anyway), `/setup hide_others:true` hides old channels from newcomers.
 
 The bot needs **Administrator** (or Manage Roles + Manage Channels) and its role must be at the **top** of the role list, above every Diesel Union role.

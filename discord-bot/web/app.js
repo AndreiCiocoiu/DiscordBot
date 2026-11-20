@@ -666,10 +666,22 @@ async function tabOverview() {
         d.loa.length ? h('div', { class: 'plist' }, d.loa.map((l) => h('div', { class: 'prow line' }, h('div', { class: 'grow' }, h('b', { text: l.name }), h('span', { class: 'muted small', text: `until ${dateL(l.until)}${l.reason ? ` · ${l.reason}` : ''}` }))))) : h('p', { class: 'muted', text: 'Nobody is on leave.' }))),
     h('p', { class: 'muted small sec', text: `Trucky: jobs read ${ago(d.sync.jobs) || 'never'}, members read ${ago(d.sync.members) || 'never'}, last webhook ${ago(d.sync.hook) || 'never'}.` })];
 }
+// Trucky drivers with no Discord account yet: staff link them here (or with /linkdriver on Discord)
+function unlinkedBox(list) {
+  if (!list?.length) return null;
+  return h('section', { class: 'sec' }, head('In the company on Trucky, not linked', 'Type their Discord name or user ID and press Link. Drivers can also do it themselves with /link on Discord.'),
+    h('div', { class: 'plist' }, list.map((m) => {
+      const who = h('input', { class: 'field', placeholder: 'Discord name or user ID', 'aria-label': `Discord account for ${m.name}` });
+      const go = () => act('/api/admin/link', { who: who.value, driver: m.driver }, render);
+      who.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      return h('div', { class: 'prow panel' }, av(m.avatar, m.name), h('div', { class: 'grow' }, h('b', { text: m.name }), h('span', { class: 'muted small', text: `${n0(m.km)} km · Trucky #${m.driver}` })),
+        h('div', { class: 'linkrow' }, who, h('button', { class: 'btn small', type: 'button', onclick: go }, 'Link')));
+    })));
+}
 async function tabDrivers() {
   const r = await api('/api/panel/drivers'); if (!r.ok) return [empty('Could not load', r.data.error || 'Try again.')];
   const rows = r.data.rows;
-  if (!rows.length) return [h('div', { class: 'sec' }, empty('No linked drivers yet', 'Drivers show up here once their Discord is linked to Trucky.'))];
+  if (!rows.length) return [h('div', { class: 'sec' }, empty('No linked drivers yet', 'Drivers show up here once their Discord is linked to Trucky. Link them below, or they can use /link on Discord.')), unlinkedBox(r.data.unlinked)];
   const q = h('input', { class: 'field', type: 'search', placeholder: 'Search a driver', 'aria-label': 'Search a driver' });
   const status = { member: ['Has access', 'accepted'], guest: ['No access', 'pending'], gone: ['Not on Discord', 'rejected'] };
   const list = h('div', { class: 'dtable' }, h('div', { class: 'dhead' }, h('span', { text: 'Driver' }), h('span', { text: 'Rank' }), h('span', { text: 'Kilometres' }), h('span', { text: 'Last job' }), h('span', { text: 'Convoys' }), h('span', { text: 'Discord' }), h('span')),
@@ -682,9 +694,10 @@ async function tabDrivers() {
       h('span', { class: 'acts' }, x.discord === 'guest' ? h('button', { class: 'btn small', type: 'button', onclick: () => act('/api/admin/grant', { uid: x.uid }, render) }, 'Give access') : null,
         x.discord === 'member' ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => act('/api/admin/grant', { uid: x.uid }, render) }, 'Sync rank') : null,
         x.discord === 'member' ? h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Remove ${x.name}'s access on Discord?`)) act('/api/admin/revoke', { uid: x.uid }, render); } }, 'Remove access') : null,
-        x.discord !== 'gone' ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => { S.modQuery = x.uid; S.panelTab = 'moderation'; render(); } }, 'Moderate') : null))));
+        x.discord !== 'gone' ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => { S.modQuery = x.uid; S.panelTab = 'moderation'; render(); } }, 'Moderate') : null,
+        h('button', { class: 'btn ghost small', type: 'button', onclick: () => { if (confirm(`Unlink ${x.name} from their Discord account?`)) act('/api/admin/unlink', { uid: x.uid }, render); } }, 'Unlink')))));
   q.addEventListener('input', () => { const t = q.value.toLowerCase().trim(); for (const row of list.querySelectorAll('.drow')) row.hidden = !!t && !row.dataset.n.includes(t); });
-  return [h('div', { class: 'toolbar sec' }, q, h('span', { class: 'muted small', text: `${rows.length} drivers` })), list];
+  return [h('div', { class: 'toolbar sec' }, q, h('span', { class: 'muted small', text: `${rows.length} drivers` })), list, unlinkedBox(r.data.unlinked)];
 }
 function tabPartners(d) {
   const ed = d.partners.find((p) => p.id === S.editPartner) || null;

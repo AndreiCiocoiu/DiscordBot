@@ -29,6 +29,14 @@ const commands = [
   new SlashCommandBuilder().setName('loa').setDescription('Going away for a while? Tell the company (leave of absence)')
     .addIntegerOption((o) => o.setName('days').setDescription('How many days (0 = I am back)').setRequired(true).setMinValue(0).setMaxValue(90))
     .addStringOption((o) => o.setName('reason').setDescription('Optional').setMaxLength(300)),
+  new SlashCommandBuilder().setName('link').setDescription('Link your Discord to your Diesel Union driver on Trucky')
+    .addStringOption((o) => o.setName('steam').setDescription('Your Steam profile link or SteamID64 (the one you drive with)').setRequired(true).setMaxLength(120)),
+  new SlashCommandBuilder().setName('unlink').setDescription('Unlink your Discord from your Trucky driver'),
+  new SlashCommandBuilder().setName('linkdriver').setDescription('Staff: link a member to a Trucky driver').setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .addUserOption((o) => o.setName('member').setDescription('The Discord member').setRequired(true))
+    .addStringOption((o) => o.setName('driver').setDescription('Start typing the Trucky name (or paste a Steam link)').setRequired(true).setAutocomplete(true)),
+  new SlashCommandBuilder().setName('unlinkdriver').setDescription('Staff: remove the Trucky link of a member').setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .addUserOption((o) => o.setName('member').setDescription('The Discord member').setRequired(true)),
   new SlashCommandBuilder().setName('setup').setDescription('Build or repair the Diesel Union channels, roles and panels').setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addBooleanOption((o) => o.setName('hide_others').setDescription('Also hide old channels that are not part of the layout from newcomers')),
   new SlashCommandBuilder().setName('verify').setDescription('Check a member\'s onboarding and give access when it is done').setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
@@ -356,7 +364,64 @@ function start() {
       return i.reply(eph(r.msg));
     }
   }
+  // ---- linking a Discord account to a Trucky driver ----
+  // driver: a Trucky driver ID, an exact Trucky name, or a Steam link / ID
+  async function findDriver(v) {
+    const s = String(v || '').trim(); if (!s) return null;
+    if (db.members[s]) return db.members[s];
+    const byName = Object.values(db.members).filter((m) => m.name?.toLowerCase() === s.toLowerCase());
+    if (byName.length === 1) return byName[0];
+    const steam = await apply.resolveSteam(s);
+    if (steam) { let m = Object.values(db.members).find((x) => x.steam === steam); if (!m) { await freshMembers(); m = Object.values(db.members).find((x) => x.steam === steam); } return m || null; }
+    return null;
+  }
+  async function linkDriver(uid, driver, by, { force = false } = {}) {
+    if (!driver) return { ok: false, msg: 'That driver is not in Diesel Union on Trucky. Join the company on Trucky first; it can take a few minutes to show up.' };
+    if (driver.left) return { ok: false, msg: `${driver.name} has left the company on Trucky.` };
+    const other = Object.keys(db.links).find((d) => db.links[d] === driver.id && d !== uid);
+    if (other && !force) return { ok: false, msg: `${driver.name} is already linked to another Discord account. Ask staff if that is a mistake.` };
+    if (other) delete db.links[other];
+    const had = db.links[uid]; db.links[uid] = driver.id; save();
+    botlog(`🔗 <@${uid}> linked to Trucky driver **${driver.name}**${by ? ` by ${by}` : ''}${other ? ` (moved from <@${other}>)` : ''}${had && had !== driver.id ? ` (was ${db.members[had]?.name || had})` : ''}.`);
+    const gm = await member(uid);
+    let extra = '';
+    if (gm) {
+      const mem = G.roleId('member');
+      if (mem && gm.roles.cache.has(mem)) { const rk = await G.syncRank(gm); if (rk) extra = ` Rank: **${rk}**.`; }
+      else { const r = await onboard(uid).catch(() => null); if (r?.done) extra = ' All steps are done, so access was given too.'; }
+    }
+    return { ok: true, msg: `Linked to **${driver.name}** on Trucky.${extra}` };
+  }
+  function unlinkDriver(uid, by) {
+    const t = db.links[uid]; if (!t) return { ok: false, msg: 'There is no Trucky link to remove.' };
+    delete db.links[uid]; save();
+    botlog(`⛓️ <@${uid}> unlinked from Trucky driver **${db.members[t]?.name || t}**${by ? ` by ${by}` : ''}.`);
+    return { ok: true, msg: `Unlinked from ${db.members[t]?.name || 'the driver'}.` };
+  }
+  async function onAutocomplete(i) {
+    const q = String(i.options.getFocused() || '').toLowerCase();
+    const linked = new Set(Object.values(db.links));
+    const list = Object.values(db.members).filter((m) => !m.left && (!q || m.name?.toLowerCase().includes(q) || m.id === q))
+      .sort((a, b) => (linked.has(a.id) - linked.has(b.id)) || a.name.localeCompare(b.name)).slice(0, 25);
+    return i.respond(list.map((m) => ({ name: `${m.name}${linked.has(m.id) ? ' (already linked)' : ''}`.slice(0, 100), value: m.id }))).catch(() => {});
+  }
+
   async function onAdminCommand(i) {
+    if (i.commandName === 'link') {
+      await i.deferReply({ flags: MessageFlags.Ephemeral });
+      const d = await findDriver(i.options.getString('steam'));
+      if (!d && !(await apply.resolveSteam(i.options.getString('steam')))) return i.editReply('We could not find that Steam profile. Paste your profile link, like steamcommunity.com/id/yourname or steamcommunity.com/profiles/7656119…');
+      return i.editReply((await linkDriver(i.user.id, d, null)).msg);
+    }
+    if (i.commandName === 'unlink') return i.reply(eph(unlinkDriver(i.user.id, null).msg));
+    if (i.commandName === 'linkdriver' || i.commandName === 'unlinkdriver') {
+      if (!(await role(i.user.id))) return i.reply(eph('Only staff can do that.'));
+      const u = i.options.getUser('member'), by = i.member?.displayName || i.user.username;
+      if (i.commandName === 'unlinkdriver') return i.reply(eph(unlinkDriver(u.id, by).msg));
+      await i.deferReply({ flags: MessageFlags.Ephemeral });
+      const r = await linkDriver(u.id, await findDriver(i.options.getString('driver')), by, { force: true });
+      return i.editReply(`<@${u.id}>: ${r.msg}`);
+    }
     if (i.commandName === 'apply') return openApply(i);
     if (i.commandName === 'setup') {
       if ((await role(i.user.id)) !== 'admin') return i.reply(eph('Only admins can run /setup.'));
@@ -393,12 +458,14 @@ function start() {
   client.on(Events.GuildCreate, (g) => g.commands.set(commands.map((x) => x.toJSON())).catch(() => {}));
   client.on(Events.InteractionCreate, async (i) => {
     try {
+      if (i.isAutocomplete()) return await onAutocomplete(i);
       if (i.isChatInputCommand()) return await onAdminCommand(i);
       if (i.isButton() && i.customId.startsWith('du:')) return await onButton(i);
       if (i.isModalSubmit() && i.customId.startsWith('du:')) return await onModal(i);
     } catch (err) {
       console.error('interaction:', err);
       const msg = 'Something went wrong. Try again.';
+      if (i.isAutocomplete?.()) return;
       if (i.deferred || i.replied) await i.followUp(eph(msg)).catch(() => {}); else await i.reply?.(eph(msg)).catch(() => {});
     }
   });
@@ -529,6 +596,8 @@ function start() {
     login: () => client.login(process.env.DISCORD_TOKEN),
     // admin panel actions on one member
     async grant(uid) { const r = await onboard(uid, { force: true }); return { ok: r.done, msg: r.done ? (r.already ? 'They already had access. Rank role synced.' : 'Access given.') : r.text.replace(/[*⬜✅]/g, '') }; },
+    async link(uid, driver, by) { return linkDriver(uid, await findDriver(driver), by, { force: true }); },
+    unlink: (uid, by) => unlinkDriver(uid, by),
     async revoke(uid) {
       const gm = await member(uid); if (!gm) return { ok: false, msg: 'That person is not on the Discord server.' };
       const drop = [G.roleId('member'), G.roleId('approved'), ...G.rankRoleIds()].filter((r) => r && gm.roles.cache.has(r));
