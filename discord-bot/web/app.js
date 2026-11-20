@@ -176,6 +176,49 @@ function bill(j) {
     h('div', { class: 'k num' }, n0(j.km), h('small', { text: 'km' })),
     h('div', { class: 'm num' }, cash(j.income, j.game), h('small', { text: `damage ${j.dmg}%` })));
 }
+// Discord-style formatting (**bold**, *italic*, __underline__, ~~strike~~, `code`, > quote, - list, # heading, [text](link))
+// turned into real elements. Built node by node, so nothing typed in can become HTML.
+const MD_INLINE = /(\*\*\*([^*]+?)\*\*\*)|(\*\*(.+?)\*\*)|(__(.+?)__)|(\*([^*\s](?:[^*]*?[^*\s])?)\*)|(\b_([^_\s](?:[^_]*?[^_\s])?)_\b)|(~~(.+?)~~)|(\|\|(.+?)\|\|)|(`([^`]+?)`)|(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\))|(https?:\/\/[^\s<>()]+[^\s<>().,!?])/g;
+function mdInline(text) {
+  const out = [], re = new RegExp(MD_INLINE.source, 'g'); let last = 0, m; // own copy: the calls nest
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    if (m[1]) out.push(h('strong', null, h('em', null, mdInline(m[2]))));
+    else if (m[3]) out.push(h('strong', null, mdInline(m[4])));
+    else if (m[5]) out.push(h('u', null, mdInline(m[6])));
+    else if (m[7]) out.push(h('em', null, mdInline(m[8])));
+    else if (m[9]) out.push(h('em', null, mdInline(m[10])));
+    else if (m[11]) out.push(h('s', null, mdInline(m[12])));
+    else if (m[13]) out.push(h('span', { class: 'spoiler', title: 'Spoiler', text: m[14] }));
+    else if (m[15]) out.push(h('code', { text: m[16] }));
+    else if (m[17]) out.push(h('a', { href: m[19], target: '_blank', rel: 'noopener noreferrer' }, mdInline(m[18])));
+    else if (m[20]) out.push(h('a', { href: m[20], target: '_blank', rel: 'noopener noreferrer', text: m[20] }));
+    last = re.lastIndex;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+function md(text, cls = '') {
+  const lines = String(text || '').replace(/\r/g, '').split('\n'), blocks = [];
+  let para = [], list = null, quote = null;
+  const flush = () => {
+    if (para.length) { blocks.push(h('p', null, para.flatMap((l, i) => (i ? [h('br'), ...mdInline(l)] : mdInline(l))))); para = []; }
+    if (list) { blocks.push(h('ul', null, list.map((l) => h('li', null, mdInline(l))))); list = null; }
+    if (quote) { blocks.push(h('blockquote', null, quote.flatMap((l, i) => (i ? [h('br'), ...mdInline(l)] : mdInline(l))))); quote = null; }
+  };
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    let m;
+    if (!line.trim()) { flush(); continue; }
+    if ((m = line.match(/^(#{1,3})\s+(.*)$/))) { flush(); blocks.push(h(`h${m[1].length + 2}`, { class: 'md-h' }, mdInline(m[2]))); continue; }
+    if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) { if (para.length || quote) { const l = list; list = null; flush(); list = l; } (list ||= []).push(m[1]); continue; }
+    if ((m = line.match(/^>>?>?\s?(.*)$/))) { if (para.length || list) { const q = quote; quote = null; flush(); quote = q; } (quote ||= []).push(m[1]); continue; }
+    if (list || quote) flush();
+    para.push(line);
+  }
+  flush();
+  return h('div', { class: `md ${cls}`.trim() }, blocks);
+}
 function convoyCard(c, full) {
   const d = new Date(c.start), soon = c.start - Date.now();
   const card = h('article', { class: `convoy panel rv${c.image ? ' has-img' : ''}`, style: c.image ? { '--img': `url("${String(c.image).replace(/["\\\n]/g, '')}")` } : null },
@@ -188,7 +231,7 @@ function convoyCard(c, full) {
         c.server ? h('span', null, icon('server', 16), c.server) : null, c.meet ? h('span', null, icon('pin', 16), c.meet) : null, h('span', { class: `game ${c.game}`, text: c.game })),
       full && c.slots && (c.slots.lead.length || c.slots.tail.length || c.slots.guard.length) ? h('p', { class: 'desc slots', text: [c.slots.lead.length ? `Lead: ${c.slots.lead.join(', ')}` : null, c.slots.tail.length ? `Tail: ${c.slots.tail.join(', ')}` : null, c.slots.guard.length ? `Road Guard: ${c.slots.guard.join(', ')}` : null].filter(Boolean).join(' · ') }) : null,
       full && c.dlc ? h('p', { class: 'desc', text: `DLC: ${c.dlc}` }) : null,
-      full && c.desc ? h('p', { class: 'desc', text: c.desc }) : null),
+      full && c.desc ? md(c.desc, 'desc') : null),
     h('div', { class: 'rsvp' },
       c.tmp ? h('a', { class: 'btn ghost small', href: c.link, target: '_blank', rel: 'noopener' }, 'View on TruckersMP', icon('out', 16))
         : [faces(c), soon > -3 * 3600_000 ? rsvpButtons(c) : null, S.caps.events && full ? h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Delete the convoy "${c.title}"?`)) act('/api/convoys/remove', { id: c.id }, render); } }, 'Delete') : null]));
@@ -324,7 +367,7 @@ async function pagePartners() {
   const r = await api('/api/partners'), list = r.ok ? r.data.partners : [];
   return [h('div', { class: 'pagehead' }, h('h1', { text: 'Partners' }), h('p', { text: 'Virtual trucking companies we drive with and join for convoys.' })),
     list.length ? h('div', { class: 'v-plist sec' }, list.map((p) => h('article', { class: 'panel v-pcard' }, p.logo ? h('img', { src: p.logo, alt: '' }) : h('span', { class: 'v-initial', text: p.name[0] }),
-      h('div', null, h('h2', { text: p.name }), p.desc ? h('p', { class: 'muted', text: p.desc }) : null,
+      h('div', null, h('h2', { text: p.name }), p.desc ? md(p.desc, 'muted') : null,
         h('div', { class: 'v-links' }, p.url ? h('a', { href: p.url, target: '_blank', rel: 'noopener' }, 'Website', icon('out', 14)) : null, p.tmp ? h('a', { href: p.tmp, target: '_blank', rel: 'noopener' }, 'TruckersMP', icon('out', 14)) : null))))) : h('div', { class: 'sec' }, empty('No partners yet', 'Partner companies will be listed here.'))];
 }
 // private pages: only drivers of the VTC (linked to Trucky, with the member role, or staff)
@@ -526,8 +569,8 @@ function composer(d) {
   const img = imagePicker('', 'po-img', () => draw());
   function draw() {
     const box = plain.checked
-      ? h('div', null, title.value ? h('b', { class: 'dc-plain-t', text: title.value }) : null, h('p', { class: 'dc-text', text: text.value }), img.value ? h('img', { class: 'dc-img', src: img.value, alt: '' }) : null)
-      : (title.value || text.value || img.value) ? h('div', { class: 'dc-embed', style: { '--c': color.value } }, title.value ? h('b', { text: title.value }) : null, text.value ? h('p', { text: text.value }) : null, img.value ? h('img', { src: img.value, alt: '' }) : null, h('small', { text: S.cfg.name })) : h('p', { class: 'muted small', text: 'Your post shows up here.' });
+      ? h('div', null, title.value ? h('b', { class: 'dc-plain-t', text: title.value }) : null, md(text.value, 'dc-text'), img.value ? h('img', { class: 'dc-img', src: img.value, alt: '' }) : null)
+      : (title.value || text.value || img.value) ? h('div', { class: 'dc-embed', style: { '--c': color.value } }, title.value ? h('b', { text: title.value }) : null, text.value ? md(text.value) : null, img.value ? h('img', { src: img.value, alt: '' }) : null, h('small', { text: S.cfg.name })) : h('p', { class: 'muted small', text: 'Your post shows up here.' });
     pv.replaceChildren(h('div', { class: 'dc-who' }, h('img', { src: '/img/logo-160.webp', alt: '' }), h('span', { text: S.cfg.name }), h('i', { text: 'BOT' })), h('div', { class: 'dc-body' }, pingPreview(ping.value), box, /^https?:\/\//.test(link.value) ? h('span', { class: 'dc-btn', text: linkLabel.value || 'Open link' }) : null));
   }
   for (const el of [title, text, color, link, linkLabel, ping, plain]) el.addEventListener('input', draw);

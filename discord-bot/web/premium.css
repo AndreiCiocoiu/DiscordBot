@@ -325,3 +325,17 @@ body.on-home .top { background: rgba(16,13,10,.92); border-bottom-color: rgba(23
 .nut:hover, .brand:hover .nut { transform: none; }
 .medal .ring, .medal .shine { display: none; }
 .medal, .medal img { animation: none; box-shadow: none; }
+
+/* Discord formatting rendered on the site */
+.md { white-space: normal; overflow-wrap: anywhere; }
+.md p { margin: 0 0 .75em; }
+.md > :last-child { margin-bottom: 0; }
+.md strong { color: var(--cream); font-weight: 700; }
+.md a { color: #e1ad83; text-decoration: underline; text-underline-offset: 3px; }
+.md code { font: 600 .9em/1.4 ui-monospace, Menlo, Consolas, monospace; background: rgba(0,0,0,.35); padding: 1px 5px; }
+.md ul { margin: 0 0 .75em; padding-left: 1.3em; }
+.md li { margin: .2em 0; }
+.md blockquote { margin: 0 0 .75em; padding: 2px 0 2px 12px; border-left: 3px solid var(--line2); color: var(--sand); }
+.md .md-h { font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: 1.1em; margin: .4em 0 .4em; color: var(--cream); }
+.convoy .md.desc { margin-top: 12px; color: var(--sand); }
+.dc-prev .md p { margin: 0 0 .5em; } .dc-prev .md strong { color: #fff; } .dc-prev .md a { color: #00a8fc; } .dc-prev .md blockquote { border-color: #4e5058; color: #dbdee1; }
