@@ -4,29 +4,47 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#140d08">
-  <meta name="description" content="{{NAME}}: a virtual trucking company on TruckersMP. Weekly convoys, jobs tracked with Trucky, and open recruitment.">
-  <title>{{NAME}}</title>
+  <meta name="theme-color" content="#100d0a">
+  <meta name="description" content="Diesel Union is a European virtual trucking company for Euro Truck Simulator 2 and TruckersMP. Discover convoys, meet drivers, track deliveries and join the crew.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Diesel Union">
+  <meta property="og:title" content="Diesel Union — United by the Road">
+  <meta property="og:description" content="More than miles. A European trucking collective built around the convoy, the crew and the open road. Join Diesel Union on TruckersMP.">
+  <meta property="og:url" content="{{URL}}/">
+  <meta property="og:image" content="{{URL}}/img/social-share.webp">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="400">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Diesel Union — United by the Road">
+  <meta name="twitter:image" content="{{URL}}/img/social-share.webp">
+  <link rel="canonical" href="{{URL}}/">
+  <title>{{NAME}} — TruckersMP VTC | United by the Road</title>
   <link rel="icon" href="/img/favicon.png" type="image/png">
-  <link rel="preload" as="image" href="/img/cover.webp" type="image/webp">
-  <link rel="preload" as="font" type="font/woff2" href="/fonts/archivo-latin-800-normal.woff2" crossorigin>
+  <link rel="preload" as="image" href="/img/hero-volvo.webp" type="image/webp" fetchpriority="high">
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/big-shoulders-display-latin-900-normal.woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/premium.css">
 </head>
 <body>
   <a class="skip" href="#view">Skip to content</a>
+  <div id="scroll-progress" class="scroll-progress" aria-hidden="true"></div>
   <header class="top">
     <a class="brand" href="#/" aria-label="{{NAME}}, home">
       <span class="nut"><img src="/img/logo-160.webp" alt="" width="44" height="44"></span>
-      <span class="brand-name">{{NAME}}</span>
+      <span class="brand-stack"><span class="brand-name">{{NAME}}</span><span class="brand-descriptor">A TRUCKERSMP COMPANY</span></span>
     </a>
     <nav id="nav" class="nav" aria-label="Sections"></nav>
     <div id="me" class="me"></div>
   </header>
   <main id="view" class="page" tabindex="-1"></main>
   <footer class="foot">
-    <div class="foot-brand"><img src="/img/logo-160.webp" alt="" width="40" height="40"><div><b>{{NAME}}</b><span>A Euro Truck Simulator 2 company on TruckersMP.</span></div></div>
-    <nav class="foot-links" id="foot-links" aria-label="Elsewhere"></nav>
-    <p class="foot-note">Jobs and distances come from Trucky. Income is in-game money, in euros. Not affiliated with SCS Software, TruckersMP or Trucky.</p>
+    <div class="foot-main">
+      <div class="foot-identity"><span class="foot-kicker">STAY IN MOTION / DIESEL UNION</span><a href="#/" class="foot-wordmark" aria-label="Diesel Union, back to home">DIESEL<span>UNION.</span></a><p>For the routes we share.<br>For the people we meet.</p></div>
+      <div class="foot-nav"><span>EXPLORE</span><a href="#/">The company</a><a href="#/convoaie">Convoys</a><a href="#/aplica">Join the union</a><a href="#/partners">Partners</a></div>
+      <div class="foot-nav"><span>ON THE ROAD</span><a data-k="tmp" href="https://truckersmp.com/vtc/93701" target="_blank" rel="noopener noreferrer">TruckersMP ↗</a><a data-k="trucky" href="https://hub.truckyapp.com/vtc/diesel-union" target="_blank" rel="noopener noreferrer">Trucky ↗</a><a data-k="discord" href="#" target="_blank" rel="noopener noreferrer">Discord ↗</a><a href="#/soferi">Our drivers</a></div>
+    </div>
+    <div class="foot-bottom"><span>© <span id="year"></span> DIESEL UNION</span><span>INDEPENDENT VIRTUAL TRUCKING COMMUNITY · ETS2</span><span>JOBS & DISTANCES POWERED BY TRUCKY</span></div>
   </footer>
   <nav id="tabbar" class="tabbar" aria-label="Sections"></nav>
   <aside id="drawer" class="drawer" hidden aria-label="Driver profile"></aside>

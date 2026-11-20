@@ -213,75 +213,111 @@ function rsvpButtons(c) {
 
 // ---- pages ----
 const VALUES = [
-  ['Convoys every week', 'Routes are posted in advance, with a meeting point, a lead and a tail. Open to anyone who wants to get to know us.'],
-  ['Jobs that log themselves', 'Run Trucky while you drive and every delivery goes straight into the company logbook.'],
-  ['Ranks you earn', 'Rank roles follow the kilometres you deliver for the company, from Rookie to Diesel Legend.'],
-  ['A crew on voice', 'Someone is always around on Discord when the road gets long or the trailer gets stuck.'],
+  ['flag', 'Convoys every week', 'Routes are posted in advance, with a meeting point, a lead and a tail. Open to anyone who wants to get to know us.'],
+  ['truck', 'Jobs that log themselves', 'Run Trucky while you drive and every delivery goes straight into the company logbook.'],
+  ['trophy', 'Ranks you earn', 'Rank roles follow the kilometres you deliver for the company, from Rookie to Diesel Legend.'],
+  ['users', 'A crew on voice', 'Someone is always around on Discord when the road gets long or the trailer gets stuck.'],
 ];
 const STEPS = [
   ['Apply', 'Press Apply on our Discord or on this site and answer five short questions.'],
   ['Get accepted', 'Staff read every application. The answer comes in a Discord DM, usually the same day.'],
   ['Join on Trucky and TruckersMP', 'Join Diesel Union in both, with the Steam account you applied with.'],
-  ['Drive', 'The server opens for you. See you at the next convoy.'],
+  ['Drive your first convoy', 'The server opens for you. We introduce you to the crew and hit the road together.'],
 ];
 const FAQ = [
   ['Do I have to play on TruckersMP?', 'Convoys are on TruckersMP. Your other jobs can be single player too: Trucky counts both.'],
   ['Which DLCs do I need?', 'None are required. When a convoy needs a map DLC, the announcement says so in advance.'],
   ['Do you play ATS?', 'No. Diesel Union drives Euro Truck Simulator 2 only, so only ETS2 jobs count.'],
   ['Is there a minimum distance?', 'No. What matters is staying active and joining a convoy when you can. Going away for a while? Tell us with /loa.'],
-  ['How are ranks worked out?', 'From the total kilometres you deliver with Trucky since joining. The thresholds are listed above.'],
+  ['How are ranks worked out?', 'From the total kilometres you deliver with Trucky since joining. The thresholds are shown above.'],
 ];
 
 async function pageHome() {
   const r = await api('/api/home');
   const d = r.ok ? r.data : { tot: { month: {}, week: {}, all: {} }, next: [], drivers: 0, partners: [] };
-  const toAbout = () => $('#about')?.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
-  const cta = () => S.member ? h('a', { class: 'btn', href: '#/curse' }, 'Company logbook') : S.cfg.recruitOpen ? h('a', { class: 'btn', href: '#/aplica' }, 'Apply to join') : S.cfg.discordInvite ? h('a', { class: 'btn', href: S.cfg.discordInvite, target: '_blank', rel: 'noopener' }, 'Join our Discord') : null;
-  const hero = h('section', { class: 'hero v-hero' }, coverHero(),
-    h('div', { class: 'v-hero-in' },
-      h('img', { class: 'v-logo', src: '/img/logo-160.webp', alt: '', width: 76, height: 76 }),
-      h('h1', { class: 'v-mark', text: S.cfg.name }),
-      h('p', { class: 'v-sub', text: S.cfg.tagline }),
-      h('p', { class: 'v-lead', text: 'A Euro Truck Simulator 2 company on TruckersMP. Weekly convoys, every job logged with Trucky, and a crew that drives together.' }),
-      h('div', { class: 'cta' }, cta(), h('button', { class: 'btn ghost', type: 'button', onclick: toAbout }, 'About the company'))));
-  scrollFx();
-  const m = d.tot.month || {}, all = d.tot.all || {};
-  const fact = (n, l) => h('div', null, h('b', { class: 'num', text: n }), h('span', { text: l }));
-  const stats = h('section', { class: 'v-stats', 'aria-label': 'The company in numbers' },
-    fact(n0(all.km || 0), 'kilometres driven'), fact(n0(m.km || 0), 'kilometres this month'), fact(n0(all.jobs || 0), 'jobs delivered'), fact(n0(d.drivers || 0), 'drivers'));
-  const out = [hero, stats];
+  const scrollTo_ = () => $('#despre')?.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
+  const hero = h('section', { class: 'du-hero', 'aria-label': 'Diesel Union, United by the Road' },
+    h('div', { class: 'du-hero-photo', 'aria-hidden': 'true' }, h('img', { src: '/img/hero-volvo.webp', alt: '', fetchpriority: 'high', width: 2172, height: 724 })),
+    h('div', { class: 'du-hero-content' },
+      h('div', { class: 'du-hero-kicker' }, h('span', { class: 'du-hero-dot' }), h('span', { class: 'du-kicker-primary', text: 'A TRUCKERSMP VIRTUAL TRUCKING COMPANY' }), h('span', { class: 'du-rule' }), h('span', { class: 'du-kicker-secondary', text: 'EURO TRUCK SIMULATOR 2' })),
+      h('div', { class: 'du-hero-title' },
+        h('span', { class: 'du-edition', text: '01 — THE UNION' }),
+        h('h1', { 'aria-label': 'Diesel Union — We move as one' }, h('span', { text: 'WE MOVE.' }), h('span', { class: 'du-accent', text: 'AS ONE.' }))),
+      h('p', { class: 'du-hero-tagline', text: S.cfg.tagline || 'United by the Road' }),
+      h('p', { class: 'du-hero-lead', text: 'A home for drivers who believe the best part of the journey is who you share it with. Real convoys. Good company. Miles that mean something.' }),
+      h('div', { class: 'du-hero-actions' },
+        S.cfg.recruitOpen && !S.member ? h('a', { class: 'btn du-btn-primary', href: '#/aplica' }, 'Become a driver', icon('arrow', 19)) :
+          S.member ? h('a', { class: 'btn du-btn-primary', href: '#/curse' }, 'Driver logbook', icon('arrow', 19)) : null,
+        h('a', { class: 'du-link-arrow', href: '#/convoaie' }, 'Explore convoys', icon('arrow', 18))),
+      h('div', { class: 'du-hero-caption' }, h('span', { text: 'INDEPENDENT. UNITED. ALWAYS MOVING.' }), h('span', { class: 'du-fine-line' }), h('span', { text: 'EST. ON THE OPEN ROAD' }))),
+    h('div', { class: 'du-hero-bottom' },
+      h('span', { class: 'du-hero-coords', text: 'DIESEL UNION / ON THE ROAD' }),
+      h('button', { class: 'du-scroll', type: 'button', onclick: scrollTo_ }, 'DISCOVER OUR STORY', h('span', { class: 'du-scroll-arrow', text: '↓' }))));
+  const m = d.tot.month || {};
+  const stat = (value, label, note, idx) => h('div', { class: 'du-stat rv', style: { '--i': idx } },
+    h('div', { class: 'du-stat-index', text: `0${idx + 1} /` }),
+    h('div', { class: 'du-stat-value num', title: n0(value), 'aria-label': n0(value), text: value >= 1000000 ? `${(value / 1000000).toFixed(2).replace(/\.?0+$/, '')}M` : n0(value) }),
+    h('div', { class: 'du-stat-label', text: label }),
+    h('div', { class: 'du-stat-note', text: note }));
+  const strip = h('section', { class: 'du-ticker', 'aria-label': 'Our culture' },
+    h('div', { class: 'du-ticker-inner' }, 'THE LONG HAUL', h('span', { text: '✳' }), 'REAL PEOPLE', h('span', { text: '✳' }), 'SHARED MILES', h('span', { text: '✳' }), 'NO ONE DRIVES ALONE'));
+  const odo = h('section', { class: 'du-stats', 'aria-label': 'Diesel Union company statistics' },
+    stat(m.km, 'KM THIS MONTH', `${kmS(d.tot.all?.km)} since day one`, 0),
+    stat(m.jobs, 'JOBS DELIVERED', `${n0(d.tot.week?.jobs)} this week`, 1),
+    stat(Math.round((m.mass || 0) / 1000), 'TONNES HAULED', 'This month', 2),
+    stat(d.drivers, 'OUR DRIVERS', `${n0(m.drivers)} active this month`, 3));
+  const out = [hero, strip, odo];
 
-  if (S.member && (d.top?.length || d.recent?.length || d.dotm)) out.push(h('section', { class: 'sec' }, head('Driver corner', 'Only members see this part.', '#/clasament', 'Full leaderboard'),
+  // members get their corner first
+  if (S.member && (d.top?.length || d.recent?.length || d.dotm)) out.push(h('section', { class: 'sec' }, head('Driver corner', 'Only members can see this part.', '#/clasament', 'Full leaderboard'),
     d.dotm ? h('div', { class: 'v-dotm panel' }, h('span', { class: 'v-dotm-t', text: `Driver of the Month, ${d.dotm.month}` }), h('b', { text: d.dotm.name }), h('span', { class: 'muted', text: `${kmS(d.dotm.km)} in ${d.dotm.jobs} jobs` })) : null,
     d.top?.length ? podium(d.top, 'km') : null, d.recent?.length ? h('div', { class: 'bills', style: { marginTop: '22px' } }, d.recent.slice(0, 5).map(bill)) : null));
 
-  out.push(h('section', { class: 'v-sec v-about', id: 'about' },
-    h('div', null, h('h2', { text: 'We drive together.' }), h('p', { class: 'v-body', text: S.cfg.about }),
-      h('div', { class: 'v-links' }, S.cfg.tmpUrl ? h('a', { href: S.cfg.tmpUrl, target: '_blank', rel: 'noopener' }, 'TruckersMP page', icon('out', 14)) : null,
-        S.cfg.discordInvite ? h('a', { href: S.cfg.discordInvite, target: '_blank', rel: 'noopener' }, 'Discord server', icon('out', 14)) : null)),
-    h('dl', { class: 'v-values' }, VALUES.map(([t, x]) => h('div', null, h('dt', { text: t }), h('dd', { text: x }))))));
+  out.push(h('section', { class: 'sec du-manifesto', id: 'despre' },
+    h('div', { class: 'du-manifesto-left rv' },
+      h('span', { class: 'du-label', text: '02 / OUR STORY' }),
+      h('h2', null, 'MORE THAN', h('br'), h('span', { text: 'MILES.' })),
+      h('div', { class: 'du-manifesto-rule' }),
+      h('p', { text: S.cfg.about }),
+      h('div', { class: 'du-manifesto-links' },
+        S.cfg.discordInvite ? h('a', { class: 'du-text-link', href: S.cfg.discordInvite, target: '_blank', rel: 'noopener noreferrer' }, 'JOIN OUR DISCORD', icon('out', 16)) : null,
+        S.cfg.tmpUrl ? h('a', { class: 'du-text-link', href: S.cfg.tmpUrl, target: '_blank', rel: 'noopener noreferrer' }, 'FIND US ON TRUCKERSMP', icon('out', 16)) : null)),
+    h('div', { class: 'du-principles' }, VALUES.map(([ic, t, x], i) => h('article', { class: 'du-principle rv' },
+      h('span', { class: 'du-principle-num', text: String(i + 1).padStart(2, '0') }),
+      h('div', { class: 'du-principle-copy' }, h('h3', { text: t }), h('p', { text: x })),
+      h('span', { class: 'du-principle-icon' }, icon(ic, 25)))))));
 
-  if (d.next.length) out.push(h('section', { class: 'v-sec' }, head('Next convoy', 'Open to anyone who wants to get to know us.', '#/convoaie', 'All convoys'), h('div', { class: 'convoys' }, d.next.slice(0, 1).map((c) => convoyCard(c, false)))));
+  out.push(h('section', { class: 'du-interlude rv' },
+    h('div', { class: 'du-interlude-art', 'aria-hidden': 'true' }, h('img', { src: '/img/truck-detail.webp', alt: '', loading: 'lazy', width: 912, height: 594 })),
+    h('div', { class: 'du-interlude-content' }, h('span', { class: 'du-label', text: 'THE SPIRIT OF DIESEL UNION' }),
+      h('p', null, 'SOME JOURNEYS', h('br'), h('em', { text: 'ARE BETTER' }), h('br'), 'TOGETHER.'),
+      h('a', { href: '#/convoaie', class: 'du-text-link' }, 'SEE OUR UPCOMING CONVOYS', icon('arrow', 17)))));
+
+  if (d.next.length) out.push(h('section', { class: 'sec' }, head('The next departure', 'Show up for the journey. Stay for the company.', '#/convoaie', 'See all convoys'), h('div', { class: 'convoys' }, d.next.slice(0, 1).map((c) => convoyCard(c, false)))));
 
   if (S.cfg.ranks?.length) {
-    out.push(h('section', { class: 'v-sec' }, head('Ranks', 'Earned with delivered kilometres. The role is given on Discord automatically.'),
-      h('ol', { class: 'v-ranks', style: { '--n': S.cfg.ranks.length } }, S.cfg.ranks.map((rk, i) => h('li', null, h('i', { style: { '--k': (i + 1) / S.cfg.ranks.length } }), h('b', { text: rk.name }), h('span', { class: 'num', text: i ? `${n0(rk.km)} km` : 'On joining' }))))));
+    const top = S.cfg.ranks[S.cfg.ranks.length - 1].km || 1;
+    out.push(h('section', { class: 'sec' }, head('Every mile counts', 'Earned on the road. Never handed out.'),
+      h('div', { class: 'ladder rv' }, h('i', { class: 'lane' }), S.cfg.ranks.map((rk, i) => h('div', { class: 'rung', style: { '--x': `${(Math.sqrt(rk.km / top) * 92 + 4).toFixed(1)}%`, '--i': i } },
+        h('span', { class: 'pin' }, chevrons({ index: i })), h('b', { text: rk.name }), h('small', { class: 'num', text: i ? `${n0(rk.km)} km` : 'start' }))))));
   }
 
-  out.push(h('section', { class: 'v-sec' }, head('How to join', 'From the form to your first convoy.'),
-    h('ol', { class: 'v-steps' }, STEPS.map(([t, x], i) => h('li', null, h('span', { class: 'num', text: String(i + 1) }), h('h3', { text: t }), h('p', { text: x }))))));
+  out.push(h('section', { class: 'sec' }, head('Your journey starts here', 'Four steps from a first hello to your first convoy.'),
+    h('ol', { class: 'steps' }, STEPS.map(([t, x], i) => h('li', { class: 'step rv', style: { '--i': i } }, h('span', { class: 'no', text: String(i + 1).padStart(2, '0') }), h('h3', { text: t }), h('p', { text: x }))))));
 
-  out.push(h('section', { class: 'v-sec v-join' },
-    h('div', null, h('h2', { text: 'What we ask' }), h('ul', { class: 'v-reqs' }, (S.cfg.requirements || []).map((x) => h('li', null, icon('check', 18), h('span', { text: x }))))),
-    h('div', { class: 'v-cta panel' }, h('h3', { text: S.member ? 'Good to have you on the road.' : S.cfg.recruitOpen ? 'Recruitment is open.' : 'Recruitment is closed for now.' }),
-      h('p', { text: S.member ? 'Check the logbook, the leaderboard and the next convoy.' : S.cfg.recruitOpen ? 'It takes five minutes. Staff answer on Discord, usually the same day.' : 'We announce it on Discord when we open again.' }),
-      S.member ? h('a', { class: 'btn', href: '#/clasament' }, 'Leaderboard') : cta())));
+  out.push(h('section', { class: 'sec reqs' },
+    h('div', { class: 'rv' }, h('span', { class: 'eyebrow', text: 'What we ask' }), h('h2', { text: 'Not much, but we mean it.' }),
+      h('ul', { class: 'checks' }, (S.cfg.requirements || []).map((x) => h('li', null, h('span', { class: 'ck' }, icon('check', 16)), x)))),
+    h('div', { class: 'join rv' }, medallion(false), h('h3', { text: S.cfg.recruitOpen ? 'Ready to roll?' : 'Recruitment is closed' }),
+      h('p', { text: S.cfg.recruitOpen ? 'Fill in the form and we will see you at the next convoy.' : 'Follow us on Discord: we announce it there when we reopen.' }),
+      S.member ? h('a', { class: 'btn', href: '#/soferi' }, 'See the drivers') : S.cfg.recruitOpen ? h('a', { class: 'btn', href: '#/aplica' }, 'Apply now', icon('arrow', 18)) : S.cfg.discordInvite ? h('a', { class: 'btn', href: S.cfg.discordInvite, target: '_blank', rel: 'noopener' }, 'Join our Discord') : null)));
 
-  if (d.partners?.length) out.push(h('section', { class: 'v-sec' }, head('Partners', 'The companies we drive with.', '#/partners', 'All partners'), partnerRow(d.partners)));
+  if (d.partners?.length) out.push(h('section', { class: 'sec' }, head('Driving partners', 'The companies we share the road with.', '#/partners', 'All partners'), partnerRow(d.partners)));
 
-  out.push(h('section', { class: 'v-sec v-faq' }, h('h2', { text: 'Questions' }), h('div', null, FAQ.map(([q, a]) => h('details', null, h('summary', null, q, icon('chev', 18)), h('p', { text: a }))))));
+  out.push(h('section', { class: 'sec' }, head('Good to know'), h('div', { class: 'faq' }, FAQ.map(([q, a]) => h('details', { class: 'rv' }, h('summary', null, q, icon('chev', 18)), h('p', { text: a }))))));
   return out;
 }
+
 const partnerRow = (list) => h('div', { class: 'v-partners' }, list.map((p) => h(p.url || p.tmp ? 'a' : 'div', { class: 'v-partner', href: p.url || p.tmp || null, target: p.url || p.tmp ? '_blank' : null, rel: 'noopener' },
   p.logo ? h('img', { src: p.logo, alt: '', loading: 'lazy' }) : h('span', { class: 'v-initial', text: p.name[0] }), h('span', { text: p.name }))));
 async function pagePartners() {
@@ -291,6 +327,15 @@ async function pagePartners() {
       h('div', null, h('h2', { text: p.name }), p.desc ? h('p', { class: 'muted', text: p.desc }) : null,
         h('div', { class: 'v-links' }, p.url ? h('a', { href: p.url, target: '_blank', rel: 'noopener' }, 'Website', icon('out', 14)) : null, p.tmp ? h('a', { href: p.tmp, target: '_blank', rel: 'noopener' }, 'TruckersMP', icon('out', 14)) : null))))) : h('div', { class: 'sec' }, empty('No partners yet', 'Partner companies will be listed here.'))];
 }
+// private pages: only drivers of the VTC (linked to Trucky, with the member role, or staff)
+function gate(title) {
+  const head_ = h('div', { class: 'pagehead' }, h('h1', { text: title }));
+  let body;
+  if (!S.user) body = empty('Drivers only', 'Log in with Discord. If you drive for Diesel Union, you will see everything.', loginBtn());
+  else body = empty('Drivers only', 'Your Discord account is not linked to a Trucky driver.', h('div', { class: 'actions', style: { justifyContent: 'center' } }, h('a', { class: 'btn', href: '#/cont' }, icon('link', 18), 'Link your account'), S.cfg.recruitOpen ? h('a', { class: 'btn ghost', href: '#/aplica' }, 'Apply to join') : null));
+  return [head_, h('div', { class: 'sec locked' }, h('span', { class: 'lockico' }, icon('lock', 28)), body)];
+}
+
 function podium(rows, metric) {
   const fmt = (r) => (metric === 'km' ? kmS(r.v) : metric === 'jobs' ? plural(r.v, 'job', 'jobs') : n0(r.v));
   return h('div', { class: 'podium' }, rows.slice(0, 3).map((r, i) => h('button', { class: `place p${i + 1}`, type: 'button', onclick: () => openDriver(r.id) },
@@ -792,7 +837,7 @@ async function render() {
   if (my !== tok) return;
   view.replaceChildren(...nodes.flat(Infinity).filter(Boolean));
   lastPage = page; reveal(view);
-  document.title = page ? `${(TABS.find((t) => t[0] === page) || [0, { aplica: 'Apply', cont: 'My account', staff: 'Staff', panel: 'Admin panel', partners: 'Partners' }[page]])[1]} · ${S.cfg.name}` : S.cfg.name;
+  document.title = page ? `${(TABS.find((t) => t[0] === page) || [0, { aplica: 'Apply', cont: 'My account', staff: 'Staff', panel: 'Admin panel', partners: 'Partners' }[page]])[1]} · ${S.cfg.name}` : `${S.cfg.name} — TruckersMP VTC | United by the Road`;
   if (page === 'soferi' && arg) openDriver(arg);
 }
 addEventListener('hashchange', () => { const { page, arg } = route(); if (!(page === 'soferi' && arg)) { closeDrawerOnly(); if (page !== lastPage) scrollTo(0, 0); } render(); });
@@ -822,9 +867,29 @@ async function boot() {
   const r = await api('/api/me').catch(() => null);
   if (r?.ok) Object.assign(S, { user: r.data.user, role: r.data.role, caps: r.data.caps || {}, teams: r.data.teams || [], member: !!r.data.member, cfg: r.data.cfg, login: r.data.login, driver: r.data.driver });
   $('.brand-name').textContent = S.cfg.name;
-  const ext = (href, t) => (href ? h('a', { href, target: '_blank', rel: 'noopener' }, t) : null);
-  $('#foot-links').replaceChildren(...[h('a', { href: '#/convoaie' }, 'Convoys'), h('a', { href: '#/partners' }, 'Partners'), S.cfg.recruitOpen && !S.member ? h('a', { href: '#/aplica' }, 'Apply') : null,
-    ext(S.cfg.tmpUrl, 'TruckersMP'), ext(S.cfg.truckyUrl, 'Trucky'), ext(S.cfg.discordInvite, 'Discord')].filter(Boolean));
+  // footer: point the outside links at our own VTC pages once the settings are known
+  const setHref = (k, href) => { const a = document.querySelector(`.foot [data-k="${k}"]`); if (a && href) a.href = href; };
+  setHref('tmp', S.cfg.tmpUrl); setHref('trucky', S.cfg.truckyUrl);
+  const dc = document.querySelector('.foot [data-k="discord"]'); if (dc) { if (S.cfg.discordInvite) dc.href = S.cfg.discordInvite; else dc.remove(); }
   await render();
 }
 boot();
+
+// Premium shell: page progress is a quiet orientation cue, not a decorative preloader.
+(() => {
+  const bar = document.getElementById('scroll-progress');
+  const year = document.getElementById('year');
+  if (year) year.textContent = String(new Date().getFullYear());
+  if (!bar) return;
+  let queued = false;
+  const update = () => {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.transform = `scaleX(${max > 0 ? Math.max(0, Math.min(1, window.scrollY / max)) : 0})`;
+    queued = false;
+  };
+  const scroll = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
+  addEventListener('scroll', scroll, { passive: true });
+  addEventListener('resize', scroll, { passive: true });
+  addEventListener('hashchange', scroll);
+  scroll();
+})();

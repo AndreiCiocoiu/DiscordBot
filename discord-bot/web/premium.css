@@ -1,0 +1,320 @@
+/*
+  DIESEL UNION — EDITORIAL DESIGN SYSTEM / 2026
+  The functional VTC portal is unchanged. This layer owns the visual language:
+  sharp typography, restrained chocolate & bronze, purposeful movement, clarity.
+  No animation or content is required to understand the interface.
+*/
+:root {
+  --oil: #100d0a;
+  --bark: #17120e;
+  --leather: #211912;
+  --saddle: #35261b;
+  --rust: #80553a;
+  --copper: #bc8158;
+  --amber: #d4a078;
+  --cream: #f1e8db;
+  --sand: #b9a899;
+  --dust: #87796b;
+  --line: rgba(244,223,200,.12);
+  --line2: rgba(244,223,200,.25);
+  --r: 4px;
+  --ease-premium: cubic-bezier(.22,1,.36,1);
+}
+html { scroll-behavior: smooth; scroll-padding-top: 105px; }
+body { background: var(--oil); line-height: 1.65; }
+body::before { opacity: .11; mix-blend-mode: soft-light; }
+::selection { background: #c28f62; color: #100d0a; }
+:focus-visible { outline: 2px solid #e1ad83; outline-offset: 5px; border-radius: 2px; }
+a, button { -webkit-tap-highlight-color: transparent; }
+.scroll-progress { position: fixed; z-index: 90; left: 0; top: 0; width: 100%; height: 2px; background: #ddad7f; transform: scaleX(0); transform-origin: left; pointer-events: none; }
+
+/* Masthead: intentionally compact and quietly authoritative. */
+.top {
+  height: 78px;
+  gap: clamp(18px, 2.5vw, 36px);
+  padding: 0 clamp(20px, 4.2vw, 80px);
+  background: rgba(16,13,10,.94);
+  border-bottom: 1px solid rgba(233,204,169,.12);
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+}
+body.on-home .top { background: rgba(16,13,10,.92); border-bottom-color: rgba(233,204,169,.12); }
+.brand { gap: 12px; white-space: nowrap; }
+.nut, .nut img { width: 44px; height: 44px; border-radius: 50%; }
+.nut { box-shadow: none; border: 1px solid #806245; padding: 2px; transition: border-color .3s, transform .5s var(--ease-premium); }
+.nut:hover, .brand:hover .nut { border-color: #dcb38e; transform: rotate(-8deg); }
+.brand-stack { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; }
+.brand-name { font-family: var(--display); font-size: 28px; font-style: normal; font-weight: 900; letter-spacing: .055em; line-height: 1; }
+.brand-descriptor { color: #ae957d; font-size: 9px; font-weight: 800; letter-spacing: .18em; }
+.nav { margin: 0 0 0 auto; gap: clamp(12px, 1.5vw, 24px); align-items: center; }
+.nav a { color: #c1ae9d; padding: 14px 2px; border-radius: 0; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; gap: 0; position: relative; }
+.nav a .ico { display: none; }
+.nav a:hover { color: var(--cream); background: transparent; }
+.nav a[aria-current="page"] { color: #f2e4d3; }
+.nav a::before, .nav a[aria-current="page"]::after { content: ''; position: absolute; left: 0; right: 100%; bottom: 9px; width: auto; height: 1px; border: 0; background: #c99467; border-radius: 0; transition: right .35s var(--ease-premium); animation: none; }
+.nav a:hover::before, .nav a[aria-current="page"]::after { right: 0; }
+.me { margin: 0; }
+.me .btn.small { min-height: 38px; border: 1px solid #b68d6f; background: #ba8966; color: #120b08; border-radius: 2px; font-size: 11px; font-weight: 800; letter-spacing: .12em; padding-inline: 19px; text-transform: uppercase; box-shadow: none; }
+.who { height: 40px; background: transparent; border: 1px solid var(--line2); border-radius: 2px; padding: 4px 13px 4px 4px; font-size: 12px; }
+.menu { border-radius: 3px; background: #221a14; }
+
+/* Buttons: physical, precise and accessible. */
+.btn { min-height: 49px; padding: 0 23px; background: #c99670; color: #1b100b; border-radius: 2px; border: 1px solid #cf9b73; box-shadow: none; text-transform: uppercase; font-size: 12px; font-weight: 800; letter-spacing: .12em; transition: background .25s, color .25s, transform .3s var(--ease-premium), border-color .25s; }
+.btn::after { display: none; }
+.btn:hover { filter: none; background: #e3b48e; box-shadow: none; transform: translateY(-2px); }
+.btn:active { transform: translateY(0); }
+.btn.ghost { border: 1px solid rgba(237,213,183,.27); background: transparent; box-shadow: none; color: var(--cream); }
+.btn.ghost:hover { border-color: #c99670; background: rgba(220,171,126,.08); box-shadow: none; }
+.btn.danger { border-color: var(--bad); background: transparent; color: var(--bad); }
+.btn.small { min-height: 38px; border-radius: 2px; font-size: 11px; }
+.field { background: #17120f; border-radius: 3px; border-color: var(--line2); }
+.seg { border-radius: 3px; background: #19130f; padding: 3px; }
+.seg button { border-radius: 2px; font-size: 12px; }
+.seg button[aria-pressed="true"] { background: #453021; }
+
+/* Full-bleed landing hero: a cinematographic shot, not an oversized dashboard card. */
+.page { max-width: 1352px; padding: clamp(24px, 3vw, 44px) clamp(18px, 3vw, 48px) 90px; }
+.du-hero { position: relative; isolation: isolate; margin: calc(-1 * clamp(24px, 3vw, 44px)) calc(50% - 50vw) 0; min-height: clamp(665px, 85svh, 850px); overflow: hidden; background: #100d0a; display: grid; grid-template-rows: 1fr auto; }
+.du-hero-photo { position: absolute; z-index: -2; inset: 0; overflow: hidden; }
+.du-hero-photo img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: 100% 52%; filter: saturate(.75) brightness(.85) contrast(1.08); transform: scale(1.07); animation: du-establish 2.2s var(--ease-premium) both, du-drift 18s ease-in-out 2.2s infinite alternate; }
+.du-hero-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg,#100d0a 0%,rgba(16,13,10,.98) 18%,rgba(16,13,10,.92) 33%,rgba(16,13,10,.58) 57%,rgba(16,13,10,.10) 90%),linear-gradient(0deg,#100d0a 0%,transparent 33%,rgba(16,13,10,.24) 75%,rgba(16,13,10,.34)); }
+.du-hero::before { content: ''; z-index: 0; pointer-events: none; position: absolute; top: 12%; bottom: 14%; left: max(22px, calc((100vw - 1320px) / 2)); width: 1px; background: linear-gradient(transparent,rgba(236,203,165,.3) 20%,rgba(236,203,165,.3) 80%,transparent); }
+.du-hero-content { position: relative; z-index: 2; width: min(100%, 1450px); margin: 0 auto; padding: clamp(74px, 12vh, 142px) clamp(32px, 6.5vw, 104px) 62px; align-self: center; }
+.du-hero-kicker { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; color: #dfc9b0; font-size: 10px; font-weight: 800; letter-spacing: .19em; animation: du-fade .8s .15s both; }
+.du-hero-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #cd9a71; box-shadow: 0 0 0 5px rgba(205,154,113,.13); }
+.du-rule { display: inline-block; width: 25px; height: 1px; background: rgba(225,196,171,.35); }
+.du-hero-title { margin-top: clamp(34px, 6vw, 78px); }
+.du-edition { display: block; margin-bottom: 17px; font-size: 10px; font-weight: 800; letter-spacing: .23em; color: #d2a67f; animation: du-fade .8s .24s both; }
+.du-hero h1 { font-size: clamp(95px, 11.1vw, 172px); line-height: .8; letter-spacing: -.015em; font-weight: 900; color: #f5eade; }
+.du-hero h1 span { display: block; overflow: visible; animation: du-rise 1.05s var(--ease-premium) .28s both; }
+.du-hero h1 .du-accent { font-weight: 900; color: #bf8962; animation-delay: .42s; }
+.du-hero-tagline { margin: 27px 0 0; color: #d8aa82; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .27em; animation: du-fade .8s .55s both; }
+.du-hero-lead { max-width: 390px; margin: 17px 0 0; color: #dccab6; line-height: 1.85; font-size: clamp(14px, 1.2vw, 16px); animation: du-fade .8s .65s both; }
+.du-hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 26px; margin-top: 27px; animation: du-fade .8s .8s both; }
+.du-btn-primary { display: inline-flex; gap: 26px; }
+.du-btn-primary .ico { transition: transform .3s var(--ease-premium); }
+.du-btn-primary:hover .ico { transform: translateX(5px); }
+.du-link-arrow, .du-text-link { display: inline-flex; align-items: center; gap: 12px; font-size: 11px; letter-spacing: .15em; font-weight: 800; text-decoration: none; text-transform: uppercase; color: #ead8c4; border-bottom: 1px solid rgba(228,185,146,.52); padding: 13px 0; transition: color .2s, gap .3s var(--ease-premium), border-color .3s; }
+.du-link-arrow:hover, .du-text-link:hover { color: #eebc90; gap: 19px; border-color: #eebc90; }
+.du-hero-caption { display: flex; gap: 16px; align-items: center; margin-top: 65px; color: #a18c78; letter-spacing: .19em; font-size: 9px; font-weight: 700; animation: du-fade .8s 1s both; }
+.du-fine-line { width: 30px; height: 1px; background: rgba(228,185,146,.4); }
+.du-hero-bottom { position: relative; z-index: 4; width: 100%; padding: 19px clamp(30px, 6.2vw, 100px); border-top: 1px solid rgba(233,205,178,.17); display: flex; justify-content: space-between; align-items: center; gap: 20px; background: rgba(16,13,10,.4); }
+.du-hero-coords { color: #c6ab95; letter-spacing: .2em; font-size: 10px; font-weight: 700; }
+.du-scroll { display: inline-flex; align-items: center; gap: 18px; background: transparent; border: 0; padding: 8px 0; color: #eee0d0; letter-spacing: .18em; font-size: 10px; font-weight: 800; }
+.du-scroll-arrow { font-size: 24px; line-height: 1; color: #c99670; animation: du-point 2.8s ease-in-out infinite; }
+@keyframes du-establish { from { opacity: 0; transform: scale(1.18); filter: saturate(.3) brightness(.4) blur(8px); } to { opacity: 1; transform: scale(1.07); filter: saturate(.75) brightness(.85) contrast(1.08); } }
+@keyframes du-drift { from { transform: scale(1.07) translateX(0); } to { transform: scale(1.115) translateX(-.7%); } }
+@keyframes du-rise { from { opacity: 0; transform: translateY(35px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes du-fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes du-point { 50% { transform: translateY(5px); } }
+
+/* The one graphic gesture: a warm typographic tape across the site. */
+.du-ticker { position: relative; margin: 0 calc(50% - 50vw); overflow: hidden; padding: 17px 24px; background: #a67752; border-top: 1px solid #cc9c72; border-bottom: 1px solid #cc9c72; color: #170f09; }
+.du-ticker-inner { width: max-content; max-width: 100%; margin: auto; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: clamp(12px, 2.6vw, 45px); text-align: center; font: 800 clamp(9px, 1vw, 12px)/1.4 var(--body); letter-spacing: .17em; }
+.du-ticker-inner span { font-size: 14px; opacity: .64; }
+
+/* Live, honest statistics. No fabricated or flashing numbers. */
+.du-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); border-bottom: 1px solid var(--line2); padding: 38px 0 46px; gap: 0; }
+.du-stat { position: relative; padding: 4px 25px 4px clamp(16px,2.5vw,35px); border-left: 1px solid var(--line); }
+.du-stat:first-child { padding-left: 0; border-left: 0; }
+.du-stat-index { color: #ba8e6a; font-size: 10px; letter-spacing: .19em; font-weight: 800; }
+.du-stat-value { font: 900 clamp(44px, 5.4vw, 80px)/1 var(--display); letter-spacing: -.02em; color: #f3e9dd; margin: 18px 0 8px; white-space: nowrap; }
+.du-stat-label { font-weight: 800; font-size: 11px; letter-spacing: .13em; text-transform: uppercase; }
+.du-stat-note { font-size: 12px; color: #948273; margin-top: 8px; }
+
+/* Editorial sections. Surface design relies on rhythm and typography, not cards. */
+.sec { margin-top: clamp(85px, 10vw, 158px); }
+.sec-head { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 8px 28px; margin-bottom: 27px; border-bottom: 1px solid var(--line2); padding-bottom: 25px; }
+.sec-head h2 { font-size: clamp(40px, 5.5vw, 68px); max-width: 800px; }
+.sec-head p { margin: 0; grid-row: 2; grid-column: 1; font-size: 14px; }
+.sec-head .more { grid-column: 2; grid-row: 1 / 3; justify-self: end; align-self: end; color: #d1a27e; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; text-decoration: none; border-bottom: 1px solid #bc8158; padding-bottom: 5px; }
+.pagehead { padding: clamp(35px, 5vw, 80px) 0 24px; margin-bottom: 24px; border-bottom: 1px solid var(--line2); }
+.pagehead::before { content: 'DIESEL UNION  /  THE DRIVER PORTAL'; display: block; font-size: 10px; letter-spacing: .23em; color: var(--copper); font-weight: 800; margin-bottom: 21px; }
+.pagehead h1 { font-size: clamp(64px, 9vw, 118px); letter-spacing: -.025em; }
+.pagehead p { margin-top: 15px; font-size: 15px; }
+.panel { background: #1a1410; border: 1px solid var(--line); border-radius: 4px; }
+.card { padding: clamp(22px, 3vw, 34px); }
+.card h2 { font-size: 35px; }
+.rv { transform: translateY(18px); }
+.rv.in { transition-duration: .9s; transition-timing-function: var(--ease-premium); }
+.sk { border-radius: 2px; }
+
+.du-label { display: inline-flex; align-items: center; gap: 14px; font-size: 10px; letter-spacing: .2em; font-weight: 800; text-transform: uppercase; color: #c99c79; }
+.du-label::before { content: ''; width: 32px; height: 1px; background: #c99c79; }
+.du-manifesto { display: grid; grid-template-columns: minmax(0,.95fr) minmax(0,1fr); gap: clamp(42px, 8vw, 140px); scroll-margin-top: 110px; }
+.du-manifesto-left h2 { margin: 29px 0 22px; font-size: clamp(63px, 7vw, 111px); letter-spacing: -.025em; line-height: .85; }
+.du-manifesto-left h2 span { color: #bb815a; }
+.du-manifesto-rule { width: 70px; height: 1px; margin: 29px 0; background: #b98967; }
+.du-manifesto-left > p { max-width: 480px; color: #c7b6a5; font-size: clamp(15px, 1.4vw, 18px); line-height: 1.9; }
+.du-manifesto-links { margin-top: 28px; display: flex; gap: 24px; flex-wrap: wrap; }
+.du-principles { display: grid; border-top: 1px solid var(--line2); }
+.du-principle { padding: 24px 0; border-bottom: 1px solid var(--line2); display: grid; grid-template-columns: 42px minmax(0,1fr) 34px; align-items: start; gap: 19px; transition: padding .35s var(--ease-premium), border-color .35s; }
+.du-principle:hover { padding-left: 9px; border-color: #b48561; }
+.du-principle-num { font-size: 11px; font-weight: 800; color: #b38b6e; letter-spacing: .08em; padding-top: 6px; }
+.du-principle-copy h3 { font-size: clamp(25px, 2.4vw, 34px); }
+.du-principle-copy p { margin: 9px 0 0; color: #a99a8b; font-size: 13px; line-height: 1.8; max-width: 42ch; }
+.du-principle-icon { color: #b48c6a; opacity: .7; }
+
+/* Full-width photo essay interlude. */
+.du-interlude { position: relative; isolation: isolate; overflow: hidden; margin: clamp(90px, 12vw, 168px) calc(50% - 50vw) 0; min-height: clamp(425px, 47vw, 590px); display: grid; align-items: center; background: #1b130f; }
+.du-interlude-art { position: absolute; z-index: -2; inset: 0; }
+.du-interlude-art img { height: 100%; width: 100%; object-fit: cover; object-position: 83% 46%; filter: brightness(1.08) saturate(.82); transition: transform 2s var(--ease-premium); }
+.du-interlude:hover .du-interlude-art img { transform: scale(1.025); }
+.du-interlude::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(16,13,10,.98), rgba(16,13,10,.80) 39%, rgba(16,13,10,.25) 82%), linear-gradient(0deg, rgba(16,13,10,.4), transparent 50%); }
+.du-interlude-content { padding: clamp(55px, 7vw, 115px) clamp(30px, 8.5vw, 145px); }
+.du-interlude-content > p { margin: 23px 0 12px; font: 900 clamp(50px, 7.8vw, 115px)/.92 var(--display); letter-spacing: -.015em; }
+.du-interlude-content em { font-style: normal; color: #d8a079; }
+.du-interlude .du-text-link { margin-top: 15px; }
+
+/* Delivery logs, convoys and ranks are workspaces: structured, legible, not neon toys. */
+.convoy, .bill, .rrow, .driver, .step, .value { background: #1b1511; border: 1px solid var(--line); border-radius: 3px; box-shadow: none; }
+.convoy { gap: 24px; padding: 25px; transition: border-color .25s, background .25s; }
+.convoy:hover { background: #251b15; border-color: rgba(218,173,130,.3); }
+.convoy.has-img::before { z-index: -1; opacity: .12; }
+.date { background: #120e0b; border-radius: 2px; }
+.date b { color: #d4a078; }
+.convoy h3 { font-size: clamp(29px,3vw,42px); }
+.route i { height: 2px; border-radius: 0; background-size: 20px 2px; }
+.route i::before, .route i::after { width: 10px; height: 10px; border-width: 2px; }
+.bill { padding: 16px 20px; transition: border-color .3s, background .3s; }
+.bill:hover { background: #241b14; border-color: rgba(214,166,124,.34); }
+.driver { padding: 23px; transition: border-color .3s, background .3s, transform .4s var(--ease-premium); }
+.driver:hover { transform: translateY(-3px); border-color: #926747; box-shadow: none; background: #241a14; }
+.driver b { font-size: 28px; }
+.rrow { padding: 15px 20px; }
+.rrow:hover { background: #271b14; border-color: #775b45; }
+.rrow .bar, .prog { border-radius: 0; height: 3px; }
+.rrow .bar i, .prog i { border-radius: 0; background: #c69672; }
+.podium { gap: 12px; }
+.place { border-radius: 4px 4px 0 0; background: #211710; }
+.plinth { border-radius: 0; background: #805a3c; box-shadow: none; color: #17100b; }
+.p1 .plinth { background: #c3936a; }.p2 .plinth { background: #a19a8b; }.p3 .plinth { background: #926747; }
+.step { padding: 27px 24px 34px; }
+.step::after { background: #956c4d; height: 1px; }
+.step .no { -webkit-text-stroke: 1px #b18a69; }
+.step h3 { font-size: 28px; }
+.ladder .lane { background: repeating-linear-gradient(90deg, #976e4d 0 12px, transparent 12px 24px); height: 2px; }
+.rung .pin { box-shadow: 0 0 0 1px #a77855; border: 0; }
+.ck { background: #b88561; }
+.join { border-radius: 3px; border: 1px solid #6c5039; background: linear-gradient(145deg, #281d15, #16110d); padding: 42px 32px; }
+.join h3 { font-size: 50px; }
+.faq { max-width: 100%; }
+.faq details { border-radius: 0; background: transparent; border: 0; border-bottom: 1px solid var(--line2); }
+.faq details:first-child { border-top: 1px solid var(--line2); }
+.faq details[open] { border-color: rgba(221,173,130,.65); }
+.faq summary { padding: 22px 5px; font-size: 16px; }
+.faq details p { padding: 0 5px 24px; max-width: 760px; }
+.drawer, .menu { background: #1c1511; }
+.drawer .tile { border-radius: 2px; }
+.drawer .x { border-radius: 2px; }
+.toast { border-radius: 2px; box-shadow: 0 20px 50px rgba(0,0,0,.45); }
+
+/* Branded footer: a deliberate final impression and useful wayfinding. */
+.foot { max-width: none; padding: clamp(55px, 7vw, 110px) clamp(22px, 6vw, 105px) 24px; background: #1b140e; border-top: 1px solid #614632; color: #b7a392; }
+.foot-main { max-width: 1460px; margin: 0 auto; display: grid; grid-template-columns: minmax(0,1.8fr) minmax(140px,.55fr) minmax(140px,.55fr); gap: 50px; padding-bottom: clamp(50px, 6vw, 92px); }
+.foot-kicker { display: block; font-size: 10px; color: #c3946e; letter-spacing: .2em; font-weight: 800; margin-bottom: 20px; }
+.foot-wordmark { display: grid; width: max-content; max-width: 100%; font: 900 clamp(72px, 9.5vw, 145px)/.72 var(--display); letter-spacing: -.02em; text-decoration: none; color: #f0e5d8; }
+.foot-wordmark span { color: #ad7850; }
+.foot-identity p { margin-top: 27px; color: #bcaa9b; line-height: 1.7; font-size: 14px; }
+.foot-nav { display: grid; align-content: start; gap: 15px; }
+.foot-nav span { color: #c18e68; font-size: 11px; font-weight: 800; letter-spacing: .15em; margin-bottom: 10px; }
+.foot-nav a { width: fit-content; text-decoration: none; font-size: 13px; transition: color .2s, transform .3s var(--ease-premium); }
+.foot-nav a:hover { color: #fff; transform: translateX(3px); }
+.foot-bottom { max-width: 1460px; margin: 0 auto; border-top: 1px solid rgba(228,202,169,.14); padding: 24px 0 0; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; font-size: 10px; letter-spacing: .12em; font-weight: 700; color: #978373; }
+
+/* Mobile intent: truck still visible, copy still readable, controls easy to reach. */
+@media (max-width: 1180px) {
+  .nav { gap: 12px; }
+  .nav a { font-size: 11px; }
+  .du-manifesto { gap: 48px; }
+  .du-stat-value { font-size: clamp(36px,5vw,64px); }
+}
+@media (max-width: 1000px) {
+  .top { height: 67px; padding: 0 20px; }
+  .nav { display: none; }
+  .me { margin-left: auto; }
+  .tabbar { border-top: 1px solid #6d4c34; background: rgba(19,15,12,.97); }
+  .tabbar a { font-size: 10px; letter-spacing: .03em; border-radius: 2px; }
+  .tabbar a[aria-current="page"] { background: #bc8c68; }
+  .du-hero { min-height: 700px; }
+  .du-hero-photo img { object-position: 90% 50%; }
+  .du-hero-photo::after { background: linear-gradient(90deg,rgba(16,13,10,.97),rgba(16,13,10,.84) 44%,rgba(16,13,10,.42) 100%),linear-gradient(0deg,#100d0a,transparent 35%); }
+  .du-hero-content { padding: 85px 45px 56px; }
+  .du-hero h1 { font-size: clamp(95px,12vw,130px); }
+  .du-manifesto { grid-template-columns: 1fr; }
+  .du-manifesto-left > p { max-width: 700px; }
+  .du-principles { grid-template-columns: 1fr 1fr; gap: 0 25px; }
+  .du-interlude-content { padding: 65px 60px; }
+  .du-stat { padding-inline: 15px; }
+  .foot-main { grid-template-columns: 1fr 1fr; }
+  .foot-identity { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .page { padding-left: 20px; padding-right: 20px; }
+  .du-hero { min-height: min(760px, max(690px, 95svh)); }
+  .du-hero-content { padding: 74px 30px 45px; }
+  .du-hero::before { left: 14px; }
+  .du-hero-photo img { object-position: 84% 40%; filter: brightness(.7) saturate(.7); }
+  .du-hero-photo::after { background: linear-gradient(0deg,#100d0a 0%,rgba(16,13,10,.72) 30%,rgba(16,13,10,.48) 70%,rgba(16,13,10,.75)),linear-gradient(90deg,rgba(16,13,10,.45),rgba(16,13,10,.12)); }
+  .du-hero-kicker { gap: 10px; font-size: 9px; letter-spacing: .13em; }
+  .du-hero-kicker .du-rule, .du-kicker-secondary { display: none; }
+  .du-hero-title { margin-top: 92px; }
+  .du-edition { margin-bottom: 14px; }
+  .du-hero h1 { font-size: clamp(75px, 14vw, 108px); }
+  .du-hero-tagline { font-size: 11px; letter-spacing: .2em; }
+  .du-hero-lead { max-width: 410px; font-size: 14px; line-height: 1.75; }
+  .du-hero-caption { display: none; }
+  .du-hero-actions { gap: 18px; }
+  .du-hero-bottom { padding: 14px 28px; }
+  .du-hero-coords { font-size: 9px; }
+  .du-scroll { font-size: 9px; }
+  .du-stats { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0; padding: 20px 0 25px; }
+  .du-stat { padding: 18px 13px; border-bottom: 1px solid var(--line); }
+  .du-stat:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .du-stat:nth-child(n+3) { border-bottom: 0; }
+  .du-stat-value { margin: 11px 0 5px; font-size: clamp(43px,10vw,65px); }
+  .du-stat-label { font-size: 9px; letter-spacing: .10em; }
+  .du-stat-note { font-size: 10px; }
+  .du-ticker { padding-block: 13px; }
+  .du-ticker-inner { gap: 10px; font-size: 9px; letter-spacing: .08em; }
+  .du-ticker-inner span { font-size: 9px; }
+  .sec { margin-top: 76px; }
+  .sec-head { grid-template-columns: 1fr; }
+  .sec-head h2 { font-size: 46px; }
+  .sec-head p { grid-column: 1; }
+  .sec-head .more { grid-column: 1; grid-row: 3; justify-self: start; margin-top: 8px; }
+  .du-manifesto-left h2 { font-size: clamp(75px, 13vw, 100px); }
+  .du-principles { grid-template-columns: 1fr; }
+  .du-interlude { min-height: 490px; margin-top: 80px; }
+  .du-interlude-content { padding: 52px 28px; }
+  .du-interlude-content > p { font-size: clamp(59px, 12.3vw, 83px); }
+  .du-interlude::after { background: linear-gradient(90deg,rgba(16,13,10,.91),rgba(16,13,10,.44)),linear-gradient(0deg,rgba(16,13,10,.6),transparent); }
+  .du-interlude-art img { object-position: 80% center; }
+  .pagehead h1 { font-size: 73px; }
+  .foot { padding: 55px 23px 125px; }
+  .foot-main { gap: 35px 20px; }
+  .foot-wordmark { font-size: clamp(78px,18vw,115px); }
+  .foot-bottom { display: grid; gap: 8px; }
+  .steps { grid-template-columns: 1fr; }
+  .convoy { padding: 15px; }
+}
+@media (max-width: 390px) {
+  .brand-descriptor { letter-spacing: .08em; font-size: 8px; }
+  .brand-name { font-size: 23px; }
+  .nut, .nut img { width: 40px; height: 40px; }
+  .du-hero-content { padding-inline: 22px; }
+  .du-hero h1 { font-size: 70px; }
+  .du-hero-kicker { font-size: 8px; }
+  .du-hero-bottom { padding-inline: 18px; }
+  .du-hero-coords { display: none; }
+  .du-scroll { margin-left: auto; }
+  .du-stat-value { font-size: 43px; }
+}
+/* Respect motion preferences without withholding content or trapping focus. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .du-hero-photo img { animation: none; transform: none; }
+  .du-hero h1 span, .du-hero-kicker, .du-edition, .du-hero-tagline, .du-hero-lead, .du-hero-actions, .du-hero-caption { animation: none; opacity: 1; transform: none; }
+  .du-scroll-arrow { animation: none; }
+  .rv { opacity: 1; transform: none; }
+}

@@ -20,7 +20,7 @@ const ROOT = path.join(__dirname, '..');
 const TTL_MS = 7 * 86400_000;
 const STATIC = {
   '/': ['web/index.html', 'text/html; charset=utf-8'], '/app.js': ['web/app.js', 'text/javascript; charset=utf-8'],
-  '/style.css': ['web/style.css', 'text/css; charset=utf-8'],
+  '/style.css': ['web/style.css', 'text/css; charset=utf-8'], '/premium.css': ['web/premium.css', 'text/css; charset=utf-8'],
 };
 const IMG = { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg' };
 for (const f of fs.readdirSync(path.join(ROOT, 'assets', 'img'))) { const ext = f.split('.').pop(); if (IMG[ext]) STATIC[`/img/${f}`] = [`assets/img/${f}`, IMG[ext]]; }
@@ -312,8 +312,14 @@ function start() {
       const stat = STATIC[url.pathname];
       if (req.method === 'GET' && stat) {
         let data = fs.readFileSync(path.join(ROOT, stat[0]));
-        if (url.pathname === '/') data = data.toString().replaceAll('{{NAME}}', esc(cfg().name));
+        if (url.pathname === '/') data = data.toString().replaceAll('{{NAME}}', esc(cfg().name)).replaceAll('{{URL}}', esc(baseUrl(req)));
         return send(res, 200, data, { 'Content-Type': stat[1], 'Cache-Control': url.pathname.startsWith('/fonts/') ? 'public, max-age=31536000, immutable' : url.pathname.startsWith('/img/') ? 'public, max-age=86400' : 'no-cache' });
+      }
+      if (req.method === 'GET' && url.pathname === '/robots.txt') {
+        return send(res, 200, `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /auth/\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+      }
+      if (req.method === 'GET' && url.pathname === '/sitemap.xml') {
+        return send(res, 200, `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${esc(baseUrl(req))}/</loc><changefreq>weekly</changefreq></url></urlset>`, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
       }
       if (req.method === 'GET' && url.pathname.startsWith('/u/')) {
         const f = media.file(url.pathname); if (!f) return page(res, 404, 'Picture not found', 'This picture was removed.');
