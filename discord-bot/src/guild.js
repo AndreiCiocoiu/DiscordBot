@@ -31,7 +31,8 @@ const LAYOUT = [
     { key: 'partners', name: '🤝┃partners', ro: true, topic: 'The VTCs we drive with.' }] },
   { cat: '🤎 Diesel Updates 🤎', access: 'member', channels: [
     { key: 'news', name: '📰┃vtc-news', ro: true, writers: ['media', 'events'] },
-    { key: 'newDrivers', name: '🤎┃new-drivers-and-promotions', ro: true, topic: 'New drivers and rank promotions, posted by the bot.' }] },
+    { key: 'newDrivers', name: '👋┃new-drivers', was: '🤎┃new-drivers-and-promotions', ro: true, topic: 'Every new driver who joins Diesel Union, welcomed by the bot.' },
+    { key: 'promotions', name: '🎖️┃promotions', ro: true, topic: 'Rank promotions and Driver of the Month, posted by the bot.' }] },
   { cat: '🤎 Convoys & Events 🤎', access: 'member', channels: [
     { key: 'convoys', name: '🚛┃convoys', ro: true, writers: ['events'], topic: 'Upcoming convoys. RSVP on the website.' },
     { key: 'convoyPhotos', name: '📸┃convoy-photos' },
@@ -174,7 +175,8 @@ async function setup(g, { hideOthers = false } = {}) {
     let cpos = 0;
     for (const c of sec.channels) {
       const type = c.voice ? ChannelType.GuildVoice : ChannelType.GuildText;
-      let x = g.channels.cache.get(db.config.channels[c.key]) || g.channels.cache.find((y) => y.type === type && y.name === c.name);
+      let x = g.channels.cache.get(db.config.channels[c.key]) || g.channels.cache.find((y) => y.type === type && (y.name === c.name || (c.was && y.name === c.was)));
+      if (x && c.was && x.name === c.was) { await x.setName(c.name).catch(() => {}); log.push(`~ renamed ${c.was} to ${c.name}`); }
       const perms = overwrites(g, sec.access, !!c.ro, me.id, c.voice ? 'voice' : 'text', c.writers || []);
       if (!x) { x = await g.channels.create({ name: c.name, type, parent: cat.id, topic: c.topic, permissionOverwrites: perms, reason: 'Diesel Union /setup' }); log.push(`+ ${c.name}`); }
       else { if (x.parentId !== cat.id) await x.setParent(cat.id, { lockPermissions: false }); await x.permissionOverwrites.set(perms); }

@@ -147,7 +147,8 @@ function start() {
   const dm = async (uid, payload) => { try { const u = await client.users.fetch(uid); await u.send(payload); return true; } catch { return false; } };
   const member = async (uid) => { const g = guild(); if (!g) return null; try { return await g.members.fetch(uid); } catch { return null; } };
   const botlog = (text) => post(G.ch('botLogs'), { content: text.slice(0, 1900), allowedMentions: { parse: [] } });
-  const promoChannel = () => G.ch('newDrivers') || cfg().jobsChannel;
+  const welcomeChannel = () => G.ch('newDrivers') || cfg().jobsChannel;
+  const promoChannel = () => G.ch('promotions') || G.ch('newDrivers') || cfg().jobsChannel;
 
   async function role(uid) { // 'admin' | 'staff' | null
     if (String(process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).includes(uid)) return 'admin';
@@ -211,7 +212,7 @@ function start() {
       await gm.roles.add(mem, 'Diesel Union onboarding done');
       if (hasAp) await gm.roles.remove(ap).catch(() => {});
       const rank = await G.syncRank(gm);
-      const w = await post(promoChannel(), { content: `Please welcome <@${uid}> to the 🤎 **Diesel Union Family** 🤎 as a driver! 🚛 We wish you a nice time here!`, allowedMentions: { users: [uid] } });
+      const w = await post(welcomeChannel(), { content: `Please welcome <@${uid}> to the 🤎 **Diesel Union Family** 🤎 as a driver! 🚛 We wish you a nice time here!`, allowedMentions: { users: [uid] } });
       if (w) for (const e of ['🤎', '🚛', '👋', '🎉']) await w.react(e).catch(() => {});
       await dm(uid, { embeds: [new EmbedBuilder().setColor(GREEN).setTitle('Welcome to Diesel Union').setDescription(`Everything is done and the whole server is open for you.${rank ? ` You start as **${rank}**.` : ''}\n\nDrive with Trucky running and your jobs show up in the logbook. See you on the road.`)] });
       botlog(`🟢 Access granted to <@${uid}>${p.driver ? ` (Trucky: ${p.driver.name})` : ''}${force ? ' by staff, forced' : ''}.`);

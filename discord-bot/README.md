@@ -31,7 +31,7 @@ Run `/setup` once (as an admin). The bot builds the whole server and can run it 
 | Finish Setup | ✅┃finish-setup | Only the **Approved** role |
 | Truck Details | 🏷┃tag-name-and-colour, 🚚┃truck-colour, 🚛┃trailer-colour-and-livery | Members (read-only; text, colour and picture set in Website → Settings → Truck details) |
 | Welcome to Diesel Union | 👋┃welcome, 📜┃discord-rules, 🏅┃ranks, 🔗┃diesel-links | Members (read-only) |
-| Diesel Updates | 📰┃vtc-news, 🤎┃new-drivers-and-promotions | Members (read-only) |
+| Diesel Updates | 📰┃vtc-news, 👋┃new-drivers, 🎖️┃promotions | Members (read-only) |
 | Convoys & Events | 🚛┃convoys, 📸┃convoy-photos, 📻 Convoy Radio 1/2 | Members |
 | Logbook | 📦┃deliveries, ❌┃cancelled-jobs, 🏆┃weekly-top | Members (read-only, bot posts) |
 | Community | 🇷🇴┃general-romana, 🇬🇧┃general-english, 📷┃screenshots, 🤖┃bot-commands, 🔊 Lounge | Members |
@@ -44,7 +44,7 @@ How someone joins:
 1. In #apply they press **Apply**, answer 5 questions, accept the rules.
 2. The application lands in #applications with **Accept / Decline** buttons (also on the website).
 3. Accepted: they get the **Approved** role and a DM with the Trucky company link, the TruckersMP VTC link (they apply there too), the Trucky download and the website.
-4. When they are in the company on Trucky (same Steam account), in the VTC on TruckersMP (checked with the public TruckersMP API) and have logged in on the website, the bot gives **Union Member** and their rank role, removes Approved and welcomes them in #new-drivers-and-promotions. They can press **Check my progress** in #finish-setup; it also happens on its own.
+4. When they are in the company on Trucky (same Steam account), in the VTC on TruckersMP (checked with the public TruckersMP API) and have logged in on the website, the bot gives **Union Member** and their rank role, removes Approved and welcomes them in #new-drivers. They can press **Check my progress** in #finish-setup; it also happens on its own.
 5. Rank roles follow their kilometres. Leaving the company on Trucky removes access (switch it off in Settings).
 
 Linking Discord to Trucky: drivers use `/link steam:<their Steam link>` (or link on the website); staff use `/linkdriver member:@x driver:<name>` (the driver list autocompletes) and `/unlinkdriver`, or the Drivers tab in the admin panel.
