@@ -61,6 +61,7 @@ The bot needs **Administrator** (or Manage Roles + Manage Channels) and its role
 | Posted | Post rights | Scheduled posts (cancel) and what was posted (delete from Discord) |
 | Drivers | CEO, Co-CEO, staff | Every linked driver: rank, km, last job, convoys, access; give or remove access, sync rank |
 | Partners | CEO, Co-CEO | Partner VTCs with logo: website page and #partners on Discord |
+| Moderation | Staff (warn, time out, kick), CEO / Co-CEO / Management (also ban, unban) | Find anyone by name or ID; the reason goes to them in a DM and to #bot-logs; moderation log and ban list |
 | Tools | CEO, Co-CEO | Sync Trucky, refresh panels, weekly top, Driver of the Month, Photo of the Week, inactivity reminders, repair server |
 
 Ping choices: **No ping** or **@everyone**, which pings the Union Member role (every driver) hidden under a spoiler.

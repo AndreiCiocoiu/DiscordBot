@@ -486,7 +486,7 @@ function start() {
     async access(uid) { // what this person may do in the panel
       const r = await role(uid), gm = await member(uid), teams = gm ? G.teamsOf(gm) : [];
       const post = r === 'admin' || teams.includes('ceo') || teams.includes('coceo');
-      return { role: r, teams, caps: { post, media: post || teams.includes('media'), events: post || !!r || teams.includes('events'), manage: post || !!r } };
+      return { role: r, teams, caps: { post, media: post || teams.includes('media'), events: post || !!r || teams.includes('events'), manage: post || !!r, ban: post || teams.includes('management') } };
     },
     mediaChannels: () => G.MEDIA_KEYS.map(G.ch).filter(Boolean),
     async publish(p) { // { channel, title, text, color, image, link, linkLabel, ping, plain }
@@ -543,6 +543,69 @@ function start() {
       return ok ? { ok: true, msg: 'Message sent.' } : { ok: false, msg: 'Their DMs are closed.' };
     },
     async inGuild(uids) { const out = {}; const mem = G.roleId('member'); for (const u of uids) { const gm = await member(u); out[u] = gm ? (mem && gm.roles.cache.has(mem) ? 'member' : 'guest') : 'gone'; } return out; },
+    // ---- moderation from the admin panel ----
+    async findMembers(q) {
+      const g = guild(); if (!g) return [];
+      q = String(q || '').trim().slice(0, 40); if (!q) return [];
+      let list = [];
+      const id = q.match(/\d{15,25}/)?.[0];
+      if (id) { const gm = await member(id); if (gm) list = [gm]; }
+      else list = [...(await g.members.search({ query: q, limit: 12 }).catch(() => new Map())).values()];
+      const ranks = new Set(G.rankRoleIds()), teams = new Set(G.staffRoleIds());
+      return list.map((gm) => ({ uid: gm.id, name: gm.displayName, tag: gm.user.username, avatar: gm.user.displayAvatarURL({ size: 64 }), bot: gm.user.bot, joined: gm.joinedTimestamp,
+        roles: gm.roles.cache.filter((r) => r.id !== g.id).sort((a, b) => b.position - a.position).map((r) => r.name).slice(0, 6),
+        staff: [...gm.roles.cache.keys()].some((r) => teams.has(r)) || gm.permissions.has(PermissionFlagsBits.ManageGuild), rank: gm.roles.cache.find((r) => ranks.has(r.id))?.name || null,
+        timeout: gm.communicationDisabledUntilTimestamp > Date.now() ? gm.communicationDisabledUntilTimestamp : null,
+        history: (db.modlog || []).filter((x) => x.uid === gm.id).slice(-8).reverse() }));
+    },
+    async bans() {
+      const g = guild(); if (!g) return [];
+      const b = await g.bans.fetch().catch(() => null); if (!b) return [];
+      return [...b.values()].slice(0, 200).map((x) => ({ uid: x.user.id, name: x.user.username, avatar: x.user.displayAvatarURL({ size: 64 }), reason: x.reason || '' }));
+    },
+    async moderate(action, uid, o, actor) { // actor: { id, name, role }
+      const g = guild(); if (!g) return { ok: false, msg: 'The bot is not on a server.' };
+      if (uid === g.ownerId || uid === client.user?.id) return { ok: false, msg: 'You cannot do that to this account.' };
+      if (uid === actor.id) return { ok: false, msg: 'You cannot moderate yourself.' };
+      const reason = String(o.reason || '').trim().slice(0, 400) || 'No reason given';
+      const gm = await member(uid);
+      if (gm && actor.role !== 'admin' && (G.staffRoleIds().some((r) => gm.roles.cache.has(r)) || gm.permissions.has(PermissionFlagsBits.ManageGuild))) return { ok: false, msg: 'Only server admins can moderate staff.' };
+      const name = gm?.displayName || o.name || uid, audit = `${reason} (by ${actor.name}, admin panel)`;
+      const tell = (title, extra = '') => dm(uid, { embeds: [new EmbedBuilder().setColor(RED).setTitle(title).setDescription(`**Reason:** ${reason}${extra}`).setFooter({ text: cfg().name })] });
+      let msg;
+      try {
+        if (action === 'warn') { if (!gm) return { ok: false, msg: 'They are not on the server.' }; const sent = await tell('You received a warning from Diesel Union staff'); msg = sent ? `${name} was warned.` : `${name} was warned (their DMs are closed, it is only in the log).`; }
+        else if (action === 'timeout') {
+          if (!gm) return { ok: false, msg: 'They are not on the server.' };
+          const min = Math.max(0, Math.min(40320, Math.round(Number(o.minutes)) || 0));
+          if (!gm.moderatable) return { ok: false, msg: 'The bot cannot time them out. Its role must be above theirs.' };
+          await gm.timeout(min ? min * 60_000 : null, audit);
+          if (min) await tell('You were timed out on the Diesel Union server', `\n**Until:** ${ts(Date.now() + min * 60_000, 'f')}`);
+          msg = min ? `${name} is timed out for ${min >= 1440 ? `${Math.round(min / 1440)} day(s)` : min >= 60 ? `${Math.round(min / 60)} hour(s)` : `${min} minutes`}.` : `${name}'s timeout was removed.`;
+          o.minutes = min;
+        }
+        else if (action === 'kick') {
+          if (!gm) return { ok: false, msg: 'They are not on the server.' };
+          if (!gm.kickable) return { ok: false, msg: 'The bot cannot kick them. Its role must be above theirs.' };
+          await tell('You were removed from the Diesel Union server'); await gm.kick(audit); msg = `${name} was kicked.`;
+        }
+        else if (action === 'ban') {
+          if (gm && !gm.bannable) return { ok: false, msg: 'The bot cannot ban them. Its role must be above theirs.' };
+          if (gm) await tell('You were banned from the Diesel Union server');
+          const days = Math.max(0, Math.min(7, Math.round(Number(o.days)) || 0));
+          await g.members.ban(uid, { reason: audit, deleteMessageSeconds: days * 86400 }); msg = `${name} was banned.`; o.days = days;
+        }
+        else if (action === 'unban') { await g.members.unban(uid, audit); msg = `${name} was unbanned.`; }
+        else return { ok: false, msg: 'Unknown action.' };
+      } catch (err) { return { ok: false, msg: `Discord refused: ${err.message}` }; }
+      db.modlog = db.modlog || [];
+      db.modlog.push({ id: Date.now().toString(36), action, uid, name, reason, minutes: o.minutes, days: o.days, by: actor.name, at: Date.now() });
+      if (db.modlog.length > 1000) db.modlog.shift();
+      save();
+      const icon = { warn: '⚠️', timeout: '⏳', kick: '👢', ban: '🔨', unban: '♻️' }[action];
+      botlog(`${icon} **${action}** <@${uid}> (${name}) by ${actor.name}: ${reason}${o.minutes ? ` · ${o.minutes} min` : ''}`);
+      return { ok: true, msg };
+    },
     async repair() { const g = guild(); if (!g) return { ok: false, msg: 'The bot is not on a server.' }; try { const log = await G.setup(g); return { ok: true, msg: `Discord server repaired. ${log.filter((l) => l.startsWith('+')).length} things created.`, log }; } catch (err) { return { ok: false, msg: err.message }; } },
   };
   return api;

@@ -54,7 +54,7 @@ function limited(req, max = 240) {
 async function raw(req, max = 2_000_000) { const c = []; let n = 0; for await (const x of req) { n += x.length; if (n > max) throw new Error('too big'); c.push(x); } return Buffer.concat(c); }
 const publicCfg = () => { const c = cfg(); return { name: c.name, tag: c.tag, tagline: c.tagline, recruitOpen: c.recruitOpen, ranks: c.ranks, about: c.about, requirements: c.requirements, discordInvite: c.discordInvite,
   tmpUrl: c.tmpId ? `https://truckersmp.com/vtc/${c.tmpId}` : '', truckyUrl: /^https:\/\//.test(c.truckyUrl || '') ? c.truckyUrl : '', trucky: !!c.truckyId }; };
-const PANEL = new Set(['/api/upload', '/api/post', '/api/post/delete', '/api/convoys', '/api/convoys/publish', '/api/convoys/remove', '/api/scheduled/cancel', '/api/panel/attendance', '/api/partners/save', '/api/partners/remove', '/api/partners/move', '/api/admin/grant', '/api/admin/revoke', '/api/admin/warn', '/api/admin/run']);
+const PANEL = new Set(['/api/admin/mod', '/api/upload', '/api/post', '/api/post/delete', '/api/convoys', '/api/convoys/publish', '/api/convoys/remove', '/api/scheduled/cancel', '/api/panel/attendance', '/api/partners/save', '/api/partners/remove', '/api/partners/move', '/api/admin/grant', '/api/admin/revoke', '/api/admin/warn', '/api/admin/run']);
 const PRIVATE = new Set(['/api/drivers', '/api/driver', '/api/jobs', '/api/board']);
 const recent = (n) => stats.done().slice(-n).reverse();
 
@@ -116,6 +116,12 @@ function start() {
       const uid = String(b.uid || '');
       if (route === '/api/admin/grant') return /^\d{5,25}$/.test(uid) ? bot.grant(uid) : { ok: false, msg: 'Missing member.' };
       if (route === '/api/admin/revoke') return /^\d{5,25}$/.test(uid) ? bot.revoke(uid) : { ok: false, msg: 'Missing member.' };
+      if (route === '/api/admin/mod') {
+        const action = String(b.action);
+        if ((action === 'ban' || action === 'unban') && !acc.caps.ban) return { ok: false, msg: 'Only CEO, Co-CEO and Management can ban.' };
+        if (!/^\d{5,25}$/.test(uid)) return { ok: false, msg: 'Pick a member first.' };
+        return bot.moderate(action, uid, { reason: b.reason, minutes: b.minutes, days: b.days, name: cleanT(b.name, 40) }, { id: s.id, name: s.name, role: acc.role });
+      }
       if (route === '/api/admin/warn') return /^\d{5,25}$/.test(uid) ? bot.warn(uid) : { ok: false, msg: 'Missing member.' };
       if (route === '/api/admin/run') {
         if (!acc.caps.post) return null;
@@ -214,6 +220,8 @@ function start() {
             scheduled: (db.scheduled || []).length, dotm: X.dotm(), lastMonth: (() => { const m = X.lastMonth(); return { label: m.label, top: m.rows.slice(0, 3) }; })(),
             sync: { jobs: db.sync.jobs?.at || null, members: db.sync.members?.at || null, hook: db.sync.lastHook?.at || null } });
         }
+        if (route === '/api/panel/mod') return json(res, 200, { members: await bot.findMembers(q.q), canBan: !!acc.caps.ban });
+        if (route === '/api/panel/bans') return json(res, 200, { bans: acc.caps.ban ? await bot.bans() : [], log: (db.modlog || []).slice(-60).reverse(), canBan: !!acc.caps.ban });
         if (route === '/api/panel/drivers') {
           const last = new Map(); for (const j of stats.done()) last.set(j.driver, j.end);
           const uids = Object.keys(db.links), where = await bot.inGuild(uids);

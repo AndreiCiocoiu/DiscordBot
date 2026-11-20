@@ -540,3 +540,11 @@ a.v-partner:hover { border-color: var(--line2); background: rgba(243,230,208,.03
 .v-pcard { display: flex; gap: 18px; padding: 22px; align-items: flex-start; }
 .v-pcard > img { width: 72px; height: 72px; }
 .v-pcard p { margin: 8px 0 0; }
+.mlist { display: grid; gap: 12px; margin-top: 14px; }
+.mcard { padding: 16px 18px; display: grid; gap: 10px; }
+.mcard header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mcard header > div { display: grid; flex: 1 1 220px; min-width: 0; }
+.mcard .av, .prow .av { width: 40px; height: 40px; border-radius: 50%; }
+.chip { font-size: 12px; padding: 2px 8px; border: 1px solid var(--line2); color: var(--sand); }
+.mhist { margin: 0; padding-left: 18px; color: var(--sand); font-size: 14px; display: grid; gap: 4px; }
+.mcard .actions { margin-top: 0; }

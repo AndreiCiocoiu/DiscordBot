@@ -628,7 +628,8 @@ async function tabDrivers() {
       h('span', null, h('span', { class: `pill ${status[x.discord][1]}`, text: x.left ? 'Left Trucky' : x.loa ? 'On leave' : status[x.discord][0] })),
       h('span', { class: 'acts' }, x.discord === 'guest' ? h('button', { class: 'btn small', type: 'button', onclick: () => act('/api/admin/grant', { uid: x.uid }, render) }, 'Give access') : null,
         x.discord === 'member' ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => act('/api/admin/grant', { uid: x.uid }, render) }, 'Sync rank') : null,
-        x.discord === 'member' ? h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Remove ${x.name}'s access on Discord?`)) act('/api/admin/revoke', { uid: x.uid }, render); } }, 'Remove access') : null))));
+        x.discord === 'member' ? h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Remove ${x.name}'s access on Discord?`)) act('/api/admin/revoke', { uid: x.uid }, render); } }, 'Remove access') : null,
+        x.discord !== 'gone' ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => { S.modQuery = x.uid; S.panelTab = 'moderation'; render(); } }, 'Moderate') : null))));
   q.addEventListener('input', () => { const t = q.value.toLowerCase().trim(); for (const row of list.querySelectorAll('.drow')) row.hidden = !!t && !row.dataset.n.includes(t); });
   return [h('div', { class: 'toolbar sec' }, q, h('span', { class: 'muted small', text: `${rows.length} drivers` })), list];
 }
@@ -678,12 +679,57 @@ async function attendanceBox(c) {
       h('button', { class: 'btn ghost', type: 'button', onclick: () => { dlg.close(); dlg.remove(); } }, 'Close')));
   document.body.append(dlg); dlg.showModal();
 }
+// ---- moderation: find a member, then warn, time out, kick or ban, with a reason ----
+const ACT_LABEL = { warn: 'Warn', timeout: 'Time out', kick: 'Kick', ban: 'Ban', unban: 'Unban' };
+function modDialog(m, action, canBan) {
+  const reason = h('textarea', { class: 'field', id: 'md-r', rows: 3, maxlength: 400, placeholder: 'They see this in a DM (except for unban)' });
+  const mins = h('select', { class: 'field', id: 'md-t' }, [[10, '10 minutes'], [60, '1 hour'], [360, '6 hours'], [1440, '1 day'], [10080, '1 week'], [40320, '28 days'], ...(m.timeout ? [[0, 'Remove the timeout']] : [])].map(([v, l]) => h('option', { value: v, selected: v === 60 }, l)));
+  const days = h('select', { class: 'field', id: 'md-d' }, [[0, 'Keep their messages'], [1, 'Delete the last 24 hours'], [7, 'Delete the last 7 days']].map(([v, l]) => h('option', { value: v }, l)));
+  const close = () => { dlg.close(); dlg.remove(); };
+  const go = (e) => { e.currentTarget.disabled = true; act('/api/admin/mod', { action, uid: m.uid, name: m.name, reason: reason.value, minutes: mins.value, days: days.value }, () => { close(); render(); }).finally(() => { if (dlg.open) e.target.disabled = false; }); };
+  const dlg = h('dialog', { class: 'dlg panel' }, h('h2', { text: `${ACT_LABEL[action]} ${m.name}` }),
+    h('p', { class: 'muted', text: { warn: 'A warning in their DMs, kept in the moderation log.', timeout: 'They can read but not write or talk until it ends.', kick: 'Removes them from the server. They can come back with an invite.', ban: 'Removes them and blocks them from coming back.', unban: 'They can join again with an invite.' }[action] }),
+    action === 'timeout' ? field_(mins, 'How long') : null, action === 'ban' ? field_(days, 'Their recent messages') : null, field_(reason, 'Reason'),
+    h('div', { class: 'actions' }, h('button', { class: `btn ${action === 'ban' || action === 'kick' ? 'danger' : ''}`, type: 'button', onclick: go }, ACT_LABEL[action]), h('button', { class: 'btn ghost', type: 'button', onclick: close }, 'Cancel')));
+  document.body.append(dlg); dlg.showModal();
+}
+function memberCard(m, canBan) {
+  return h('article', { class: 'mcard panel' },
+    h('header', null, h('img', { class: 'av', src: m.avatar, alt: '' }), h('div', null, h('b', { text: m.name }), h('span', { class: 'muted small', text: `@${m.tag} · ID ${m.uid}${m.joined ? ` · joined ${dateL(m.joined)}` : ''}` })),
+      m.staff ? h('span', { class: 'pill pending', text: 'Staff' }) : null, m.timeout ? h('span', { class: 'pill rejected', text: `Timed out until ${timeL(m.timeout)}` }) : null),
+    m.roles.length ? h('div', { class: 'chips' }, m.roles.map((r) => h('span', { class: 'chip', text: r }))) : null,
+    m.history.length ? h('ul', { class: 'mhist' }, m.history.map((x) => h('li', null, h('b', { text: ACT_LABEL[x.action] }), ` ${ago(x.at)} by ${x.by}: ${x.reason}`))) : null,
+    m.bot ? h('p', { class: 'muted small', text: 'This is a bot.' }) : h('div', { class: 'actions' },
+      h('button', { class: 'btn ghost small', type: 'button', onclick: () => modDialog(m, 'warn') }, 'Warn'),
+      h('button', { class: 'btn ghost small', type: 'button', onclick: () => modDialog(m, 'timeout') }, m.timeout ? 'Change timeout' : 'Time out'),
+      h('button', { class: 'btn danger small', type: 'button', onclick: () => modDialog(m, 'kick') }, 'Kick'),
+      canBan ? h('button', { class: 'btn danger small', type: 'button', onclick: () => modDialog(m, 'ban', canBan) }, 'Ban') : null));
+}
+async function tabModeration() {
+  const q = h('input', { class: 'field', type: 'search', id: 'mod-q', placeholder: 'Discord name or user ID', 'aria-label': 'Find a member', value: S.modQuery || '' });
+  const results = h('div', { class: 'mlist' });
+  const search = async () => {
+    S.modQuery = q.value.trim(); if (!S.modQuery) { results.replaceChildren(); return; }
+    results.replaceChildren(h('p', { class: 'muted', text: 'Searching…' }));
+    const r = await api(`/api/panel/mod?q=${encodeURIComponent(S.modQuery)}`);
+    results.replaceChildren(...(!r.ok ? [h('p', { class: 'muted', text: r.data.error })] : r.data.members.length ? r.data.members.map((m) => memberCard(m, r.data.canBan)) : [h('p', { class: 'muted', text: 'Nobody on the server matches that.' })]));
+  };
+  q.addEventListener('keydown', (e) => { if (e.key === 'Enter') search(); });
+  if (S.modQuery) search();
+  const b = await api('/api/panel/bans'), bd = b.ok ? b.data : { bans: [], log: [], canBan: false };
+  return [h('section', { class: 'sec' }, h('div', { class: 'toolbar' }, q, h('button', { class: 'btn', type: 'button', onclick: search }, 'Find')), results),
+    bd.canBan ? h('section', { class: 'sec' }, head('Banned', `${bd.bans.length} account${bd.bans.length === 1 ? '' : 's'}`), bd.bans.length ? h('div', { class: 'plist' }, bd.bans.map((x) => h('div', { class: 'prow panel' }, h('img', { class: 'av', src: x.avatar, alt: '' }),
+      h('div', { class: 'grow' }, h('b', { text: x.name }), h('span', { class: 'muted small', text: x.reason || 'No reason' })),
+      h('button', { class: 'btn ghost small', type: 'button', onclick: () => modDialog({ uid: x.uid, name: x.name }, 'unban') }, 'Unban')))) : h('p', { class: 'muted', text: 'Nobody is banned.' })) : null,
+    h('section', { class: 'sec' }, head('Moderation log', 'Everything done from this panel.'), bd.log.length ? h('div', { class: 'plist' }, bd.log.map((x) => h('div', { class: 'prow line' },
+      h('div', { class: 'grow' }, h('b', { text: `${ACT_LABEL[x.action]}: ${x.name}` }), h('span', { class: 'muted small', text: `${ago(x.at)} by ${x.by} · ${x.reason}` }))))) : h('p', { class: 'muted', text: 'Nothing yet.' }))];
+}
 async function pagePanel() {
   if (!S.user) return [empty('Log in with Discord', 'The admin panel is for the team.', loginBtn())];
   const r = await api('/api/panel'); if (!r.ok) return [empty('Team only', r.data.error || 'Try again.')];
   const d = r.data, c = d.caps;
   const tabs = [...(c.manage ? [['overview', 'Overview']] : []), ...(c.media ? [['post', 'Post']] : []), ...(c.events ? [['convoys', 'Convoys']] : []), ...(c.media ? [['history', 'Posted']] : []),
-    ...(c.manage ? [['drivers', 'Drivers']] : []), ...(c.post ? [['partners', 'Partners'], ['tools', 'Tools']] : [])];
+    ...(c.manage ? [['drivers', 'Drivers'], ['moderation', 'Moderation']] : []), ...(c.post ? [['partners', 'Partners'], ['tools', 'Tools']] : [])];
   const tab = tabs.some((t) => t[0] === S.panelTab) ? S.panelTab : tabs[0][0];
   const out = [h('div', { class: 'pagehead' }, h('h1', { text: 'Admin panel' }), d.teams.length ? h('div', { class: 'chips' }, d.teams.map((t) => h('span', { class: 'pill pending', text: TEAM_NAME[t] || t }))) : null),
     h('div', { class: 'tabsline', role: 'tablist' }, tabs.map(([k, l]) => h('button', { class: `btn small ${tab === k ? '' : 'ghost'}`, type: 'button', role: 'tab', 'aria-selected': String(tab === k), onclick: () => { S.panelTab = k; render(); } }, l)))];
@@ -692,6 +738,7 @@ async function pagePanel() {
   if (tab === 'convoys') out.push(planner(d), h('section', { class: 'sec' }, head('Planned', 'Drafts, upcoming convoys and the last ones (to mark who came).'), convoyRows(d)));
   if (tab === 'history') out.push(...tabPosted(d));
   if (tab === 'drivers') out.push(...await tabDrivers());
+  if (tab === 'moderation') out.push(...await tabModeration());
   if (tab === 'partners') out.push(...tabPartners(d));
   if (tab === 'tools') out.push(...tabTools());
   return out;
