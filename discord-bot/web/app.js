@@ -637,7 +637,7 @@ function convoyRows(d) {
     !c.draft && c.start < Date.now() + 3600_000 ? h('button', { class: 'btn ghost small', type: 'button', onclick: () => attendanceBox(c) }, c.attended ? `Attendance (${c.attended})` : 'Mark attendance') : null,
     h('button', { class: 'btn danger small', type: 'button', onclick: () => { if (confirm(`Delete "${c.title}"? The Discord post goes too.`)) act('/api/convoys/remove', { id: c.id }, render); } }, 'Delete'))));
 }
-function history(d) {
+function postHistory(d) {
   if (!d.posts.length) return empty('Nothing posted yet', 'What you post from here shows up in this list, so you can delete it later.');
   return h('div', { class: 'plist sec' }, d.posts.map((p) => h('div', { class: 'prow panel' },
     p.image ? h('img', { class: 'thumb', src: p.image, alt: '' }) : null,
@@ -657,7 +657,7 @@ async function tabOverview() {
           h('button', { class: 'btn ghost small', type: 'button', onclick: () => act('/api/admin/grant', { uid: o.uid }, render) }, 'Give access now')))) : h('p', { class: 'muted', text: 'Nobody is waiting.' })),
       h('section', { class: 'panel card' }, h('h2', { text: 'Driver of the Month' }),
         d.dotm ? h('p', { class: 'big-name' }, h('b', { text: d.dotm.name }), h('span', { class: 'muted', text: `${d.dotm.month} · ${kmS(d.dotm.km)}` })) : h('p', { class: 'muted', text: 'Picked automatically on the 1st of each month.' }),
-        d.lastMonth.top.length ? [h('p', { class: 'lab', text: `Top of ${d.lastMonth.label}` }), h('ol', { class: 'mini' }, d.lastMonth.top.map((t) => h('li', null, h('span', { text: t.name }), h('span', { class: 'num muted', text: kmS(t.km) }))))] : null)),
+        d.lastMonth.top.length ? [h('p', { class: 'lab', text: `Top of ${d.lastMonth.label}` }), h('ol', { class: 'topmini' }, d.lastMonth.top.map((t) => h('li', null, h('span', { text: t.name }), h('span', { class: 'num muted', text: kmS(t.km) }))))] : null)),
     h('div', { class: 'cols2 sec' },
       h('section', { class: 'panel card' }, h('h2', { text: 'Inactive drivers' }), h('p', { class: 'muted', text: 'No delivery for 30 days or more. The bot sends them one friendly DM a month.' }),
         d.inactive.length ? h('div', { class: 'plist' }, d.inactive.map((x) => h('div', { class: 'prow line' }, h('div', { class: 'grow' }, h('b', { text: x.name }), h('span', { class: 'muted small', text: `${x.days} days${x.lastJob ? `, last job ${dateL(x.lastJob)}` : ', no jobs yet'}${x.loa ? ' · on leave' : ''}${x.warned ? ` · messaged ${ago(x.warned)}` : ''}` })),
@@ -734,7 +734,7 @@ function tabPosted(d) {
   return [d.scheduled.length ? h('section', { class: 'sec' }, head('Scheduled', 'These go out by themselves at the time shown.'), h('div', { class: 'plist' }, d.scheduled.sort((a, b) => a.at - b.at).map((p) => h('div', { class: 'prow panel' },
     p.image ? h('img', { class: 'thumb', src: p.image, alt: '' }) : null, h('div', { class: 'grow' }, h('b', { text: p.title || '(picture)' }), h('span', { class: 'muted small', text: `#${p.channel} · ${dateL(p.at)} ${timeL(p.at)} · ${p.by.name}${p.ping && p.ping !== 'none' ? ' · @everyone' : ''}` })),
     h('button', { class: 'btn danger small', type: 'button', onclick: () => act('/api/scheduled/cancel', { id: p.id }, render) }, 'Cancel'))))) : null,
-    h('section', { class: 'sec' }, head('Posted'), history(d))];
+    h('section', { class: 'sec' }, head('Posted'), postHistory(d))];
 }
 async function attendanceBox(c) {
   const r = await api(`/api/panel/attendance?id=${encodeURIComponent(c.id)}`); if (!r.ok) return toast(r.data.error, true);

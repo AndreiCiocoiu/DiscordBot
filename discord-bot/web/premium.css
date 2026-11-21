@@ -364,3 +364,4 @@ body.on-home .top { background: rgba(16,13,10,.92); border-bottom-color: rgba(23
 .tier-lvl .short { display: none; }
 @media (max-width: 760px) { .tier-lvl .full { display: none; } .tier-lvl .short { display: inline; } .tier-lvl small { font-size: 12px; } }
 .tier-lvl small span { font-weight: 400; color: inherit; font-size: inherit; }
+#drawer .mini .bill { grid-template-columns: minmax(0, 1fr) auto; } #drawer .mini .bill .way { grid-column: auto; grid-row: auto; } #drawer .mini .bill .k { grid-column: auto; grid-row: auto; }

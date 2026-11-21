@@ -501,7 +501,7 @@ a.kpi:hover { border-color: var(--amber); }
 .ticks { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; }
 .tick.ok { color: var(--ok); } .tick.no { color: var(--bad); } .tick.na { color: var(--sand); }
 .big-name { display: grid; gap: 4px; margin: 6px 0 14px; } .big-name b { font: 800 30px/1.05 var(--display); text-transform: uppercase; color: var(--cream); }
-.mini { margin: 0; padding-left: 20px; display: grid; gap: 6px; } .mini li { display: flex; justify-content: space-between; gap: 12px; }
+.topmini { margin: 0; padding-left: 20px; display: grid; gap: 6px; } .topmini li { display: flex; justify-content: space-between; gap: 12px; }
 .dtable { display: grid; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
 .dhead, .drow { display: grid; grid-template-columns: minmax(180px, 2fr) 1fr .9fr 1fr .6fr 1.1fr minmax(170px, 1.6fr); gap: 12px; align-items: center; padding: 10px 16px; }
 .dhead { background: rgba(0,0,0,.25); color: var(--sand); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
