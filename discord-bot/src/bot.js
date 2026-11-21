@@ -9,6 +9,8 @@ const convoys = require('./convoys');
 const apply = require('./apply');
 const G = require('./guild');
 const X = require('./extras');
+const cards = require('./cards');
+const { flag, countryOf } = require('./flags');
 
 const BROWN = 0x8a5a2b, AMBER = 0xf2a03d, GREEN = 0x6fae5a, RED = 0xc4553b;
 const km = (n) => `${Math.round(n).toLocaleString('en-GB')} km`;
@@ -45,13 +47,60 @@ const commands = [
   new SlashCommandBuilder().setName('portal').setDescription('Link to the company portal'),
 ];
 
+// colour of the bar by cargo damage: green under 5%, amber up to 15%, red above
+const dmgColor = (d) => (d < 5 ? 0x57a85f : d < 15 ? 0xe0a23a : 0xd0563f);
 function jobEmbed(j) {
-  const e = new EmbedBuilder().setColor(BROWN).setAuthor({ name: j.driverName, iconURL: web(j.avatar) || undefined })
-    .setTitle(`${j.from || '?'} → ${j.to || '?'}`.slice(0, 250))
-    .setDescription([`**${j.cargo || 'Cargo'}**${j.mass ? ` · ${(j.mass / 1000).toFixed(1)} t` : ''}`, `${km(j.km)} · ${money(j.income, j.game)} · damage ${j.dmg}%`, j.truck ? `Truck: ${j.truck}` : null].filter(Boolean).join('\n'))
+  const f1 = flag(countryOf(j.from, j.fromCc)), f2 = flag(countryOf(j.to, j.toCc));
+  const e = new EmbedBuilder().setColor(dmgColor(Number(j.dmg) || 0)).setAuthor({ name: `${j.driverName} delivered`, iconURL: web(j.avatar) || undefined })
+    .setTitle(`${f1 ? `${f1} ` : ''}${j.from || '?'} → ${j.to || '?'}${f2 ? ` ${f2}` : ''}`.slice(0, 250))
+    .addFields(
+      { name: '📦 Cargo', value: (j.cargo || '?').slice(0, 100), inline: true },
+      { name: '⚖️ Weight', value: j.mass ? `${(j.mass / 1000).toFixed(1)} t` : '?', inline: true },
+      { name: '🚛 Truck', value: (j.truck || '?').slice(0, 100), inline: true },
+      { name: '🛣️ Distance', value: km(j.km), inline: true },
+      { name: '💶 Income', value: money(j.income, j.game), inline: true },
+      { name: '🔧 Damage', value: `${j.dmg}%`, inline: true })
     .setFooter({ text: `${j.game}${j.mp ? ` · ${j.server || 'TruckersMP'}` : ''}` }).setTimestamp(j.end || Date.now());
   if (siteUrl()) e.setURL(`${siteUrl()}/#/curse`);
   return e;
+}
+// the delivery post: the embed plus the drawn banner under it (the banner is skipped if it cannot be drawn)
+async function jobMessage(j) {
+  const e = jobEmbed(j), png = await cards.delivery(j).catch((err) => { console.warn('delivery card:', err.message); return null; });
+  if (!png) return { embeds: [e] };
+  e.setImage('attachment://delivery.png');
+  return { embeds: [e], files: [new AttachmentBuilder(png, { name: 'delivery.png' })] };
+}
+// /top: podium picture, places 4-10, where you stand, company totals, buttons for the period
+const METRIC = { km: 'kilometres', income: 'income', jobs: 'jobs' };
+async function topMessage(per, by, uid) {
+  const all = stats.board(per, by), rows = all.slice(0, 10);
+  const fmt = (r) => (by === 'km' ? km(r.v) : by === 'jobs' ? `${r.v} jobs` : money(r.v, 'ETS2'));
+  const label = { week: 'This week', month: 'This month', all: 'All time' }[per];
+  const sub = per === 'month' ? new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'Europe/Bucharest' }) : label;
+  const e = new EmbedBuilder().setColor(BROWN).setTitle(`🏆 Top drivers · ${label}`);
+  if (siteUrl()) e.setURL(`${siteUrl()}/#/clasament`);
+  const files = [];
+  if (!rows.length) e.setDescription('No jobs in this period yet. Hit the road!');
+  else {
+    const png = await cards.podium({ title: 'Top drivers', sub: `${sub}  ·  ${METRIC[by]}`, rows: rows.slice(0, 3).map((r) => ({ name: r.name, avatar: r.avatar, label: fmt(r) })) }).catch(() => null);
+    if (png) { files.push(new AttachmentBuilder(png, { name: 'top.png' })); e.setImage('attachment://top.png'); }
+    const list = (png ? rows.slice(3) : rows).map((r) => `\`${String(all.indexOf(r) + 1).padStart(2, '0')}\` **${r.name}** — ${fmt(r)}${by === 'jobs' ? '' : ` · ${r.jobsP} jobs`}`);
+    if (list.length) e.setDescription(list.join('\n'));
+    const me = uid && db.links[uid], at = me ? all.findIndex((r) => String(r.id) === String(me)) : -1;
+    const you = !me ? 'Link your Trucky driver with **/link** to see your place.'
+      : at < 0 ? 'You have no jobs in this period yet.'
+      : `📍 **You: #${at + 1}** · ${fmt(all[at])}${at > 0 ? ` · ${by === 'km' ? km(all[at - 1].v - all[at].v) : by === 'jobs' ? `${all[at - 1].v - all[at].v} jobs` : money(all[at - 1].v - all[at].v, 'ETS2')} behind #${at}` : ' · leading the company 👑'}`;
+    e.addFields({ name: '\u200b', value: you },
+      { name: `Company ${label.toLowerCase()}`, value: km(all.reduce((a, r) => a + r.kmP, 0)), inline: true },
+      { name: 'Jobs', value: String(all.reduce((a, r) => a + r.jobsP, 0)), inline: true },
+      { name: 'Drivers on the road', value: String(all.length), inline: true });
+    e.setFooter({ text: siteUrl() ? 'Full leaderboard on the website' : cfg().name }).setTimestamp();
+  }
+  const row = new ActionRowBuilder().addComponents(
+    ...[['week', 'This week'], ['month', 'This month'], ['all', 'All time']].map(([k, l]) => new ButtonBuilder().setCustomId(`du:top:${k}:${by}`).setLabel(l).setStyle(k === per ? ButtonStyle.Primary : ButtonStyle.Secondary)),
+    ...(siteUrl() ? [new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(`${siteUrl()}/#/clasament`).setLabel('Website').setEmoji('🔗')] : []));
+  return { embeds: [e], files, components: [row], attachments: [] };
 }
 const slotLine = (c) => {
   const s = convoys.slotsOf(c), n = (k) => (s[k].length ? s[k].join(', ') : 'open');
@@ -99,12 +148,9 @@ async function onCommand(i) {
   }
   if (n === 'top') {
     const per = i.options.getString('period') || 'month', by = i.options.getString('by') || 'km';
-    const rows = stats.board(per, by).slice(0, 10);
-    const fmt = (r) => (by === 'km' ? km(r.v) : by === 'jobs' ? `${r.v} jobs` : `${Math.round(r.v).toLocaleString('en-GB')} income`);
-    const e = new EmbedBuilder().setColor(BROWN).setTitle(`Leaderboard, ${PERIOD[per]}`)
-      .setDescription(rows.length ? rows.map((r, k) => `\`${String(k + 1).padStart(2)}\` **${r.name}**  ${fmt(r)}`).join('\n') : 'No jobs in this period yet.');
-    if (siteUrl()) e.setURL(`${siteUrl()}/#/clasament`);
-    return i.reply({ embeds: [e] });
+    await i.deferReply(); // drawing the podium takes a moment
+    const { attachments, ...msg } = await topMessage(per, by, i.user.id);
+    return i.editReply(msg);
   }
   if (n === 'convoy') {
     const next = convoys.list().find((c) => c.start > Date.now() - 1800_000);
@@ -234,7 +280,7 @@ function start() {
   // a finished delivery: logbook post, and a promotion (with the role) when someone reaches a new rank
   trucky.on('job', (j, live) => {
     if (!client.isReady() || !live || j.game !== 'ETS2') return; // only fresh ETS2 webhook deliveries, not the backfill
-    post(cfg().jobsChannel, { embeds: [jobEmbed(j)] });
+    jobMessage(j).then((m) => post(cfg().jobsChannel, m));
     const total = db.jobs.filter((x) => x.driver === j.driver && x.status === 'completed' && x.game === 'ETS2' && x.km >= (cfg().minJobKm || 0)).reduce((a, x) => a + x.km, 0); // read the raw list: the new job is not saved yet
     const before = stats.rankFor(total - j.km), after = stats.rankFor(total);
     if (after.index > before.index) {
@@ -314,6 +360,11 @@ function start() {
   async function onButton(i) {
     const [, what, id] = i.customId.split(':');
     if (what === 'apply') return openApply(i);
+    if (what === 'top') { // switch the period on a /top message
+      const [, , per, by] = i.customId.split(':');
+      await i.deferUpdate();
+      return i.editReply(await topMessage(['week', 'month', 'all'].includes(per) ? per : 'month', ['km', 'income', 'jobs'].includes(by) ? by : 'km', i.user.id));
+    }
     if (what === 'applyok') {
       const d = drafts.get(i.user.id); if (!d) return i.update({ content: 'The form expired. Press Apply again.', components: [] });
       const r = apply.submit({ id: i.user.id, name: i.user.globalName || i.user.username, avatar: i.user.displayAvatarURL({ size: 128 }) }, { ...d.b, rules: true });
@@ -681,4 +732,4 @@ function start() {
   return api;
 }
 
-module.exports = { start, commands, _onCommand: onCommand, jobEmbed, convoyEmbed, convoyMsg, appEmbed, applyModal };
+module.exports = { start, commands, _onCommand: onCommand, jobEmbed, jobMessage, topMessage, convoyEmbed, convoyMsg, appEmbed, applyModal };

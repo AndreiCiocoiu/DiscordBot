@@ -68,6 +68,10 @@ The bot needs **Administrator** (or Manage Roles + Manage Channels) and its role
 
 Ping choices: **No ping** or **@everyone**, which pings the Union Member role (every driver) hidden under a spoiler.
 
+## Pictures the bot draws
+
+Each delivery in #deliveries gets a banner (fleet photo, route, km, cargo, driver), and `/top` shows a podium picture with the top three, places 4-10, your own place, company totals and buttons to switch week / month / all time. Drawn with `@napi-rs/canvas` (installed by `npm install`, no system packages needed); fonts and backgrounds are in `assets/fonts/card` and `assets/cards`. If the library cannot load, the posts still go out, just without the pictures.
+
 ## Automatic
 
 - **Driver of the Month**: 1st of the month, most km last month gets the role and an announcement.

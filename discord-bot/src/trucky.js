@@ -42,6 +42,7 @@ function normJob(d) {
     steam: String(driver.steam_profile?.steam_id || driver.steam_id || d.steam_id || ''),
     game: String(d.game?.code || d.game_code || d.game || 'ETS2').toUpperCase().includes('ATS') ? 'ATS' : 'ETS2',
     from: d.source_city_name || '', fromCo: d.source_company_name || '', to: d.destination_city_name || '', toCo: d.destination_company_name || '',
+    fromCc: d.source_country_code || d.source_city?.country_code || d.source_country?.code || '', toCc: d.destination_country_code || d.destination_city?.country_code || d.destination_country?.code || '',
     cargo: d.cargo_name || d.cargo?.name || '', mass: Math.round(mass),
     km: Math.round(num(kmRaw)), planned: Math.round(num(d.planned_distance_km ?? num(d.planned_distance) * k)),
     income: Math.round(num(d.income ?? d.revenue)), dmg: Math.round(num(d.cargo_damage) * 10) / 10,

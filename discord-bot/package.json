@@ -1,14 +1,17 @@
 {
   "name": "diesel-union",
-  "version": "2.9.4",
+  "version": "3.0.0",
   "description": "Diesel Union VTC portal: drivers, deliveries and leaderboards from Trucky, convoys, recruitment, with a Discord bot.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "deploy": "node -e \"console.log('Nothing to deploy: slash commands are registered when the bot starts.')\""
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.100",
     "discord.js": "^14.27.0",
     "dotenv": "^16.4.5"
   }
