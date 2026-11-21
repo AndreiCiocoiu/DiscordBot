@@ -1,3 +1,4 @@
+const V = (document.querySelector('meta[name="du-v"]') || {}).content || '0';
 'use strict';
 // Diesel Union portal. No framework: small helpers build the DOM (never innerHTML).
 
@@ -281,7 +282,7 @@ async function pageHome() {
   const d = r.ok ? r.data : { tot: { month: {}, week: {}, all: {} }, next: [], drivers: 0, partners: [] };
   const scrollTo_ = () => $('#despre')?.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
   const hero = h('section', { class: 'du-hero', 'aria-label': 'Diesel Union, United by the Road' },
-    h('div', { class: 'du-hero-photo', 'aria-hidden': 'true' }, h('img', { src: '/img/hero-fleet.webp', srcset: '/img/hero-fleet-1400.webp 1600w, /img/hero-fleet.webp 3094w', sizes: '(max-width: 900px) 200vw, 160vw', alt: '', fetchpriority: 'high', width: 3094, height: 1190 })),
+    h('div', { class: 'du-hero-photo', 'aria-hidden': 'true' }, h('img', { src: '/img/hero-fleet.webp?v=' + V + '', srcset: '/img/hero-fleet-1400.webp?v=' + V + ' 1600w, /img/hero-fleet.webp?v=' + V + ' 3094w', sizes: '(max-width: 900px) 200vw, 160vw', alt: '', fetchpriority: 'high', width: 3094, height: 1190 })),
     h('div', { class: 'du-hero-content' },
       h('div', { class: 'du-hero-kicker' }, h('span', { class: 'du-hero-dot' }), h('span', { class: 'du-kicker-primary', text: 'A TRUCKERSMP VIRTUAL TRUCKING COMPANY' }), h('span', { class: 'du-rule' }), h('span', { class: 'du-kicker-secondary', text: 'EURO TRUCK SIMULATOR 2' })),
       h('div', { class: 'du-hero-title' },
@@ -332,7 +333,7 @@ async function pageHome() {
       h('span', { class: 'du-principle-icon' }, icon(ic, 25)))))));
 
   out.push(h('section', { class: 'du-interlude rv' },
-    h('div', { class: 'du-interlude-art', 'aria-hidden': 'true' }, h('img', { src: '/img/convoy-detail.webp', alt: '', loading: 'lazy', width: 1600, height: 1040 })),
+    h('div', { class: 'du-interlude-art', 'aria-hidden': 'true' }, h('img', { src: '/img/convoy-detail.webp?v=' + V + '', alt: '', loading: 'lazy', width: 1600, height: 1040 })),
     h('div', { class: 'du-interlude-content' }, h('span', { class: 'du-label', text: 'THE SPIRIT OF DIESEL UNION' }),
       h('p', null, 'SOME JOURNEYS', h('br'), h('em', { text: 'ARE BETTER' }), h('br'), 'TOGETHER.'),
       h('a', { href: '#/convoaie', class: 'du-text-link' }, 'SEE OUR UPCOMING CONVOYS', icon('arrow', 17)))));

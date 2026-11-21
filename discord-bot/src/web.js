@@ -42,6 +42,7 @@ const setCookie = (req, n, v, age) => `${n}=${v}; Path=/; HttpOnly; SameSite=Lax
 const baseUrl = (req) => (process.env.WEB_URL || `${String(req.headers['x-forwarded-proto'] || 'http').split(',')[0]}://${req.headers.host}`).replace(/\/$/, '');
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const send = (res, code, body, h = {}) => { res.writeHead(code, { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'Content-Security-Policy': CSP, ...h }); res.end(body); };
+const VERSION = require('../package.json').version;
 const json = (res, code, o) => send(res, code, JSON.stringify(o), { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
 const page = (res, code, title, text) => send(res, code, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="/style.css"><body class="plain"><main class="notice"><h1>${esc(title)}</h1><p>${esc(text)}</p><p><a class="btn" href="/">Back to the portal</a></p></main>`, { 'Content-Type': 'text/html; charset=utf-8' });
 
@@ -332,9 +333,14 @@ function start() {
       }
       const stat = STATIC[url.pathname];
       if (req.method === 'GET' && stat) {
-        let data = fs.readFileSync(path.join(ROOT, stat[0]));
-        if (url.pathname === '/') data = data.toString().replaceAll('{{NAME}}', esc(cfg().name)).replaceAll('{{URL}}', esc(baseUrl(req)));
-        return send(res, 200, data, { 'Content-Type': stat[1], 'Cache-Control': url.pathname.startsWith('/fonts/') ? 'public, max-age=31536000, immutable' : url.pathname.startsWith('/img/') ? 'public, max-age=86400' : 'no-cache' });
+        const file = path.join(ROOT, stat[0]);
+        // pictures keep their names between versions, so the browser has to ask again each time (cheap: 304 when unchanged)
+        const st = fs.statSync(file), tag = `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}-${VERSION}"`;
+        const cache = url.pathname.startsWith('/fonts/') ? 'public, max-age=31536000, immutable' : 'no-cache';
+        if (url.pathname !== '/' && req.headers['if-none-match'] === tag) { res.writeHead(304, { ETag: tag, 'Cache-Control': cache }); return res.end(); }
+        let data = fs.readFileSync(file);
+        if (url.pathname === '/') data = data.toString().replaceAll('{{NAME}}', esc(cfg().name)).replaceAll('{{URL}}', esc(baseUrl(req))).replaceAll('{{V}}', VERSION);
+        return send(res, 200, data, { 'Content-Type': stat[1], 'Cache-Control': cache, ...(url.pathname === '/' ? {} : { ETag: tag }) });
       }
       if (req.method === 'GET' && url.pathname === '/robots.txt') {
         return send(res, 200, `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /auth/\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });

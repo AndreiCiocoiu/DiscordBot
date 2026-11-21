@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="du-v" content="{{V}}">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#100d0a">
@@ -12,26 +13,26 @@
   <meta property="og:title" content="Diesel Union — United by the Road">
   <meta property="og:description" content="More than miles. A European trucking collective built around the convoy, the crew and the open road. Join Diesel Union on TruckersMP.">
   <meta property="og:url" content="{{URL}}/">
-  <meta property="og:image" content="{{URL}}/img/social-share.webp">
+  <meta property="og:image" content="{{URL}}/img/social-share.webp?v={{V}}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Diesel Union — United by the Road">
-  <meta name="twitter:image" content="{{URL}}/img/social-share.webp">
+  <meta name="twitter:image" content="{{URL}}/img/social-share.webp?v={{V}}">
   <link rel="canonical" href="{{URL}}/">
   <title>{{NAME}} — TruckersMP VTC | United by the Road</title>
   <link rel="icon" href="/img/favicon.png" type="image/png">
-  <link rel="preload" as="image" href="/img/hero-fleet.webp" imagesrcset="/img/hero-fleet-1400.webp 1600w, /img/hero-fleet.webp 3094w" imagesizes="(max-width: 900px) 200vw, 160vw" type="image/webp" fetchpriority="high">
+  <link rel="preload" as="image" href="/img/hero-fleet.webp?v={{V}}" imagesrcset="/img/hero-fleet-1400.webp?v={{V}} 1600w, /img/hero-fleet.webp?v={{V}} 3094w" imagesizes="(max-width: 900px) 200vw, 160vw" type="image/webp" fetchpriority="high">
   <link rel="preload" as="font" type="font/woff2" href="/fonts/big-shoulders-display-latin-900-normal.woff2" crossorigin>
-  <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/premium.css">
+  <link rel="stylesheet" href="/style.css?v={{V}}">
+  <link rel="stylesheet" href="/premium.css?v={{V}}">
 </head>
 <body>
   <a class="skip" href="#view">Skip to content</a>
   <div id="scroll-progress" class="scroll-progress" aria-hidden="true"></div>
   <header class="top">
     <a class="brand" href="#/" aria-label="{{NAME}}, home">
-      <span class="nut"><img src="/img/logo-160.webp" alt="" width="44" height="44"></span>
+      <span class="nut"><img src="/img/logo-160.webp?v={{V}}" alt="" width="44" height="44"></span>
       <span class="brand-stack"><span class="brand-name">{{NAME}}</span><span class="brand-descriptor">A TRUCKERSMP COMPANY</span></span>
     </a>
     <nav id="nav" class="nav" aria-label="Sections"></nav>
@@ -51,6 +52,6 @@
   <div id="scrim" class="scrim" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>
   <noscript><p class="notice">This page needs JavaScript.</p></noscript>
-  <script src="/app.js" defer></script>
+  <script src="/app.js?v={{V}}" defer></script>
 </body>
 </html>
