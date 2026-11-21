@@ -325,6 +325,11 @@ function start() {
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://x');
+      // one address only: www.<domain> and the old railway address go to WEB_URL (the Trucky webhook is left alone)
+      const home = (() => { try { return new URL(process.env.WEB_URL || '').host; } catch { return ''; } })();
+      if (home && req.headers.host && req.headers.host !== home && url.pathname !== '/trucky/webhook' && req.method === 'GET' && !/^(localhost|127\.|\[)/.test(req.headers.host)) {
+        return send(res, 301, '', { Location: `https://${home}${req.url}` });
+      }
       const stat = STATIC[url.pathname];
       if (req.method === 'GET' && stat) {
         let data = fs.readFileSync(path.join(ROOT, stat[0]));
