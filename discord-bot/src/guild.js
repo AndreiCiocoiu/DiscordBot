@@ -274,9 +274,11 @@ const STANDARDS = { tagInfo: ['tag', '🏷 Tag name and colour'], truckInfo: ['t
 function standardPanel(key) {
   const [k, title] = STANDARDS[key], s = (cfg().standards || {})[k] || {}, hex = /^#[0-9a-f]{6}$/i.test(s.color || '') ? s.color : null;
   const e = new EmbedBuilder().setColor(hex ? parseInt(hex.slice(1), 16) : BROWN).setTitle(title).setDescription((s.text || 'Coming soon. Staff will post the details here.').slice(0, 4000));
-  if (hex) e.addFields({ name: 'Colour', value: `\`${hex.toUpperCase()}\``, inline: true });
+  if (hex && !String(s.text || '').toUpperCase().includes(hex.toUpperCase())) e.addFields({ name: 'Colour', value: `\`${hex.toUpperCase()}\``, inline: true });
+  const f = media.file(s.image); // our own picture (uploaded, or shipped with the site) goes along as an attachment
+  if (f) { const name = `${k}${require('path').extname(f)}`; e.setImage(`attachment://${name}`); return { embeds: [e], files: [new AttachmentBuilder(f, { name })] }; }
   if (https(s.image)) e.setImage(s.image);
-  return { embeds: [e] };
+  return { embeds: [e], files: [] };
 }
 function partnersPanel() {
   const list = (db.partners || []).slice(0, 10), files = [];

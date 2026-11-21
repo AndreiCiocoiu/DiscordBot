@@ -31,7 +31,11 @@ function store(dataUrl) {
   return { ok: true, url: `/u/${name}`, msg: 'Picture uploaded.' };
 }
 // '/u/<name>' -> absolute path of an existing upload, or null
+const IMG_DIR = path.join(__dirname, '..', 'assets', 'img');
 function file(u) {
+  // pictures shipped with the site (/img/name.webp) count as ours too
+  const shipped = String(u || '').match(/^\/img\/([\w.-]{1,80}\.(?:webp|png|jpg))$/);
+  if (shipped) { const p = path.join(IMG_DIR, shipped[1]); return fs.existsSync(p) ? p : null; }
   const name = String(u || '').replace(/^\/u\//, '');
   if (!String(u || '').startsWith('/u/') || !NAME.test(name)) return null;
   const p = path.join(DIR, name);

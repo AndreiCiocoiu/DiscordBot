@@ -35,10 +35,15 @@ if (db.version < 5) { // the tier names (Rookie I ... Legend V) become the named
   if (Array.isArray(db.config.ranks) && db.config.ranks[0]?.name === 'Rookie I' && db.config.ranks.length === 45) delete db.config.ranks;
   db.version = 5;
 }
+if (db.version < 7) { // truck details saved empty from the settings page: use the Meteor defaults
+  const st = db.config.standards;
+  if (st && ['tag', 'truck', 'trailer'].every((k) => !st[k]?.text && !st[k]?.image)) delete db.config.standards;
+}
 if (db.version < 6) { // the 45 joke names become the 50 names Moft picked
   if (Array.isArray(db.config.ranks) && db.config.ranks[0]?.name === 'Learner Plate') delete db.config.ranks;
   db.version = 6;
 }
+if (db.version < 7) db.version = 7;
 
 let timer = null, rev = 0;
 function flush() {
@@ -110,7 +115,11 @@ const cfg = () => ({
   truckyId: process.env.TRUCKY_COMPANY_ID || '', tmpId: process.env.TMP_VTC_ID || '93701',
   jobsChannel: null, convoyChannel: null, staffChannel: null, recruitOpen: true, minJobKm: 0,
   // the three Truck Details channels: text, colour (hex) and a picture, set on the website
-  standards: { tag: { text: '', color: '', image: '' }, truck: { text: '', color: '', image: '' }, trailer: { text: '', color: '', image: '' } },
+  standards: {
+    tag: { text: "**Player tag:** `Diesel Union`\nType it exactly like this in the TruckersMP settings in game, then set the tag colour:\n\n**Tag colour**\nHEX `#433414`\nRGB `67, 52, 20`", color: '#433414', image: '/img/player-tag.webp' },
+    truck: { text: "**Paint job:** Meteor\nSet these four colours in the paint shop. The **HSV** values are the ones you type in the game.\n\n**Colour 1** \u00b7 `H 21  S 63  V 22`\nHEX `#382115` \u00b7 RGB `56, 33, 21`\n\n**Colour 2** \u00b7 `H 20  S 59  V 7`\nHEX `#120B07` \u00b7 RGB `18, 11, 7`\n\n**Colour 3** \u00b7 `H 20  S 64  V 20`\nHEX `#331D12` \u00b7 RGB `51, 29, 18`\n\n**Colour 4** \u00b7 `H 15  S 57  V 10`\nHEX `#1A0F0B` \u00b7 RGB `26, 15, 11`\n\n-# HEX and RGB are worked out from the HSV values, for anywhere outside the game.", color: '#382115', image: '/img/paint-truck.webp' },
+    trailer: { text: "**Paint job:** Meteor\nSame paint job and the same four colours as the truck, on the trailer. The **HSV** values are the ones you type in the game.\n\n**Colour 1** \u00b7 `H 21  S 63  V 22`\nHEX `#382115` \u00b7 RGB `56, 33, 21`\n\n**Colour 2** \u00b7 `H 20  S 59  V 7`\nHEX `#120B07` \u00b7 RGB `18, 11, 7`\n\n**Colour 3** \u00b7 `H 20  S 64  V 20`\nHEX `#331D12` \u00b7 RGB `51, 29, 18`\n\n**Colour 4** \u00b7 `H 15  S 57  V 10`\nHEX `#1A0F0B` \u00b7 RGB `26, 15, 11`\n\n-# HEX and RGB are worked out from the HSV values, for anywhere outside the game.", color: '#382115', image: '/img/paint-trailer.webp' },
+  },
   discordInvite: '', truckyUrl: 'https://hub.truckyapp.com/vtc/diesel-union',
   discordRules: ['Be respectful. No insults, harassment, racism or drama.', 'Keep it clean: no NSFW, no spam, no advertising other VTCs or servers.', 'Use the right channel for the right thing.', 'Follow the TruckersMP rules on the road and in convoys. A TruckersMP ban can mean a removal from the company.', 'Listen to the convoy lead and staff during events.', 'Your Trucky profile has to stay in Diesel Union. If you leave the company on Trucky, you lose access here.', 'Going away for a while? Post in #leave-of-absence.'],
   about: 'Diesel Union is a virtual trucking company on TruckersMP, driving Euro Truck Simulator 2. We run convoys every week, track every job with Trucky and look out for each other on the road. It does not matter how many kilometres you have: show up, drive clean, and have a good time.',

@@ -516,7 +516,8 @@ function start() {
     console.log(`Logged in as ${c.user.tag}`);
     try { const g = await c.application.commands.fetch(); if (g.size) await c.application.commands.set([]); } catch { /* ignore */ }
     for (const g of c.guilds.cache.values()) await g.commands.set(commands.map((x) => x.toJSON())).catch((err) => console.error(`commands in ${g.name}:`, err.message));
-    const g = guild(); if (g && db.config.panels) G.refreshPanels(g).catch(() => {}); // keep panels up to date after an update
+    const g = guild(); if (g && db.config.panels) await G.refreshPanels(g).catch(() => {}); // keep panels up to date after an update
+    announceLook().catch((err) => console.warn('announce:', err.message));
   });
   client.on(Events.GuildCreate, (g) => g.commands.set(commands.map((x) => x.toJSON())).catch(() => {}));
   client.on(Events.InteractionCreate, async (i) => {
@@ -594,6 +595,20 @@ function start() {
   function convoyRefresh(c) {
     if (!c?.post || pending.has(c.id)) return;
     pending.set(c.id, setTimeout(() => { pending.delete(c.id); api.convoyPost(c).catch(() => {}); }, 15_000));
+  }
+
+  // once: tell every driver about the company paint job and tag (pings the drivers role, hidden under a spoiler)
+  async function announceLook() {
+    const KEY = 'meteor-2026-11';
+    if (db.sync.lookAnnounced === KEY || !G.ch('truckInfo') || !G.roleId('member')) return;
+    const where = G.ch('news') || G.ch('truckInfo'); if (!channel(where)) return;
+    const pg = G.ping('members-hidden');
+    const e = new EmbedBuilder().setColor(0x382115).setTitle('🎨 New company look: Meteor')
+      .setDescription(`Every Diesel Union truck and trailer now wears the **Meteor** paint job in our brown colours, with the **Diesel Union** player tag.\n\n🚚 Truck colours: <#${G.ch('truckInfo')}>\n🚛 Trailer colours: <#${G.ch('trailerInfo')}>\n🏷 Player tag and colour: <#${G.ch('tagInfo')}>\n\nAll the HSV, HEX and RGB values are there, ready to copy. See you on the road in company colours!`)
+      .setImage('attachment://paint-truck.webp');
+    const f = media.file('/img/paint-truck.webp');
+    const m = await post(where, { content: pg.content, allowedMentions: pg.allowedMentions, embeds: [e], files: f ? [new AttachmentBuilder(f, { name: 'paint-truck.webp' })] : [] });
+    if (m) { db.sync.lookAnnounced = KEY; save(); }
   }
 
   let n = 0;
