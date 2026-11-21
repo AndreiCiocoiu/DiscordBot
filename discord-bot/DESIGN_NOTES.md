@@ -29,7 +29,7 @@ This is a **frontend redesign of the uploaded Diesel Union project**, not a repl
 - `web/app.js` — only the homepage composition and reduced unused visual code; other VTC pages retain their existing behaviour.
 - `web/index.html` — masthead, footer, metadata, no intro overlay.
 - `src/web.js` — serves premium CSS and exposes `robots.txt`, `sitemap.xml` and fully qualified Open Graph URLs.
-- `assets/img/hero-volvo.webp`, `truck-detail.webp`, `social-share.webp` — optimised art assets.
+- `assets/img/hero-fleet.webp` (+ `-1400`), `convoy-detail.webp`, `social-share.webp` — real in-game photos of the company trucks, cleaned up and colour-graded.
 
 ## Deployment to Railway
 

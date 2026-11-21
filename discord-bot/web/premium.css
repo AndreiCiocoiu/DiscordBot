@@ -76,8 +76,8 @@ body.on-home .top { background: rgba(16,13,10,.92); border-bottom-color: rgba(23
 .page { max-width: 1352px; padding: clamp(24px, 3vw, 44px) clamp(18px, 3vw, 48px) 90px; }
 .du-hero { position: relative; isolation: isolate; margin: calc(-1 * clamp(24px, 3vw, 44px)) calc(50% - 50vw) 0; min-height: clamp(665px, 85svh, 850px); overflow: hidden; background: #100d0a; display: grid; grid-template-rows: 1fr auto; }
 .du-hero-photo { position: absolute; z-index: -2; inset: 0; overflow: hidden; }
-.du-hero-photo img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: 100% 52%; filter: saturate(.75) brightness(.85) contrast(1.08); transform: scale(1.07); animation: du-establish 2.2s var(--ease-premium) both, du-drift 18s ease-in-out 2.2s infinite alternate; }
-.du-hero-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg,#100d0a 0%,rgba(16,13,10,.98) 18%,rgba(16,13,10,.92) 33%,rgba(16,13,10,.58) 57%,rgba(16,13,10,.10) 90%),linear-gradient(0deg,#100d0a 0%,transparent 33%,rgba(16,13,10,.24) 75%,rgba(16,13,10,.34)); }
+.du-hero-photo img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: 100% 52%; filter: saturate(.95) brightness(.92) contrast(1.04); transform: scale(1.07); animation: du-establish 2.2s var(--ease-premium) both, du-drift 18s ease-in-out 2.2s infinite alternate; }
+.du-hero-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg,#100d0a 0%,rgba(16,13,10,.98) 18%,rgba(16,13,10,.9) 31%,rgba(16,13,10,.42) 52%,rgba(16,13,10,.06) 88%),linear-gradient(0deg,#100d0a 0%,transparent 33%,rgba(16,13,10,.24) 75%,rgba(16,13,10,.34)); }
 .du-hero::before { content: ''; z-index: 0; pointer-events: none; position: absolute; top: 12%; bottom: 14%; left: max(22px, calc((100vw - 1320px) / 2)); width: 1px; background: linear-gradient(transparent,rgba(236,203,165,.3) 20%,rgba(236,203,165,.3) 80%,transparent); }
 .du-hero-content { position: relative; z-index: 2; width: min(100%, 1450px); margin: 0 auto; padding: clamp(74px, 12vh, 142px) clamp(32px, 6.5vw, 104px) 62px; align-self: center; }
 .du-hero-kicker { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; color: #dfc9b0; font-size: 10px; font-weight: 800; letter-spacing: .19em; animation: du-fade .8s .15s both; }
@@ -158,7 +158,7 @@ body.on-home .top { background: rgba(16,13,10,.92); border-bottom-color: rgba(23
 /* Full-width photo essay interlude. */
 .du-interlude { position: relative; isolation: isolate; overflow: hidden; margin: clamp(90px, 12vw, 168px) calc(50% - 50vw) 0; min-height: clamp(425px, 47vw, 590px); display: grid; align-items: center; background: #1b130f; }
 .du-interlude-art { position: absolute; z-index: -2; inset: 0; }
-.du-interlude-art img { height: 100%; width: 100%; object-fit: cover; object-position: 83% 46%; filter: brightness(1.08) saturate(.82); transition: transform 2s var(--ease-premium); }
+.du-interlude-art img { height: 100%; width: 100%; object-fit: cover; object-position: 75% 55%; filter: brightness(1.02) saturate(.95); transition: transform 2s var(--ease-premium); }
 .du-interlude:hover .du-interlude-art img { transform: scale(1.025); }
 .du-interlude::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(16,13,10,.98), rgba(16,13,10,.80) 39%, rgba(16,13,10,.25) 82%), linear-gradient(0deg, rgba(16,13,10,.4), transparent 50%); }
 .du-interlude-content { padding: clamp(55px, 7vw, 115px) clamp(30px, 8.5vw, 145px); }
@@ -254,7 +254,7 @@ body.on-home .top { background: rgba(16,13,10,.92); border-bottom-color: rgba(23
   .du-hero { min-height: min(760px, max(690px, 95svh)); }
   .du-hero-content { padding: 74px 30px 45px; }
   .du-hero::before { left: 14px; }
-  .du-hero-photo img { object-position: 84% 40%; filter: brightness(.7) saturate(.7); }
+  .du-hero-photo img { object-position: 74% 60%; filter: brightness(.78) saturate(.9); }
   .du-hero-photo::after { background: linear-gradient(0deg,#100d0a 0%,rgba(16,13,10,.72) 30%,rgba(16,13,10,.48) 70%,rgba(16,13,10,.75)),linear-gradient(90deg,rgba(16,13,10,.45),rgba(16,13,10,.12)); }
   .du-hero-kicker { gap: 10px; font-size: 9px; letter-spacing: .13em; }
   .du-hero-kicker .du-rule, .du-kicker-secondary { display: none; }

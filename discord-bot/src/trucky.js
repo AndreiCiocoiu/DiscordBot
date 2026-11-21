@@ -23,13 +23,19 @@ function rows(x) {
 }
 
 // one delivery, from a webhook payload or an API row, in our own small shape
+// jobs saved by older versions kept the weight in tonnes: turn it into kg once
+for (const j of db.jobs) if (j.mass > 0 && j.mass < 200) j.mass = Math.round(j.mass * 1000);
+
 function normJob(d) {
   if (!d || d.id === undefined) return null;
   const mi = String(d.distance_unit || '').toLowerCase() === 'mi', k = mi ? 1.609344 : 1;
   const kmRaw = d.real_driven_distance_km ?? d.driven_distance_km ?? (d.real_driven_distance ?? d.driven_distance) * k;
   const status = String(d.status || (d.completed_at ? 'completed' : d.canceled_at ? 'canceled' : 'in_progress')).toLowerCase().replace('cancelled', 'canceled');
   const driver = d.driver || d.user || {};
-  const mass = num(d.cargo_mass) || num(d.cargo_unit_count) * num(d.cargo_unit_mass);
+  // cargo weight in kg. Trucky gives cargo_mass in tonnes (e.g. 18.4), other fields may be kg;
+  // a whole load is never under 200 kg, so anything that small is tonnes
+  let mass = num(d.cargo_mass) || num(d.cargo_mass_t) || num(d.cargo_weight) || num(d.cargo_unit_count) * num(d.cargo_unit_mass) || num(d.cargo?.mass);
+  if (mass > 0 && mass < 200) mass *= 1000;
   return {
     id: String(d.id), status,
     driver: String(driver.id ?? d.user_id ?? d.driver_id ?? ''), driverName: String(driver.name || d.driver_name || 'Driver'), avatar: driver.avatar_url || driver.avatar || null,
