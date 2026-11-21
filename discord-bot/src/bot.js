@@ -313,17 +313,28 @@ function start() {
   });
 
   // Monday: last week's top drivers
-  async function weekly() {
-    const ws = stats.startOf('week'), c = G.ch('weekly');
-    if (!c || db.sync.weekly === ws || Date.now() < ws + 9 * 3600_000) return;
-    db.sync.weekly = ws; save();
-    const by = new Map();
-    for (const j of stats.done()) if (j.end >= ws - 7 * 86400_000 && j.end < ws) { const r = by.get(j.driver) || { name: j.driverName, km: 0, jobs: 0 }; r.km += j.km; r.jobs++; by.set(j.driver, r); }
-    const rows = [...by.entries()].sort((a, b) => b[1].km - a[1].km).slice(0, 10);
-    if (!rows.length) return;
-    const medal = ['🥇', '🥈', '🥉'], total = [...by.values()].reduce((a, r) => a + r.km, 0);
-    const line = ([id, r], k) => { const uid = Object.keys(db.links).find((d) => db.links[d] === id); return `${medal[k] || `\`${k + 1}.\``} **${r.name}**${uid ? ` (<@${uid}>)` : ''}  ${km(r.km)} · ${r.jobs} jobs`; };
-    post(c, { allowedMentions: { parse: [] }, embeds: [new EmbedBuilder().setColor(AMBER).setTitle('🏆 Top drivers of last week').setDescription(`${rows.map(line).join('\n')}\n\nThe company drove **${km(total)}** together. Well done, everyone.`).setTimestamp()] });
+  // Monday morning: last week's top drivers, with the podium picture. From the admin panel (force) it always posts:
+  // last week if anyone drove then, otherwise this week so far. Returns what happened, so the panel can say it.
+  async function weekly(force = false) {
+    const ws = stats.startOf('week'), c = G.ch('weekly') || cfg().jobsChannel;
+    if (!c || !channel(c)) return { ok: false, msg: 'There is no #weekly-top channel. Run /setup on Discord.' };
+    if (!force && (db.sync.weekly === ws || Date.now() < ws + 9 * 3600_000)) return { ok: false, msg: 'Not due yet.' };
+    const tally = (from, to) => { const by = new Map(); for (const j of stats.done()) if (j.end >= from && j.end < to) { const r = by.get(j.driver) || { id: j.driver, name: j.driverName, avatar: j.avatar, km: 0, jobs: 0 }; r.km += j.km; r.jobs++; by.set(j.driver, r); } return [...by.values()].sort((x, y) => y.km - x.km); };
+    let rows = tally(ws - 7 * 86400_000, ws), which = 'last week';
+    if (!force) { db.sync.weekly = ws; save(); }
+    if (!rows.length && force) { rows = tally(ws, Date.now() + 1); which = 'this week so far'; }
+    if (!rows.length) return { ok: false, msg: 'Nobody delivered anything last week or this week yet, so there is nothing to post.' };
+    const total = rows.reduce((a, r) => a + r.km, 0), jobs = rows.reduce((a, r) => a + r.jobs, 0);
+    const tag = (r) => { const uid = Object.keys(db.links).find((d) => db.links[d] === r.id); return uid ? ` (<@${uid}>)` : ''; };
+    const png = await cards.podium({ title: 'Top drivers', sub: `${which === 'last week' ? 'Last week' : 'This week so far'}  ·  kilometres`, rows: rows.slice(0, 3).map((r) => ({ name: r.name, avatar: r.avatar, label: km(r.km) })) }).catch(() => null);
+    const medal = ['🥇', '🥈', '🥉'];
+    const list = rows.slice(0, 10).map((r, k) => `${medal[k] || `\`${String(k + 1).padStart(2, '0')}\``} **${r.name}**${tag(r)} — ${km(r.km)} · ${r.jobs} jobs`);
+    const e = new EmbedBuilder().setColor(AMBER).setTitle(`🏆 Top drivers of ${which}`)
+      .setDescription(`${list.join('\n')}\n\nThe company drove **${km(total)}** in **${jobs}** jobs together. Well done, everyone.`).setTimestamp();
+    const msg = { allowedMentions: { parse: [] }, embeds: [e], files: [] };
+    if (png) { e.setImage('attachment://weekly.png'); msg.files.push(new AttachmentBuilder(png, { name: 'weekly.png' })); }
+    const m = await post(c, msg);
+    return m ? { ok: true, msg: `Posted the top of ${which} in #${channel(c).name}.` } : { ok: false, msg: 'Discord refused the post. Check that the bot can write in #weekly-top.' };
   }
 
   async function tick(n) {
@@ -590,7 +601,7 @@ function start() {
   setInterval(() => runScheduled().catch((err) => console.warn('scheduled:', err.message)), 60_000);
 
   const api = {
-    client, role, onboard, decided, convoyRefresh, driverOfMonth, photoOfWeek, inactivity, weekly: () => { db.sync.weekly = null; return weekly(); },
+    client, role, onboard, decided, convoyRefresh, driverOfMonth, photoOfWeek, inactivity, weekly: () => weekly(true),
     async isMember(uid) {
       const ids = [G.roleId('member'), ...G.staffRoleIds()].filter(Boolean); if (!ids.length) return false;
       const m = await member(uid); return !!m && ids.some((r) => m.roles.cache.has(r));

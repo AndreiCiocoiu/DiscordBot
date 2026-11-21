@@ -134,7 +134,7 @@ function start() {
         const w = String(b.what);
         if (w === 'dotm') return bot.driverOfMonth(true);
         if (w === 'potw') return bot.photoOfWeek(true);
-        if (w === 'weekly') { await bot.weekly(); return { ok: true, msg: 'Weekly top posted (if there were jobs last week).' }; }
+        if (w === 'weekly') return bot.weekly();
         if (w === 'inactivity') return bot.inactivity(true);
         if (w === 'panels') { await bot.refreshPanels?.(); return { ok: true, msg: 'Discord panels refreshed.' }; }
         if (w === 'repair') return acc.role === 'admin' ? bot.repair() : { ok: false, msg: 'Only server admins can repair the server.' };
